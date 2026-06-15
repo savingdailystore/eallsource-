@@ -54,6 +54,8 @@ services:
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-this-secret}
       NODE_ENV: production
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      WALMART_API_KEY: ${WALMART_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,6 +76,9 @@ services:
       DATABASE_URL: postgresql://postgres:password@postgres:5432/arbitrage_pro
       REDIS_URL: redis://redis:6379
       NODE_ENV: production
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      WALMART_API_KEY: ${WALMART_API_KEY:-}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -306,3 +306,128 @@ enum ScanStatus {
   COMPLETED
   FAILED
 }
+
+// ─────────────────────────────────────────────
+// Intelligence Pipeline — Phase 1
+// ─────────────────────────────────────────────
+
+model ProductRaw {
+  id          String     @id @default(cuid())
+  asin        String
+  title       String
+  url         String
+  imageUrl    String?
+  price       Float?
+  rating      Float?
+  reviewCount Int?
+  bsr         Int?
+  category    String?
+  isPrime     Boolean    @default(false)
+  raw         Json       @default("{}")
+  scrapeJobId String?
+  createdAt   DateTime   @default(now())
+
+  scrapeJob   ScrapeJob? @relation(fields: [scrapeJobId], references: [id])
+
+  @@index([asin])
+  @@index([createdAt])
+  @@map("products_raw")
+}
+
+model Lead {
+  id             String     @id @default(cuid())
+  asin           String
+  title          String
+  category       String?
+  imageUrl       String?
+
+  sourceRetailer String
+  sourcePrice    Float
+  sourceUrl      String
+
+  amazonPrice    Float
+  amazonFees     Float
+  amazonUrl      String
+  bsr            Int?
+  fbaSellers     Int        @default(0)
+  amazonOwnsBB   Boolean    @default(false)
+
+  finalCost      Float
+  netProfit      Float
+  roi            Float
+
+  score          Int        @default(0)
+  scoreBreakdown Json       @default("{}")
+
+  status         LeadStatus @default(NEW)
+  alertSent      Boolean    @default(false)
+  scrapeJobId    String?
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  scrapeJob      ScrapeJob?    @relation(fields: [scrapeJobId], references: [id])
+  priceHistory   PriceHistory[]
+
+  @@index([score])
+  @@index([roi])
+  @@index([status])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+model ScrapeJob {
+  id           String          @id @default(cuid())
+  type         ScrapeJobType
+  query        String?
+  asin         String?
+  status       ScrapeJobStatus @default(PENDING)
+  itemsFound   Int             @default(0)
+  leadsCreated Int             @default(0)
+  error        String?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime        @default(now())
+
+  rawProducts  ProductRaw[]
+  leads        Lead[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("scrape_jobs")
+}
+
+model PriceHistory {
+  id         String   @id @default(cuid())
+  asin       String
+  price      Float
+  source     String
+  leadId     String?
+  recordedAt DateTime @default(now())
+
+  lead       Lead? @relation(fields: [leadId], references: [id])
+
+  @@index([asin, recordedAt])
+  @@map("price_history")
+}
+
+enum LeadStatus {
+  NEW
+  REVIEWED
+  PURCHASED
+  PASSED
+  EXPIRED
+}
+
+enum ScrapeJobType {
+  AMAZON_SEARCH
+  AMAZON_PRODUCT
+  WALMART_SEARCH
+}
+
+enum ScrapeJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}

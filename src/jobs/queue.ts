@@ -1,6 +1,6 @@
 import { Queue, Worker, type Job } from 'bullmq';
 
-function getConnection() {
+export function getConnection() {
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
   try {
     const parsed = new URL(redisUrl);
@@ -19,8 +19,42 @@ function getConnection() {
 // Queue Definitions
 // ─────────────────────────────────────────────
 
-export const weeklyScanQueue = new Queue('weekly-scan', { connection: getConnection() });
+export const weeklyScanQueue  = new Queue('weekly-scan',  { connection: getConnection() });
 export const productScanQueue = new Queue('product-scan', { connection: getConnection() });
+
+// Phase 1 — Intelligence pipeline
+export const scrapeQueue  = new Queue('scrape',  { connection: getConnection() });
+export const enrichQueue  = new Queue('enrich',  { connection: getConnection() });
+export const scoreQueue   = new Queue('score',   { connection: getConnection() });
+
+// ─────────────────────────────────────────────
+// Phase 1 job helpers
+// ─────────────────────────────────────────────
+
+export async function enqueueScrapeJob(payload: {
+  query: string;
+  scrapeJobId: string;
+  maxResults?: number;
+}) {
+  return scrapeQueue.add('amazon-search', payload, {
+    attempts: 2,
+    backoff: { type: 'exponential', delay: 5_000 },
+  });
+}
+
+export async function enqueueEnrichJob(payload: {
+  rawProductId: string;
+  scrapeJobId?: string;
+}) {
+  return enrichQueue.add('enrich-product', payload, {
+    attempts: 2,
+    backoff: { type: 'fixed', delay: 2_000 },
+  });
+}
+
+export async function enqueueScoreJob(payload: { leadId: string }) {
+  return scoreQueue.add('score-lead', payload);
+}
 
 // ─────────────────────────────────────────────
 // Job Schedulers

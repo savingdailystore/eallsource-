@@ -1,7 +1,7 @@
 {
-  "rootDirectory": "apps/web",
-  "installCommand": "cd ../.. && npm ci",
-  "buildCommand": "prisma generate --schema=../../db/prisma/schema.prisma && next build",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build",
+  "outputDirectory": "apps/web/.next",
   "framework": "nextjs",
   "regions": ["iad1"]
 }

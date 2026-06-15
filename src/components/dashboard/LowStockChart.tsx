@@ -21,7 +21,7 @@ const STATUS_COLOR = { out: '#ef4444', low: '#f59e0b', ok: '#22c55e' };
 
 const CustomTooltip = ({ active, payload, label }: {
   active?: boolean;
-  payload?: { name: string; value: number; dataKey: string }[];
+  payload?: { name: string; value: number; dataKey: string; payload: ChartRow }[];
   label?: string;
 }) => {
   if (!active || !payload?.length) return null;

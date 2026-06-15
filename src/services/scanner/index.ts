@@ -149,6 +149,10 @@ export async function qualifyProduct(raw: RawProduct): Promise<QualificationResu
     ipRiskScore: 'LOW',
     ipRiskReasons: [],
     keepaLink: getKeepaLink(raw.asin),
+    hasBrandGating: false,
+    hasCounterfeitRisk: false,
+    isHazmat: false,
+    isRestrictedCategory: false,
   };
 
   return { qualifies: true, reasons: [], product };

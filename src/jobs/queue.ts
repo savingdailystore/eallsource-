@@ -1,7 +1,13 @@
 import { Queue, Worker, type Job } from 'bullmq';
-import { redis } from '@/lib/redis';
 
-const connection = redis;
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const parsed = new URL(redisUrl);
+const connection = {
+  host: parsed.hostname,
+  port: Number(parsed.port) || 6379,
+  password: parsed.password || undefined,
+  tls: redisUrl.startsWith('rediss://') ? {} : undefined,
+};
 
 // ─────────────────────────────────────────────
 // Queue Definitions

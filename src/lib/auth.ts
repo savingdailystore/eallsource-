@@ -56,9 +56,10 @@ export const {
     },
     async session({ session, token }) {
       if (token && session.user) {
-        (session.user as { id: string; role: string; subscriptionPlan: string }).id = token.sub!;
-        (session.user as { id: string; role: string; subscriptionPlan: string }).role = token.role as string;
-        (session.user as { id: string; role: string; subscriptionPlan: string }).subscriptionPlan = token.subscriptionPlan as string;
+        const u = session.user as unknown as { id: string; role: string; subscriptionPlan: string };
+        u.id = token.sub!;
+        u.role = token.role as string;
+        u.subscriptionPlan = token.subscriptionPlan as string;
       }
       return session;
     },

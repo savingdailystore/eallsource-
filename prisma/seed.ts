@@ -10,7 +10,7 @@ const MOCK_PRODUCTS = [
     category: 'Health & Beauty',
     imageUrl: 'https://m.media-amazon.com/images/I/61evn2-BFKL._SL75_.jpg',
     upc: '069055856890',
-    sourceUrl: 'https://www.walmart.com/ip/Oral-B-Pro-1000-Electric-Toothbrush-Power-Rechargeable-Black-Handle/396809874',
+    sourceUrl: 'https://www.walmart.com/search?q=Oral-B+Pro+1000+Electric+Toothbrush',
     sourceRetailer: 'Walmart',
     sourcePrice: 39.97,
     finalCost: 30.58,
@@ -54,7 +54,7 @@ const MOCK_PRODUCTS = [
     category: 'Home & Kitchen',
     imageUrl: 'https://m.media-amazon.com/images/I/71V1-D35UCL._SL75_.jpg',
     upc: '810028581738',
-    sourceUrl: 'https://www.target.com/p/instant-pot-duo-7-in-1-electric-pressure-cooker-6-qt/-/A-79595297',
+    sourceUrl: 'https://www.target.com/s?searchTerm=Instant+Pot+Duo+7+in+1+6+quart',
     sourceRetailer: 'Target',
     sourcePrice: 59.99,
     finalCost: 47.39,
@@ -98,7 +98,7 @@ const MOCK_PRODUCTS = [
     category: 'Health & Beauty',
     imageUrl: 'https://m.media-amazon.com/images/I/71OmPLePiJL._SL75_.jpg',
     upc: '301871574217',
-    sourceUrl: 'https://www.walmart.com/ip/CeraVe-Moisturizing-Cream-for-Normal-to-Dry-Skin-19-oz/47080590',
+    sourceUrl: 'https://www.walmart.com/search?q=CeraVe+Moisturizing+Cream+19+oz',
     sourceRetailer: 'Walmart',
     sourcePrice: 14.97,
     finalCost: 11.77,
@@ -142,7 +142,7 @@ const MOCK_PRODUCTS = [
     category: 'Home & Kitchen',
     imageUrl: 'https://m.media-amazon.com/images/I/81R1F2JCQYL._SL75_.jpg',
     upc: '086279186348',
-    sourceUrl: 'https://www.kohls.com/product/prd-6034489/cuisinart-perfectemp-14-cup-coffee-maker.jsp',
+    sourceUrl: 'https://www.kohls.com/search/results.do?keyword=Cuisinart+DCC-3200+coffee+maker',
     sourceRetailer: "Kohl's",
     sourcePrice: 49.99,
     finalCost: 38.49,
@@ -186,7 +186,7 @@ const MOCK_PRODUCTS = [
     category: 'Toys & Games',
     imageUrl: 'https://m.media-amazon.com/images/I/81oet3ZYDAL._SL75_.jpg',
     upc: '630509575138',
-    sourceUrl: 'https://www.walmart.com/ip/Monopoly-Board-Game/21819210',
+    sourceUrl: 'https://www.walmart.com/search?q=Monopoly+Classic+Board+Game',
     sourceRetailer: 'Walmart',
     sourcePrice: 14.97,
     finalCost: 11.21,
@@ -230,7 +230,7 @@ const MOCK_PRODUCTS = [
     category: 'Office Products',
     imageUrl: 'https://m.media-amazon.com/images/I/71rZG9WBxZL._SL75_.jpg',
     upc: '071641730244',
-    sourceUrl: 'https://www.staples.com/Sharpie-Permanent-Markers-Fine-Point-Assorted-Colors-24-Pack/product_24401776',
+    sourceUrl: 'https://www.staples.com/search?query=Sharpie+permanent+markers+24+pack',
     sourceRetailer: 'Staples',
     sourcePrice: 12.99,
     finalCost: 9.49,
@@ -273,7 +273,7 @@ const MOCK_PRODUCTS = [
     category: 'Home & Kitchen',
     imageUrl: 'https://m.media-amazon.com/images/I/71UYNrWHmOL._SL75_.jpg',
     upc: '050875776032',
-    sourceUrl: 'https://www.homedepot.com/p/BLACK-DECKER-20V-MAX-Cordless-Hand-Vacuum-BDH2000PL/204592976',
+    sourceUrl: 'https://www.homedepot.com/s/BLACK%2BDECKER+hand+vacuum+cordless',
     sourceRetailer: 'Home Depot',
     sourcePrice: 39.97,
     finalCost: 30.38,
@@ -317,7 +317,7 @@ const MOCK_PRODUCTS = [
     category: 'Office Products',
     imageUrl: 'https://m.media-amazon.com/images/I/71G1sMYajQL._SL75_.jpg',
     upc: '071641006609',
-    sourceUrl: 'https://www.staples.com/Sharpie-S-Gel-Gel-Pens-Fine-Point-Black-4-Pack/product_24506889',
+    sourceUrl: 'https://www.staples.com/search?query=Sharpie+S-Gel+gel+pens+fine+point',
     sourceRetailer: 'Staples',
     sourcePrice: 7.99,
     finalCost: 5.99,
@@ -402,6 +402,10 @@ async function main() {
       completedAt: new Date(),
     },
   });
+
+  // Clear old products so stale rows (wrong URLs, replaced ASINs) don't linger
+  await prisma.savedProduct.deleteMany({});
+  await prisma.product.deleteMany({});
 
   const retailers = [
     { name: 'Target', baseUrl: 'https://www.target.com' },

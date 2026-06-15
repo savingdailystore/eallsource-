@@ -58,6 +58,28 @@
   }
 }
 
+/* ── Dark-mode overrides for hardcoded utility classes ─────────────────── */
+/* These complement components that don't have explicit dark: variants yet  */
+.dark .bg-white          { background-color: hsl(var(--card)); }
+.dark .bg-gray-50        { background-color: hsl(var(--secondary)); }
+.dark .bg-gray-100       { background-color: hsl(var(--muted)); }
+.dark .bg-gray-50\/80    { background-color: hsl(var(--secondary) / 0.8); }
+
+.dark .text-gray-900     { color: hsl(var(--foreground)); }
+.dark .text-gray-800     { color: hsl(var(--foreground)); }
+.dark .text-gray-700     { color: hsl(var(--muted-foreground)); }
+.dark .text-gray-600     { color: hsl(var(--muted-foreground)); }
+
+.dark .border-gray-100   { border-color: hsl(var(--border)); }
+.dark .border-gray-200   { border-color: hsl(var(--border)); }
+
+.dark .hover\:bg-gray-50:hover      { background-color: hsl(var(--secondary)); }
+.dark .hover\:bg-gray-50\/50:hover  { background-color: hsl(var(--secondary) / 0.5); }
+.dark .hover\:bg-gray-100:hover     { background-color: hsl(var(--muted)); }
+
+.dark .divide-gray-50  > * + * { border-color: hsl(var(--border)); }
+.dark .divide-gray-100 > * + * { border-color: hsl(var(--border)); }
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

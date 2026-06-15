@@ -2,17 +2,31 @@
   "name": "arbitrage-pro-ai",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
-    "postinstall": "prisma generate",
-    "start": "next start",
-    "lint": "next lint",
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=apps/web",
+    "start": "npm run start --workspace=apps/web",
+    "worker": "ts-node -r tsconfig-paths/register workers/index.ts",
+    "worker:scrape": "ts-node -r tsconfig-paths/register workers/scrapeWorker.ts",
+    "worker:enrich": "ts-node -r tsconfig-paths/register workers/enrichmentWorker.ts",
+    "worker:score": "ts-node -r tsconfig-paths/register workers/scoringWorker.ts",
+    "worker:weekly": "ts-node -r tsconfig-paths/register workers/weeklyWorker.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "ts-node prisma/seed.ts",
-    "worker": "ts-node src/jobs/worker.ts"
+    "db:seed": "ts-node -r tsconfig-paths/register db/prisma/seed.ts"
+  },
+  "prisma": {
+    "schema": "db/prisma/schema.prisma"
+  },
+  "ts-node": {
+    "require": [
+      "tsconfig-paths/register"
+    ],
+    "transpileOnly": true
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
@@ -45,6 +59,7 @@
     "lucide-react": "^0.462.0",
     "next": "^15.0.3",
     "next-auth": "^5.0.0-beta.25",
+    "playwright": "^1.61.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.54.0",
@@ -63,6 +78,7 @@
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.15",
     "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.6.3"
   }
 }

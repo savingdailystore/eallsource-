@@ -1,0 +1,12 @@
+{
+  "name": "@arbitrage/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "postinstall": "prisma generate --schema=../../db/prisma/schema.prisma",
+    "start": "next start",
+    "lint": "next lint"
+  }
+}

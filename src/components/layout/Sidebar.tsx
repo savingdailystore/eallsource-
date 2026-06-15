@@ -16,6 +16,7 @@ import {
   Zap,
   Warehouse,
   ArrowUpDown,
+  Brain,
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ const USER_NAV = [
   { label: 'Products', href: '/dashboard/products', icon: Package },
   { label: 'Saved', href: '/dashboard/saved', icon: Bookmark },
   { label: 'Inventory', href: '/dashboard/inventory', icon: Warehouse },
+  { label: 'Arbitrage AI', href: '/dashboard/ai-sourcing', icon: Brain },
   { label: 'AI Repricer', href: '/dashboard/repricer', icon: ArrowUpDown },
   { label: 'Weekly Feed', href: '/dashboard/weekly', icon: CalendarDays },
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },

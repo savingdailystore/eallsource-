@@ -1,20 +1,26 @@
 import { Queue, Worker, type Job } from 'bullmq';
 
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-const parsed = new URL(redisUrl);
-const connection = {
-  host: parsed.hostname,
-  port: Number(parsed.port) || 6379,
-  password: parsed.password || undefined,
-  tls: redisUrl.startsWith('rediss://') ? {} : undefined,
-};
+function getConnection() {
+  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  try {
+    const parsed = new URL(redisUrl);
+    return {
+      host: parsed.hostname,
+      port: Number(parsed.port) || 6379,
+      password: parsed.password || undefined,
+      tls: redisUrl.startsWith('rediss://') ? {} : undefined,
+    };
+  } catch {
+    return { host: 'localhost', port: 6379 };
+  }
+}
 
 // ─────────────────────────────────────────────
 // Queue Definitions
 // ─────────────────────────────────────────────
 
-export const weeklyScanQueue = new Queue('weekly-scan', { connection });
-export const productScanQueue = new Queue('product-scan', { connection });
+export const weeklyScanQueue = new Queue('weekly-scan', { connection: getConnection() });
+export const productScanQueue = new Queue('product-scan', { connection: getConnection() });
 
 // ─────────────────────────────────────────────
 // Job Schedulers
@@ -78,6 +84,6 @@ export function createWeeklyScanWorker() {
         throw err;
       }
     },
-    { connection, concurrency: 1 },
+    { connection: getConnection(), concurrency: 1 },
   );
 }

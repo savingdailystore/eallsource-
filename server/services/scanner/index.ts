@@ -160,20 +160,23 @@ export async function qualifyProduct(raw: RawProduct): Promise<QualificationResu
 
 export async function saveQualifiedProduct(
   product: Omit<Product, 'id' | 'dateAdded' | 'status' | 'weeklyBatchId'>,
-  batchId?: string,
 ) {
-  return prisma.product.upsert({
-    where: { asin: product.asin },
-    update: {
-      ...product,
-      availableDiscounts: product.availableDiscounts as object[],
-      weeklyBatchId: batchId,
-    },
-    create: {
-      ...product,
-      availableDiscounts: product.availableDiscounts as object[],
-      weeklyBatchId: batchId,
-      status: 'ACTIVE',
-    },
-  });
+  const data = {
+    asin:   product.asin,
+    title:  product.name,
+    price:  product.estimatedResellPrice,
+    fees:   product.amazonFees + product.prepFee + product.taxAmount,
+    profit: product.netProfit,
+    roi:    product.roi,
+    score:  0,
+  };
+
+  const existing = await prisma.product.findFirst({ where: { asin: product.asin } });
+  if (existing) {
+    return prisma.product.update({ where: { id: existing.id }, data });
+  }
+
+  const created = await prisma.product.create({ data });
+  await prisma.lead.create({ data: { productId: created.id, score: 0 } });
+  return created;
 }

@@ -1,6 +1,5 @@
 ﻿import { prisma } from '@lib/prisma';
 import { qualifyProduct, saveQualifiedProduct } from './index';
-import { getWeekNumber } from '@lib/utils';
 import type { RawProduct } from './index';
 
 // Sample product catalog to source from (replace with real scraper per retailer)
@@ -167,17 +166,15 @@ const SAMPLE_PRODUCTS: RawProduct[] = [
   },
 ];
 
-export async function runWeeklyFeed(batchId: string): Promise<{
+export async function runWeeklyFeed(): Promise<{
   processed: number;
   passed: number;
   failed: number;
 }> {
-  const { week, year } = getWeekNumber();
-
-  // Find ASINs already in the last 90 days to avoid duplicates
+  // Find ASINs already processed in the last 90 days to avoid duplicates
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   const recentAsins = await prisma.product.findMany({
-    where: { dateAdded: { gte: cutoff } },
+    where: { createdAt: { gte: cutoff } },
     select: { asin: true },
   });
 
@@ -196,7 +193,7 @@ export async function runWeeklyFeed(batchId: string): Promise<{
 
     const result = await qualifyProduct(raw);
     if (result.qualifies && result.product) {
-      await saveQualifiedProduct(result.product, batchId);
+      await saveQualifiedProduct(result.product);
       usedAsins.add(raw.asin);
       passed++;
     } else {

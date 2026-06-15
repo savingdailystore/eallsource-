@@ -8,58 +8,50 @@ export function createScrapeWorker() {
       const { scrapeAmazonSearch } = await import('@scraper/amazon');
       const { prisma } = await import('@lib/prisma');
 
-      const { query, scrapeJobId, maxResults = 20 } = job.data as {
-        query: string;
+      const { url, scrapeJobId, maxResults = 20 } = job.data as {
+        url: string;
         scrapeJobId: string;
         maxResults?: number;
       };
 
       await prisma.scrapeJob.update({
         where: { id: scrapeJobId },
-        data: { status: 'RUNNING', startedAt: new Date() },
+        data:  { status: 'RUNNING' },
       });
 
       try {
-        console.log(`[Scrape] Searching Amazon for: "${query}"`);
-        const products = await scrapeAmazonSearch(query, maxResults);
+        console.log(`[Scrape] Searching Amazon for: "${url}"`);
+        const products = await scrapeAmazonSearch(url, maxResults);
         console.log(`[Scrape] Found ${products.length} products`);
 
         const created = await Promise.all(
           products.map((p) =>
             prisma.productRaw.create({
               data: {
-                asin: p.asin,
-                title: p.title,
-                url: p.url,
-                imageUrl: p.imageUrl,
-                price: p.price,
-                rating: p.rating,
-                reviewCount: p.reviewCount,
-                bsr: p.bsr,
-                category: p.category,
-                isPrime: p.isPrime,
-                raw: p.raw as object,
-                scrapeJobId,
+                asin:    p.asin,
+                title:   p.title,
+                url:     p.url,
+                price:   p.price,
+                rawData: p.raw as object,
               },
             }),
           ),
         );
 
-        await prisma.scrapeJob.update({
-          where: { id: scrapeJobId },
-          data: { itemsFound: created.length },
-        });
-
         await Promise.all(
           created.map((raw) => enqueueEnrichJob({ rawProductId: raw.id, scrapeJobId })),
         );
 
-        return { scraped: created.length };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
         await prisma.scrapeJob.update({
           where: { id: scrapeJobId },
-          data: { status: 'FAILED', error: msg, completedAt: new Date() },
+          data:  { status: 'COMPLETED' },
+        });
+
+        return { scraped: created.length };
+      } catch (err) {
+        await prisma.scrapeJob.update({
+          where: { id: scrapeJobId },
+          data:  { status: 'FAILED' },
         });
         throw err;
       }

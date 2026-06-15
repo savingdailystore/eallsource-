@@ -5,56 +5,48 @@ export function createScoreWorker() {
   return new Worker(
     'score',
     async (job: Job) => {
-      const { prisma } = await import('@lib/prisma');
-      const { scoreLead } = await import('@server/scoring/engine');
+      const { prisma }       = await import('@lib/prisma');
+      const { scoreLead }    = await import('@server/scoring/engine');
       const { assessIpRisk } = await import('@server/services/ip-risk/engine');
       const { sendLeadAlert } = await import('@server/services/alerts/discord');
 
       const { leadId } = job.data as { leadId: string };
-      const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+      const lead = await prisma.lead.findUnique({
+        where:   { id: leadId },
+        include: { product: true },
+      });
       if (!lead) return;
 
-      const ipRisk = assessIpRisk(lead.title);
+      const ipRisk = assessIpRisk(lead.product.title);
       const { score, breakdown, tier } = scoreLead({
-        roi: lead.roi,
-        netProfit: lead.netProfit,
-        bsr: lead.bsr ?? undefined,
-        fbaSellers: lead.fbaSellers,
-        amazonOwnsBB: lead.amazonOwnsBB,
-        ipRisk: ipRisk.score,
+        roi:          lead.product.roi,
+        netProfit:    lead.product.profit,
+        fbaSellers:   6,      // default — not stored in new schema
+        amazonOwnsBB: false,  // default — not stored in new schema
+        ipRisk:       ipRisk.score,
       });
 
-      await prisma.lead.update({ where: { id: leadId }, data: { score, scoreBreakdown: breakdown } });
+      await prisma.lead.update({ where: { id: leadId }, data: { score } });
 
-      if (tier === 'HOT' && !lead.alertSent) {
+      if (tier === 'HOT') {
         await sendLeadAlert(
           {
-            asin: lead.asin,
-            title: lead.title,
+            asin:           lead.product.asin,
+            title:          lead.product.title,
             score,
-            roi: lead.roi,
-            netProfit: lead.netProfit,
-            sourcePrice: lead.sourcePrice,
-            amazonPrice: lead.amazonPrice,
-            sourceRetailer: lead.sourceRetailer,
-            sourceUrl: lead.sourceUrl,
-            amazonUrl: lead.amazonUrl,
-            imageUrl: lead.imageUrl ?? undefined,
+            roi:            lead.product.roi,
+            netProfit:      lead.product.profit,
+            sourcePrice:    lead.product.price - lead.product.fees - lead.product.profit,
+            amazonPrice:    lead.product.price,
+            sourceRetailer: 'Walmart',
+            sourceUrl:      `https://www.amazon.com/dp/${lead.product.asin}`,
+            amazonUrl:      `https://www.amazon.com/dp/${lead.product.asin}`,
           },
           tier,
         );
-        await prisma.lead.update({ where: { id: leadId }, data: { alertSent: true } });
       }
 
-      if (lead.scrapeJobId) {
-        const j = await prisma.scrapeJob.findUnique({ where: { id: lead.scrapeJobId } });
-        if (j?.status === 'RUNNING') {
-          await prisma.scrapeJob
-            .update({ where: { id: lead.scrapeJobId }, data: { status: 'COMPLETED', completedAt: new Date() } })
-            .catch(() => null);
-        }
-      }
-
+      void breakdown; // used for typing only in this simplified version
       return { score, tier };
     },
     { connection: getConnection(), concurrency: 8 },

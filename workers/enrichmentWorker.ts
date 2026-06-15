@@ -6,7 +6,6 @@ export function createEnrichWorker() {
     'enrich',
     async (job: Job) => {
       const { enrichProduct } = await import('@server/enrichment/pipeline');
-      const { prisma } = await import('@lib/prisma');
 
       const { rawProductId, scrapeJobId } = job.data as {
         rawProductId: string;
@@ -16,11 +15,6 @@ export function createEnrichWorker() {
       const result = await enrichProduct(rawProductId, scrapeJobId);
 
       if (result.leadId) {
-        if (scrapeJobId) {
-          await prisma.scrapeJob
-            .update({ where: { id: scrapeJobId }, data: { leadsCreated: { increment: 1 } } })
-            .catch(() => null);
-        }
         await enqueueScoreJob({ leadId: result.leadId });
       }
 

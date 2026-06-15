@@ -1,30 +1,30 @@
-﻿'use client';
+'use client';
 
-import { TrendingUp, DollarSign, Bookmark, Zap, Package, ArrowUpRight } from 'lucide-react';
+import { TrendingUp, DollarSign, Zap, Package, Flame, ArrowUpRight } from 'lucide-react';
 import { formatCurrency, formatPercent, formatNumber } from '@lib/utils';
 
 interface MetricsCardsProps {
   totalOpportunities: number;
   averageRoi: number;
   averageProfit: number;
-  savedProducts: number;
-  weeklyNewLeads: number;
+  totalLeads: number;
+  newLeads: number;
 }
 
 export function MetricsCards({
   totalOpportunities,
   averageRoi,
   averageProfit,
-  savedProducts,
-  weeklyNewLeads,
+  totalLeads,
+  newLeads,
 }: MetricsCardsProps) {
   const cards = [
     {
-      label: 'Total Opportunities',
+      label: 'Total Products',
       value: formatNumber(totalOpportunities),
       icon: Package,
       color: 'blue',
-      trend: 'Active products',
+      trend: 'In database',
     },
     {
       label: 'Average ROI',
@@ -41,27 +41,27 @@ export function MetricsCards({
       trend: 'Per unit',
     },
     {
-      label: 'Saved Products',
-      value: formatNumber(savedProducts),
-      icon: Bookmark,
+      label: 'Total Leads',
+      value: formatNumber(totalLeads),
+      icon: Flame,
       color: 'purple',
-      trend: 'In watchlist',
+      trend: 'All time',
     },
     {
-      label: 'Weekly New Leads',
-      value: formatNumber(weeklyNewLeads),
+      label: 'New Leads',
+      value: formatNumber(newLeads),
       icon: Zap,
       color: 'orange',
-      trend: 'This week',
+      trend: 'Awaiting review',
     },
   ];
 
   const colorMap: Record<string, { bg: string; icon: string; badge: string }> = {
-    blue: { bg: 'bg-blue-50', icon: 'text-blue-600', badge: 'bg-blue-100 text-blue-700' },
-    green: { bg: 'bg-green-50', icon: 'text-green-600', badge: 'bg-green-100 text-green-700' },
+    blue:    { bg: 'bg-blue-50',    icon: 'text-blue-600',    badge: 'bg-blue-100 text-blue-700' },
+    green:   { bg: 'bg-green-50',   icon: 'text-green-600',   badge: 'bg-green-100 text-green-700' },
     emerald: { bg: 'bg-emerald-50', icon: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' },
-    purple: { bg: 'bg-purple-50', icon: 'text-purple-600', badge: 'bg-purple-100 text-purple-700' },
-    orange: { bg: 'bg-orange-50', icon: 'text-orange-600', badge: 'bg-orange-100 text-orange-700' },
+    purple:  { bg: 'bg-purple-50',  icon: 'text-purple-600',  badge: 'bg-purple-100 text-purple-700' },
+    orange:  { bg: 'bg-orange-50',  icon: 'text-orange-600',  badge: 'bg-orange-100 text-orange-700' },
   };
 
   return (

@@ -30,7 +30,7 @@ export const scoreQueue       = new Queue('score',        { connection: getConne
 // ─────────────────────────────────────────────
 
 export async function enqueueScrapeJob(payload: {
-  query: string;
+  url: string;
   scrapeJobId: string;
   maxResults?: number;
 }) {

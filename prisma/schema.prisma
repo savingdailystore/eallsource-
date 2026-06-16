@@ -1,0 +1,382 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ─────────────────────────────────────────────────────────────────
+
+enum Plan {
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  ANALYST
+  VIEWER
+}
+
+enum LeadStatus {
+  NEW
+  SAVED
+  PURCHASED
+  REJECTED
+  EXPIRED
+}
+
+enum InventoryStatus {
+  IN_STOCK
+  LISTED
+  SOLD
+}
+
+enum DemandLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum GatingRisk {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ─── Multi-Tenant Core ─────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      Plan     @default(STARTER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  subscription   Subscription?
+  products       Product[]
+  leads          Lead[]
+  inventory      InventoryItem[]
+  repricingRules RepricingRule[]
+  scanJobs       ScanJob[]
+  amazonCred     AmazonCredential?
+  auditLogs      AuditLog[]
+
+  @@index([slug])
+  @@map("organizations")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      Role     @default(ANALYST)
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([orgId])
+  @@map("users")
+}
+
+model Subscription {
+  id                String   @id @default(cuid())
+  orgId             String   @unique
+  org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  stripeCustomerId  String?  @unique
+  stripeSubId       String?  @unique
+  plan              Plan     @default(STARTER)
+  status            String   @default("trialing")
+  currentPeriodEnd  DateTime?
+  trialEndsAt       DateTime?
+  cancelAtPeriodEnd Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  billingEvents BillingEvent[]
+
+  @@map("subscriptions")
+}
+
+model BillingEvent {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  stripeEventId  String   @unique
+  type           String
+  data           Json?
+  createdAt      DateTime @default(now())
+
+  @@map("billing_events")
+}
+
+// ─── Products & Leads ──────────────────────────────────────────────────────
+
+model Product {
+  id    String @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // Identifiers
+  asin  String
+  upc   String?
+  ean   String?
+  model String?
+  brand String?
+
+  // Product info
+  title    String
+  category String?
+  imageUrl String?
+
+  // Source data
+  sourceUrl      String?
+  sourceRetailer String?
+  sourcePrice    Float?
+  sourceTax      Float?
+  sourceShipping Float?
+
+  // Discounts applied
+  availableDiscounts Json? // { source, type, amount, percentage?, code? }[]
+  discountSources    Json? // string[]
+  finalCost          Float?
+
+  // Amazon pricing data
+  amazonUrl            String?
+  buyBoxPrice          Float?
+  lowestFbaPrice       Float?
+  estimatedResellPrice Float?
+
+  // Fee breakdown
+  amazonFees      Float?
+  referralFee     Float?
+  fbaFee          Float?
+  storageFee      Float?
+  prepFee         Float?
+  taxAmount       Float?
+  totalLandedCost Float?
+
+  // Computed profitability
+  price  Float @default(0)
+  fees   Float @default(0)
+  profit Float @default(0)
+  roi    Float @default(0)
+  margin Float?
+
+  // Sales rank
+  bsr           Int?
+  bsrPercentage Float?
+
+  // Seller / competition data
+  buyBoxOwner      String?
+  fbaSellers       Int?
+  totalSellers     Int?
+  amazonIsSeller   Boolean @default(false)
+  amazonOwnsBuyBox Boolean @default(false)
+
+  // Validation scores (all must be >= 95 to pass)
+  matchMethod      String?
+  matchConfidence  Float?
+  identityScore    Float?
+  urlScore         Float?
+  priceScore       Float?
+  inventoryScore   Float?
+  validationPassed Boolean @default(false)
+
+  // Gating & risk
+  autoUngated       Boolean    @default(false)
+  ipRiskScore       String     @default("LOW")
+  gatingRisk        GatingRisk @default(LOW)
+  hasHazmat         Boolean    @default(false)
+  isBrandRestricted Boolean    @default(false)
+  isCategoryGated   Boolean    @default(false)
+
+  // Demand & price stability
+  demandLevel    DemandLevel @default(MEDIUM)
+  priceStability String?
+
+  // External links
+  keepaLink String?
+
+  // Final lead score (0–100)
+  score Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leads Lead[]
+
+  @@index([orgId])
+  @@index([orgId, asin])
+  @@index([orgId, score])
+  @@index([orgId, roi])
+  @@index([orgId, createdAt])
+  @@map("products")
+}
+
+model Lead {
+  id        String     @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  score   Float
+  status  LeadStatus @default(NEW)
+  savedAt DateTime?
+  notes   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([orgId, score])
+  @@map("leads")
+}
+
+// ─── Inventory ─────────────────────────────────────────────────────────────
+
+model InventoryItem {
+  id    String @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  asin         String
+  title        String
+  imageUrl     String?
+  costBasis    Float
+  quantity     Int      @default(1)
+  purchaseDate DateTime
+  retailer     String?
+  status       InventoryStatus @default(IN_STOCK)
+
+  listedPrice     Float?
+  estimatedProfit Float?
+  actualProfit    Float?
+  soldAt          DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([asin])
+  @@map("inventory_items")
+}
+
+// ─── Repricing ─────────────────────────────────────────────────────────────
+
+model RepricingRule {
+  id    String @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  asin      String
+  title     String?
+  minRoi    Float   @default(30)
+  minProfit Float   @default(5)
+  strategy  String  @default("COMPETITIVE")
+
+  lastRecommendedPrice Float?
+  lastDirection        String?
+  lastRepricedAt       DateTime?
+  isActive             Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  history RepricingHistory[]
+
+  @@unique([orgId, asin])
+  @@index([orgId])
+  @@map("repricing_rules")
+}
+
+model RepricingHistory {
+  id     String @id @default(cuid())
+  ruleId String
+  rule   RepricingRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  buyBoxPrice      Float?
+  recommendedPrice Float
+  direction        String
+  riskScore        Float
+
+  createdAt DateTime @default(now())
+
+  @@index([ruleId])
+  @@map("repricing_history")
+}
+
+// ─── Amazon SP-API ─────────────────────────────────────────────────────────
+
+model AmazonCredential {
+  id    String @id @default(cuid())
+  orgId String @unique
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  sellerId       String
+  marketplaceId  String
+  accessToken    String   // AES-256-GCM encrypted
+  refreshToken   String   // AES-256-GCM encrypted
+  tokenExpiresAt DateTime?
+  isActive       Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("amazon_credentials")
+}
+
+// ─── Scan Jobs ─────────────────────────────────────────────────────────────
+
+model ScanJob {
+  id    String @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  type        String
+  retailer    String?
+  status      String   @default("PENDING")
+  error       String?
+  result      Json?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([orgId])
+  @@index([status])
+  @@index([orgId, type])
+  @@map("scan_jobs")
+}
+
+// ─── Audit Log ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id    String @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  userId   String?
+  action   String
+  resource String?
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([orgId, createdAt])
+  @@map("audit_logs")
+}

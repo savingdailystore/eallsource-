@@ -1,0 +1,351 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import {
+  ChevronDown, ChevronUp, ExternalLink, TrendingUp,
+  ShieldCheck, ShieldAlert, ShieldX, Bookmark, BookmarkCheck,
+  Package, Check, X, Minus, ChevronLeft, ChevronRight,
+} from 'lucide-react';
+import { formatCurrency, formatPercent, cn } from '@/lib/utils';
+import { scoreLabel } from '@/engines/scoring';
+import type { Discount, Plan } from '@/types';
+
+export interface LeadRow {
+  id: string;
+  score: number;
+  status: string;
+  createdAt: string;
+  product: {
+    id: string;
+    asin: string;
+    title: string;
+    brand?: string | null;
+    category?: string | null;
+    imageUrl?: string | null;
+    sourceRetailer?: string | null;
+    sourcePrice?: number | null;
+    finalCost?: number | null;
+    lowestFbaPrice?: number | null;
+    buyBoxPrice?: number | null;
+    amazonFees?: number | null;
+    prepFee?: number | null;
+    taxAmount?: number | null;
+    profit: number;
+    roi: number;
+    margin?: number | null;
+    bsr?: number | null;
+    bsrPercentage?: number | null;
+    demandLevel: string;
+    gatingRisk: string;
+    ipRiskScore?: string | null;
+    autoUngated?: boolean | null;
+    amazonOwnsBuyBox?: boolean | null;
+    buyBoxOwner?: string | null;
+    matchConfidence?: number | null;
+    availableDiscounts?: any;
+    discountSources?: any;
+    keepaLink?: string | null;
+    amazonUrl?: string | null;
+    score: number;
+    validationPassed?: boolean | null;
+    identityScore?: number | null;
+    urlScore?: number | null;
+    priceScore?: number | null;
+    inventoryScore?: number | null;
+  };
+}
+
+function IpBadge({ score }: { score?: string | null }) {
+  if (score === 'HIGH')   return <span className="flex items-center gap-1 text-xs text-red-600 font-medium"><ShieldX className="w-3.5 h-3.5" />High</span>;
+  if (score === 'MEDIUM') return <span className="flex items-center gap-1 text-xs text-amber-600 font-medium"><ShieldAlert className="w-3.5 h-3.5" />Med</span>;
+  return <span className="flex items-center gap-1 text-xs text-green-600 font-medium"><ShieldCheck className="w-3.5 h-3.5" />Low</span>;
+}
+
+function DemandBadge({ level }: { level: string }) {
+  const cls = level === 'HIGH' ? 'bg-green-100 text-green-700' : level === 'MEDIUM' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700';
+  return <span className={`badge text-xs ${cls}`}>{level}</span>;
+}
+
+function ScorePill({ score }: { score: number }) {
+  const { label, color } = scoreLabel(score);
+  return (
+    <div className={`text-center ${color}`}>
+      <div className="text-lg font-black leading-none">{score}</div>
+      <div className="text-[10px] font-semibold">{label}</div>
+    </div>
+  );
+}
+
+function ProductImage({ asin, imageUrl, title }: { asin: string; imageUrl?: string | null; title: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return (
+    <div className="w-10 h-10 rounded-lg border bg-slate-50 flex items-center justify-center flex-shrink-0">
+      <Package className="w-4 h-4 text-slate-300" />
+    </div>
+  );
+  return (
+    <div className="w-10 h-10 rounded-lg border bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+      <img
+        src={imageUrl ?? `https://images-na.ssl-images-amazon.com/images/P/${asin}.01._SL75_.jpg`}
+        alt={title}
+        className="w-10 h-10 object-contain"
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+}
+
+function ExpandedPanel({ lead }: { lead: LeadRow }) {
+  const p = lead.product;
+  const discounts = (p.availableDiscounts as Discount[] | null) ?? [];
+  const resell    = p.lowestFbaPrice ?? 0;
+  const amazonUrl = p.amazonUrl ?? `https://www.amazon.com/dp/${p.asin}`;
+  const keepaUrl  = p.keepaLink ?? `https://keepa.com/#!product/1-${p.asin}`;
+
+  return (
+    <tr className="bg-slate-50/60">
+      <td colSpan={11} className="px-4 py-4">
+        <div className="grid md:grid-cols-3 gap-4">
+          {/* Profitability */}
+          <div className="bg-white rounded-xl border border-slate-100 p-4">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Profitability Formula</div>
+            {p.sourcePrice != null && (
+              <div className="flex justify-between text-xs py-0.5">
+                <span className="text-slate-500">Source Price</span>
+                <span>{formatCurrency(p.sourcePrice)}</span>
+              </div>
+            )}
+            {discounts.map((d, i) => (
+              <div key={i} className="flex justify-between text-xs py-0.5">
+                <span className="text-green-600">− {d.source} {d.percentage ? `(${d.percentage}%)` : ''}</span>
+                <span className="text-green-600">−{formatCurrency(d.amount)}</span>
+              </div>
+            ))}
+            {p.finalCost != null && (
+              <div className="flex justify-between text-xs font-semibold border-t border-slate-100 pt-1 mt-1">
+                <span>Final Cost</span><span>{formatCurrency(p.finalCost)}</span>
+              </div>
+            )}
+            <div className="my-2 border-t border-slate-100" />
+            <div className="text-[10px] text-slate-400 mb-1">From resell price {resell ? formatCurrency(resell) : '—'}</div>
+            {p.amazonFees != null && <div className="flex justify-between text-xs py-0.5"><span className="text-slate-500">Amazon Fees</span><span className="text-red-500">−{formatCurrency(p.amazonFees)}</span></div>}
+            {p.prepFee   != null && <div className="flex justify-between text-xs py-0.5"><span className="text-slate-500">Prep Fee</span><span className="text-red-500">−{formatCurrency(p.prepFee)}</span></div>}
+            {p.taxAmount != null && <div className="flex justify-between text-xs py-0.5"><span className="text-slate-500">Tax</span><span className="text-red-500">−{formatCurrency(p.taxAmount)}</span></div>}
+            <div className="flex justify-between text-xs font-bold border-t border-slate-100 pt-1 mt-1">
+              <span>Net Profit</span>
+              <span className={p.profit >= 0 ? 'text-green-600' : 'text-red-500'}>{formatCurrency(p.profit)}</span>
+            </div>
+            <div className="text-[10px] text-slate-400 mt-1">ROI = {formatPercent(p.roi)}</div>
+          </div>
+
+          {/* Amazon data */}
+          <div className="bg-white rounded-xl border border-slate-100 p-4 space-y-1.5">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Market Data</div>
+            {[
+              ['Buy Box', p.buyBoxPrice != null ? formatCurrency(p.buyBoxPrice) : '—'],
+              ['Lowest FBA', p.lowestFbaPrice != null ? formatCurrency(p.lowestFbaPrice) : '—'],
+              ['BSR', p.bsr != null ? `#${p.bsr.toLocaleString()}` : '—'],
+              ['BSR %', p.bsrPercentage != null ? `Top ${p.bsrPercentage.toFixed(2)}%` : '—'],
+              ['Buy Box Owner', p.buyBoxOwner ?? '—'],
+              ['Amazon Sells', p.amazonOwnsBuyBox ? 'Yes ⚠️' : 'No ✓'],
+              ['Auto-Ungated', p.autoUngated ? 'Yes ✓' : 'No'],
+              ['Match Confidence', p.matchConfidence != null ? `${p.matchConfidence.toFixed(0)}%` : '—'],
+            ].map(([label, value]) => (
+              <div key={label} className="flex justify-between text-xs">
+                <span className="text-slate-400">{label}</span>
+                <span className="font-medium text-slate-700">{value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Links & validation */}
+          <div className="space-y-3">
+            <div className="bg-white rounded-xl border border-slate-100 p-4">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Validation</div>
+              {[
+                ['Identity', p.identityScore],
+                ['URL', p.urlScore],
+                ['Price', p.priceScore],
+                ['Inventory', p.inventoryScore],
+              ].map(([label, val]) => (
+                <div key={label as string} className="flex items-center justify-between text-xs py-0.5">
+                  <span className="text-slate-400">{label as string}</span>
+                  <span className={`font-medium ${(val as number ?? 0) >= 95 ? 'text-green-600' : 'text-red-500'}`}>
+                    {val != null ? `${(val as number).toFixed(0)}%` : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs py-1.5">
+                <ExternalLink className="w-3 h-3" />Amazon
+              </a>
+              <a href={keepaUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs py-1.5">
+                <TrendingUp className="w-3 h-3" />Keepa
+              </a>
+              <Link href={`/dashboard/leads/${lead.id}`} className="btn-primary text-xs py-1.5">
+                View Detail →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+interface LeadsTableProps {
+  leads: LeadRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  orgPlan: Plan;
+}
+
+export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTableProps) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const totalPages = Math.ceil(total / pageSize);
+
+  if (!leads.length) {
+    return (
+      <div className="card py-16 text-center">
+        <TrendingUp className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+        <p className="text-slate-500 font-medium">No leads match your filters</p>
+        <p className="text-sm text-slate-400 mt-1">Run a scanner job to discover new opportunities</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: '960px' }}>
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/80">
+                {['Product', 'Retailer', 'Cost', 'Resell', 'Amazon Fees', 'Profit', 'ROI', 'Demand', 'IP Risk', 'Score', ''].map((h) => (
+                  <th key={h} className="table-th">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {leads.map((lead) => {
+                const p          = lead.product;
+                const isExpanded = expanded === lead.id;
+
+                return (
+                  <>
+                    <tr
+                      key={lead.id}
+                      className="cursor-pointer hover:bg-slate-50/60 transition-colors"
+                      onClick={() => setExpanded(isExpanded ? null : lead.id)}
+                    >
+                      {/* Product */}
+                      <td className="table-td">
+                        <div className="flex items-center gap-3" style={{ minWidth: '200px' }}>
+                          <ProductImage asin={p.asin} imageUrl={p.imageUrl} title={p.title} />
+                          <div className="min-w-0">
+                            <div className="font-medium text-slate-900 text-sm leading-tight line-clamp-1">{p.title}</div>
+                            <div className="text-xs text-slate-400 font-mono mt-0.5">{p.asin}</div>
+                            {p.category && <div className="text-xs text-slate-400">{p.category}</div>}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Retailer */}
+                      <td className="table-td text-slate-600 text-xs">{p.sourceRetailer ?? '—'}</td>
+
+                      {/* Cost */}
+                      <td className="table-td text-right">
+                        <div className="text-xs font-medium">{p.finalCost != null ? formatCurrency(p.finalCost) : '—'}</div>
+                        {p.sourcePrice != null && p.finalCost != null && p.sourcePrice > p.finalCost && (
+                          <div className="text-[10px] text-green-600">was {formatCurrency(p.sourcePrice)}</div>
+                        )}
+                      </td>
+
+                      {/* Resell */}
+                      <td className="table-td text-right">
+                        <div className="text-xs font-medium">{p.lowestFbaPrice != null ? formatCurrency(p.lowestFbaPrice) : '—'}</div>
+                        {p.buyBoxPrice != null && <div className="text-[10px] text-slate-400">BB: {formatCurrency(p.buyBoxPrice)}</div>}
+                      </td>
+
+                      {/* Amazon Fees */}
+                      <td className="table-td text-right text-xs text-slate-600">
+                        {p.amazonFees != null ? formatCurrency(p.amazonFees) : '—'}
+                      </td>
+
+                      {/* Profit */}
+                      <td className="table-td text-right">
+                        <div className={`text-sm font-bold ${p.profit >= 10 ? 'text-green-600' : p.profit >= 0 ? 'text-blue-600' : 'text-red-500'}`}>
+                          {formatCurrency(p.profit)}
+                        </div>
+                      </td>
+
+                      {/* ROI */}
+                      <td className="table-td text-right">
+                        <span className={cn(
+                          'badge text-xs font-bold',
+                          p.roi >= 60 ? 'bg-green-100 text-green-700' :
+                          p.roi >= 30 ? 'bg-blue-100 text-blue-700' :
+                          'bg-red-100 text-red-700',
+                        )}>
+                          {formatPercent(p.roi)}
+                        </span>
+                      </td>
+
+                      {/* Demand */}
+                      <td className="table-td"><DemandBadge level={p.demandLevel} /></td>
+
+                      {/* IP Risk */}
+                      <td className="table-td"><IpBadge score={p.ipRiskScore} /></td>
+
+                      {/* Score */}
+                      <td className="table-td"><ScorePill score={lead.score} /></td>
+
+                      {/* Expand */}
+                      <td className="table-td" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setExpanded(isExpanded ? null : lead.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-all"
+                        >
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </button>
+                      </td>
+                    </tr>
+
+                    {isExpanded && <ExpandedPanel key={`${lead.id}-exp`} lead={lead} />}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-slate-500">
+            {((page - 1) * pageSize + 1).toLocaleString()}–{Math.min(page * pageSize, total).toLocaleString()} of {total.toLocaleString()} leads
+          </span>
+          <div className="flex items-center gap-2">
+            <a
+              href={`?page=${page - 1}`}
+              className={cn('btn-secondary text-xs py-1.5', page <= 1 && 'pointer-events-none opacity-40')}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />Prev
+            </a>
+            <span className="text-slate-600 px-2">Page {page} of {totalPages}</span>
+            <a
+              href={`?page=${page + 1}`}
+              className={cn('btn-secondary text-xs py-1.5', page >= totalPages && 'pointer-events-none opacity-40')}
+            >
+              Next<ChevronRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

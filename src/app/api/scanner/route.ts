@@ -5,7 +5,8 @@ import { enqueueScrape } from '@/lib/queue';
 import { getRetailerNames } from '@/retailers';
 import { z } from 'zod';
 
-export const dynamic = 'force-dynamic';
+export const dynamic    = 'force-dynamic';
+export const maxDuration = 300;
 
 const startSchema = z.object({
   retailer: z.string(),

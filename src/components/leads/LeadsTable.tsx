@@ -8,6 +8,7 @@ import {
   Package, Check, X, Minus, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { formatCurrency, formatPercent, cn } from '@/lib/utils';
+import { discountUrl } from '@/lib/discount-urls';
 import { scoreLabel } from '@/engines/scoring';
 import type { Discount, Plan } from '@/types';
 
@@ -116,12 +117,24 @@ function ExpandedPanel({ lead }: { lead: LeadRow }) {
                 <span>{formatCurrency(p.sourcePrice)}</span>
               </div>
             )}
-            {discounts.map((d, i) => (
-              <div key={i} className="flex justify-between text-xs py-0.5">
-                <span className="text-green-600">− {d.source} {d.percentage ? `(${d.percentage}%)` : ''}</span>
-                <span className="text-green-600">−{formatCurrency(d.amount)}</span>
-              </div>
-            ))}
+            {discounts.map((d, i) => {
+              const url = discountUrl(d.source, lead.product.sourceRetailer ?? '', d.url);
+              return (
+                <div key={i} className="flex justify-between text-xs py-0.5 gap-2">
+                  <span className="text-green-600 flex items-center gap-1 min-w-0">
+                    <span>−</span>
+                    {url ? (
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 decoration-green-400 hover:text-green-700 flex items-center gap-0.5">
+                        {d.source}<ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
+                      </a>
+                    ) : <span>{d.source}</span>}
+                    {d.percentage ? <span>({d.percentage}%)</span> : null}
+                    {d.code && <span className="font-mono bg-green-50 border border-green-100 px-1 rounded text-[10px]">{d.code}</span>}
+                  </span>
+                  <span className="text-green-600 flex-shrink-0">−{formatCurrency(d.amount)}</span>
+                </div>
+              );
+            })}
             {p.finalCost != null && (
               <div className="flex justify-between text-xs font-semibold border-t border-slate-100 pt-1 mt-1">
                 <span>Final Cost</span><span>{formatCurrency(p.finalCost)}</span>

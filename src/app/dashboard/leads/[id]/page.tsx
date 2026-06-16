@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import type { Discount } from '@/types';
+import { discountUrl } from '@/lib/discount-urls';
 
 export const dynamic = 'force-dynamic';
 
@@ -128,12 +129,28 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   <span className="font-medium">{formatCurrency(p.sourcePrice)}</span>
                 </div>
               )}
-              {discounts.map((d, i) => (
-                <div key={i} className="flex justify-between text-sm">
-                  <span className="text-green-600">− {d.source} {d.type}{d.code ? ` [${d.code}]` : ''}{d.percentage ? ` (${d.percentage}%)` : ''}</span>
-                  <span className="text-green-600 font-medium">−{formatCurrency(d.amount)}</span>
-                </div>
-              ))}
+              {discounts.map((d, i) => {
+                const url = discountUrl(d.source, p.sourceRetailer ?? '', d.url);
+                return (
+                  <div key={i} className="flex justify-between text-sm gap-2">
+                    <span className="text-green-600 flex items-center gap-1.5 min-w-0">
+                      <span>−</span>
+                      {url ? (
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 decoration-green-400 hover:text-green-700 flex items-center gap-1">
+                          {d.source}
+                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                        </a>
+                      ) : (
+                        <span>{d.source}</span>
+                      )}
+                      <span className="text-green-500">{d.type}</span>
+                      {d.code && <span className="font-mono text-xs bg-green-50 border border-green-100 px-1 rounded">{d.code}</span>}
+                      {d.percentage && <span>({d.percentage}%)</span>}
+                    </span>
+                    <span className="text-green-600 font-medium flex-shrink-0">−{formatCurrency(d.amount)}</span>
+                  </div>
+                );
+              })}
               <div className="flex justify-between text-sm font-semibold border-t border-slate-100 pt-1 mt-1">
                 <span>Final Cost</span>
                 <span>{p.finalCost != null ? formatCurrency(p.finalCost) : '—'}</span>

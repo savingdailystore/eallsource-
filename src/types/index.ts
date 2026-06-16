@@ -33,6 +33,7 @@ export interface Discount {
   amount: number;
   percentage?: number;
   code?: string;
+  url?: string;
 }
 
 // ─── Retailer plugin ────────────────────────────────────────────────────────

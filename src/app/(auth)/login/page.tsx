@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
-export default function LoginPage() {
+function LoginForm() {
   const router      = useRouter();
   const params      = useSearchParams();
   const callbackUrl = params.get('callbackUrl') ?? '/dashboard';
@@ -105,11 +105,19 @@ export default function LoginPage() {
       </form>
 
       <p className="text-center text-sm mt-6" style={{ color: '#6b7280' }}>
-        Don't have an account?{' '}
+        Don&apos;t have an account?{' '}
         <Link href="/register" className="text-orange-400 font-medium hover:text-orange-300 transition-colors">
           Start free trial
         </Link>
       </p>
     </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

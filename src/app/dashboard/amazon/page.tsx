@@ -14,11 +14,11 @@ export default async function AmazonPage() {
     return (
       <div className="p-6 lg:p-8 max-w-xl">
         <div className="card p-10 text-center">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(245,158,11,0.1)' }}>
-            <Zap className="w-7 h-7 text-amber-400" />
+          <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Zap className="w-7 h-7 text-amber-500" />
           </div>
-          <h2 className="text-xl font-bold mb-2" style={{ color: '#fafafa' }}>Amazon SP-API requires Pro</h2>
-          <p className="text-sm mb-5" style={{ color: '#71717a' }}>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Amazon SP-API requires Pro</h2>
+          <p className="text-slate-500 text-sm mb-5">
             Connect your Amazon Seller Central account to sync inventory, update listings, and automate repricing.
           </p>
           <a href="/dashboard/billing" className="btn-primary">Upgrade to Pro →</a>
@@ -45,20 +45,17 @@ export default async function AmazonPage() {
       </div>
 
       {/* Connection status */}
-      <div
-        className="card p-5"
-        style={isConnected ? { borderColor: 'rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.06)' } : {}}
-      >
+      <div className={`card p-5 ${isConnected ? 'border-green-200 bg-green-50/50' : ''}`}>
         <div className="flex items-center gap-3">
           {isConnected
-            ? <CheckCircle2 className="w-6 h-6 text-green-400" />
-            : <XCircle className="w-6 h-6" style={{ color: '#52525b' }} />}
+            ? <CheckCircle2 className="w-6 h-6 text-green-500" />
+            : <XCircle className="w-6 h-6 text-slate-300" />}
           <div>
-            <div className="font-semibold" style={{ color: '#fafafa' }}>
+            <div className="font-semibold text-slate-900">
               {isConnected ? 'Connected' : 'Not connected'}
             </div>
             {isConnected && cred && (
-              <div className="text-xs mt-0.5" style={{ color: '#71717a' }}>
+              <div className="text-xs text-slate-500 mt-0.5">
                 Seller ID: {cred.sellerId} · Marketplace: {cred.marketplaceId}
               </div>
             )}
@@ -74,20 +71,20 @@ export default async function AmazonPage() {
       {/* Connect form */}
       {!isConnected && (
         <div className="card p-6">
-          <h2 className="font-semibold mb-1" style={{ color: '#fafafa' }}>Connect Amazon Seller Account</h2>
-          <p className="text-sm mb-5" style={{ color: '#71717a' }}>
+          <h2 className="font-semibold text-slate-900 mb-1">Connect Amazon Seller Account</h2>
+          <p className="text-sm text-slate-500 mb-5">
             Enter your SP-API credentials. Tokens are encrypted with AES-256-GCM before storage.
           </p>
 
-          <div className="rounded-xl px-4 py-3 mb-5 flex gap-2" style={{ background: 'rgba(245,158,11,0.1)', border: '0.5px solid rgba(245,158,11,0.25)' }}>
-            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-400">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 flex gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700">
               You must have a registered SP-API application. See{' '}
               <a
                 href="https://developer-docs.amazon.com/sp-api/docs/registering-your-application"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline"
+                className="underline font-medium"
               >
                 SP-API documentation
               </a>.
@@ -101,7 +98,7 @@ export default async function AmazonPage() {
       {/* Available integrations */}
       {isConnected && (
         <div className="card p-5">
-          <h2 className="font-semibold mb-4" style={{ color: '#fafafa' }}>Available Integrations</h2>
+          <h2 className="font-semibold text-slate-900 mb-4">Available Integrations</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
               ['Inventory Sync', 'Pull current FBA inventory levels', true],
@@ -111,14 +108,11 @@ export default async function AmazonPage() {
             ].map(([name, desc, active]) => (
               <div
                 key={name as string}
-                className="rounded-xl p-4"
-                style={active
-                  ? { border: '0.5px solid rgba(34,197,94,0.2)', background: 'rgba(34,197,94,0.06)' }
-                  : { border: '0.5px solid #27272a', background: '#18181b', opacity: 0.6 }}
+                className={`rounded-xl border p-4 ${active ? 'border-green-200 bg-green-50/50' : 'border-slate-200 bg-slate-50/50 opacity-60'}`}
               >
-                <div className="font-medium text-sm" style={{ color: '#fafafa' }}>{name as string}</div>
-                <div className="text-xs mt-1" style={{ color: '#71717a' }}>{desc as string}</div>
-                {!active && <div className="text-xs mt-2 text-amber-400">Coming soon</div>}
+                <div className="font-medium text-slate-800 text-sm">{name as string}</div>
+                <div className="text-xs text-slate-500 mt-1">{desc as string}</div>
+                {!active && <div className="text-xs text-amber-600 mt-2">Coming soon</div>}
               </div>
             ))}
           </div>

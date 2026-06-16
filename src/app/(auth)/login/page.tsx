@@ -40,14 +40,11 @@ function LoginForm() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold mb-1" style={{ color: '#fafafa' }}>Welcome back</h1>
-      <p className="text-sm mb-6" style={{ color: '#71717a' }}>Sign in to your account</p>
+      <h1 className="text-2xl font-semibold text-slate-900 mb-1">Welcome back</h1>
+      <p className="text-sm text-slate-500 mb-6">Sign in to your account</p>
 
       {error && (
-        <div
-          className="mb-4 px-4 py-3 rounded-xl text-sm"
-          style={{ background: 'rgba(239,68,68,0.1)', border: '0.5px solid rgba(239,68,68,0.2)', color: '#f87171' }}
-        >
+        <div className="mb-4 px-4 py-3 rounded-xl text-sm bg-red-50 border border-red-100 text-red-600">
           {error}
         </div>
       )}
@@ -71,7 +68,7 @@ function LoginForm() {
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="label mb-0" htmlFor="password">Password</label>
-            <Link href="/forgot-password" className="text-xs transition-colors" style={{ color: '#a78bfa' }}>
+            <Link href="/forgot-password" className="text-xs text-blue-600 hover:text-blue-700 transition-colors">
               Forgot password?
             </Link>
           </div>
@@ -89,10 +86,7 @@ function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPw(!showPw)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-              style={{ color: '#71717a' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#a1a1aa')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = '#71717a')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
             >
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -104,9 +98,9 @@ function LoginForm() {
         </button>
       </form>
 
-      <p className="text-center text-sm mt-6" style={{ color: '#71717a' }}>
+      <p className="text-center text-sm text-slate-500 mt-6">
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="font-medium transition-colors" style={{ color: '#a78bfa' }}>
+        <Link href="/register" className="text-blue-600 font-medium hover:text-blue-700 transition-colors">
           Start free trial
         </Link>
       </p>

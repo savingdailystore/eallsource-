@@ -96,7 +96,7 @@ export function ProductsTable({ products, total, page, pageSize }: Props) {
                       </td>
                       <td className="table-td" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1">
-                          <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-slate-300 hover:text-orange-500 hover:bg-orange-50 transition-all">
+                          <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-zinc-400 hover:text-violet-400 hover:bg-violet-500/10 transition-all">
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                           <button onClick={() => setExpanded(isExp ? null : p.id)} className="p-1.5 rounded-lg text-slate-300 hover:text-green-600 hover:bg-green-50 transition-all">

@@ -40,8 +40,8 @@ function LoginForm() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold mb-1" style={{ color: '#f9fafb' }}>Welcome back</h1>
-      <p className="text-sm mb-6" style={{ color: '#6b7280' }}>Sign in to your account</p>
+      <h1 className="text-2xl font-semibold mb-1" style={{ color: '#fafafa' }}>Welcome back</h1>
+      <p className="text-sm mb-6" style={{ color: '#71717a' }}>Sign in to your account</p>
 
       {error && (
         <div
@@ -71,7 +71,7 @@ function LoginForm() {
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="label mb-0" htmlFor="password">Password</label>
-            <Link href="/forgot-password" className="text-xs text-orange-400 hover:text-orange-300 transition-colors">
+            <Link href="/forgot-password" className="text-xs transition-colors" style={{ color: '#a78bfa' }}>
               Forgot password?
             </Link>
           </div>
@@ -90,9 +90,9 @@ function LoginForm() {
               type="button"
               onClick={() => setShowPw(!showPw)}
               className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-              style={{ color: '#6b7280' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#9ca3af')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = '#6b7280')}
+              style={{ color: '#71717a' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#a1a1aa')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#71717a')}
             >
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -104,9 +104,9 @@ function LoginForm() {
         </button>
       </form>
 
-      <p className="text-center text-sm mt-6" style={{ color: '#6b7280' }}>
+      <p className="text-center text-sm mt-6" style={{ color: '#71717a' }}>
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="text-orange-400 font-medium hover:text-orange-300 transition-colors">
+        <Link href="/register" className="font-medium transition-colors" style={{ color: '#a78bfa' }}>
           Start free trial
         </Link>
       </p>

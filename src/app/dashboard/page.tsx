@@ -56,8 +56,8 @@ export default async function DashboardPage() {
       value: Number(stats.total).toLocaleString(),
       sub:   `+${Number(stats.new_today)} today`,
       icon:  TrendingUp,
-      color: 'text-orange-400',
-      bg:    'bg-orange-500/10',
+      color: 'text-violet-400',
+      bg:    'bg-violet-500/10',
     },
     {
       label: 'Avg ROI',
@@ -123,10 +123,10 @@ export default async function DashboardPage() {
         <div className="lg:col-span-2 card overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '0.5px solid #2a2a2a' }}>
             <div className="flex items-center gap-2">
-              <Flame className="w-4 h-4 text-orange-400" />
+              <Flame className="w-4 h-4 text-violet-400" />
               <h2 className="font-semibold" style={{ color: '#f9fafb' }}>Top leads</h2>
             </div>
-            <Link href="/dashboard/leads" className="text-xs font-medium text-orange-400 hover:text-orange-300 transition-colors">
+            <Link href="/dashboard/leads" className="text-xs font-medium hover:opacity-80 transition-colors" style={{ color: '#a78bfa' }}>
               View all →
             </Link>
           </div>

@@ -33,8 +33,8 @@ const BOTTOM_NAV: NavItem[] = [
 ];
 
 const PLAN_COLORS: Record<Plan, string> = {
-  STARTER:    'bg-[#2a2a2a] text-[#9ca3af]',
-  PRO:        'bg-orange-500/20 text-orange-400',
+  STARTER:    'bg-zinc-800 text-zinc-400',
+  PRO:        'bg-violet-500/20 text-violet-400',
   ENTERPRISE: 'bg-purple-500/20 text-purple-400',
 };
 
@@ -47,9 +47,9 @@ interface SidebarProps {
 function BrandIcon() {
   return (
     <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect x="2"  y="18" width="7" height="12" rx="2" fill="#f97316" fillOpacity="0.45" />
-      <rect x="12" y="10" width="7" height="20" rx="2" fill="#f97316" fillOpacity="0.7"  />
-      <rect x="22" y="2"  width="7" height="28" rx="2" fill="#f97316" />
+      <rect x="2"  y="18" width="7" height="12" rx="2" fill="#a78bfa" fillOpacity="0.45" />
+      <rect x="12" y="10" width="7" height="20" rx="2" fill="#a78bfa" fillOpacity="0.7"  />
+      <rect x="22" y="2"  width="7" height="28" rx="2" fill="#a78bfa" />
     </svg>
   );
 }
@@ -67,7 +67,7 @@ export function Sidebar({ plan, orgName, userEmail }: SidebarProps) {
         className={cn(
           'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
           isActive
-            ? 'bg-orange-500 text-white'
+            ? 'bg-violet-600 text-white'
             : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white',
           isLocked && 'opacity-60',
         )}
@@ -83,14 +83,14 @@ export function Sidebar({ plan, orgName, userEmail }: SidebarProps) {
   return (
     <aside
       className="fixed inset-y-0 left-0 z-40 flex flex-col"
-      style={{ width: 'var(--sidebar-width)', background: '#0d0d0d', borderRight: '1px solid #2a2a2a' }}
+      style={{ width: 'var(--sidebar-width)', background: '#141417', borderRight: '1px solid #27272a' }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-5" style={{ borderBottom: '1px solid #2a2a2a' }}>
+      <div className="flex items-center gap-2.5 px-4 py-5" style={{ borderBottom: '1px solid #27272a' }}>
         <BrandIcon />
         <div className="min-w-0">
           <div className="text-white font-semibold text-sm leading-tight truncate">
-            Arbitrage Pro <span className="text-orange-400">AI</span>
+            Arbitrage Pro <span style={{ color: '#a78bfa' }}>AI</span>
           </div>
           <div className="text-[10px] truncate" style={{ color: '#6b7280' }}>{orgName}</div>
         </div>
@@ -113,9 +113,9 @@ export function Sidebar({ plan, orgName, userEmail }: SidebarProps) {
       </nav>
 
       {/* User footer */}
-      <div className="px-3 py-3" style={{ borderTop: '1px solid #2a2a2a' }}>
+      <div className="px-3 py-3" style={{ borderTop: '1px solid #27272a' }}>
         <div className="flex items-center gap-2 px-2 mb-2">
-          <div className="w-7 h-7 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">{userEmail[0]?.toUpperCase()}</span>
           </div>
           <span className="text-xs truncate flex-1" style={{ color: '#6b7280' }}>{userEmail}</span>

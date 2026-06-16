@@ -119,22 +119,30 @@ function ExpandedPanel({ lead }: { lead: LeadRow }) {
             )}
             {discounts.map((d, i) => {
               const url = discountUrl(d.source, lead.product.sourceRetailer ?? '', d.url);
+              const isCashback = d.type === 'cashback' || d.type === 'rewards';
               return (
                 <div key={i} className="flex justify-between text-xs py-0.5 gap-2">
-                  <span className="text-green-600 flex items-center gap-1 min-w-0">
+                  <span className="text-green-600 flex items-center gap-1 min-w-0 flex-wrap">
                     <span>−</span>
                     {url ? (
                       <a href={url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 decoration-green-400 hover:text-green-700 flex items-center gap-0.5">
                         {d.source}<ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
                       </a>
                     ) : <span>{d.source}</span>}
-                    {d.percentage ? <span>({d.percentage}%)</span> : null}
+                    {d.percentage ? (
+                      <span title={isCashback ? 'Rate at scan time — verify current rate before purchasing' : undefined}>
+                        {isCashback ? `~${d.percentage}%` : `${d.percentage}%`}
+                      </span>
+                    ) : null}
                     {d.code && <span className="font-mono bg-green-50 border border-green-100 px-1 rounded text-[10px]">{d.code}</span>}
                   </span>
                   <span className="text-green-600 flex-shrink-0">−{formatCurrency(d.amount)}</span>
                 </div>
               );
             })}
+            {discounts.some((d) => d.type === 'cashback' || d.type === 'rewards') && (
+              <p className="text-[10px] text-amber-600 mt-1">~ Cashback rates at scan time — verify before purchasing.</p>
+            )}
             {p.finalCost != null && (
               <div className="flex justify-between text-xs font-semibold border-t border-slate-100 pt-1 mt-1">
                 <span>Final Cost</span><span>{formatCurrency(p.finalCost)}</span>

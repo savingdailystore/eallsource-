@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { stripe, createCheckoutSession, createStripeCustomer, PRICE_IDS } from '@/lib/stripe';
+import { createCheckoutSession, createStripeCustomer, PRICE_IDS } from '@/lib/stripe';
 import type { Plan } from '@/types';
 
 export const dynamic = 'force-dynamic';

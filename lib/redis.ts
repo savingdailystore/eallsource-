@@ -1,13 +1,17 @@
 import Redis from 'ioredis';
 
-const globalForRedis = globalThis as unknown as { redis: Redis };
+const REDIS_URL = process.env.REDIS_URL ?? '';
+const REDIS_ENABLED =
+  REDIS_URL.length > 0 &&
+  !REDIS_URL.includes('localhost') &&
+  !REDIS_URL.includes('127.0.0.1');
 
-export const redis =
-  globalForRedis.redis ||
-  new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-    maxRetriesPerRequest: 3,
-    lazyConnect: true,
-  });
+const globalForRedis = globalThis as unknown as { redis: Redis | null };
+
+export const redis: Redis | null = REDIS_ENABLED
+  ? (globalForRedis.redis ??
+      new Redis(REDIS_URL, { maxRetriesPerRequest: 3, lazyConnect: true }))
+  : null;
 
 if (process.env.NODE_ENV !== 'production') globalForRedis.redis = redis;
 
@@ -16,25 +20,30 @@ export async function getCached<T>(
   fetcher: () => Promise<T>,
   ttlSeconds = 300,
 ): Promise<T> {
-  try {
-    const cached = await redis.get(key);
-    if (cached) return JSON.parse(cached) as T;
-  } catch {
-    // Redis unavailable — fall through to fetcher
+  if (redis) {
+    try {
+      const cached = await redis.get(key);
+      if (cached) return JSON.parse(cached) as T;
+    } catch {
+      // Redis unavailable — fall through to fetcher
+    }
   }
 
   const result = await fetcher();
 
-  try {
-    await redis.setex(key, ttlSeconds, JSON.stringify(result));
-  } catch {
-    // Redis unavailable — ignore cache write
+  if (redis) {
+    try {
+      await redis.setex(key, ttlSeconds, JSON.stringify(result));
+    } catch {
+      // ignore cache write failure
+    }
   }
 
   return result;
 }
 
 export async function invalidateCache(pattern: string) {
+  if (!redis) return;
   try {
     const keys = await redis.keys(pattern);
     if (keys.length > 0) await redis.del(...keys);

@@ -15,26 +15,29 @@ export function getConnection() {
   }
 }
 
-// ─────────────────────────────────────────────
-// Queue Definitions
-// ─────────────────────────────────────────────
+function redisConfigured(): boolean {
+  const url = process.env.REDIS_URL ?? '';
+  return url.length > 0 && !url.includes('localhost') && !url.includes('127.0.0.1');
+}
 
-export const weeklyScanQueue  = new Queue('weekly-scan',  { connection: getConnection() });
-export const productScanQueue = new Queue('product-scan', { connection: getConnection() });
-export const scrapeQueue      = new Queue('scrape',       { connection: getConnection() });
-export const enrichQueue      = new Queue('enrich',       { connection: getConnection() });
-export const scoreQueue       = new Queue('score',        { connection: getConnection() });
+// Lazy singletons — queues are only created when a job is actually enqueued
+let _scrapeQueue: Queue | null = null;
+let _enrichQueue: Queue | null = null;
+let _scoreQueue: Queue | null = null;
+let _weeklyScanQueue: Queue | null = null;
 
-// ─────────────────────────────────────────────
-// Job Helpers
-// ─────────────────────────────────────────────
+function scrapeQueue()     { return (_scrapeQueue     ??= new Queue('scrape',       { connection: getConnection() })); }
+function enrichQueue()     { return (_enrichQueue     ??= new Queue('enrich',       { connection: getConnection() })); }
+function scoreQueue()      { return (_scoreQueue      ??= new Queue('score',        { connection: getConnection() })); }
+function weeklyScanQueue() { return (_weeklyScanQueue ??= new Queue('weekly-scan',  { connection: getConnection() })); }
 
 export async function enqueueScrapeJob(payload: {
   url: string;
   scrapeJobId: string;
   maxResults?: number;
 }) {
-  return scrapeQueue.add('amazon-search', payload, {
+  if (!redisConfigured()) return null;
+  return scrapeQueue().add('amazon-search', payload, {
     attempts: 2,
     backoff: { type: 'exponential', delay: 5_000 },
   });
@@ -44,18 +47,21 @@ export async function enqueueEnrichJob(payload: {
   rawProductId: string;
   scrapeJobId?: string;
 }) {
-  return enrichQueue.add('enrich-product', payload, {
+  if (!redisConfigured()) return null;
+  return enrichQueue().add('enrich-product', payload, {
     attempts: 2,
     backoff: { type: 'fixed', delay: 2_000 },
   });
 }
 
 export async function enqueueScoreJob(payload: { leadId: string }) {
-  return scoreQueue.add('score-lead', payload);
+  if (!redisConfigured()) return null;
+  return scoreQueue().add('score-lead', payload);
 }
 
 export async function scheduleWeeklyScan() {
-  await weeklyScanQueue.add(
+  if (!redisConfigured()) return;
+  await weeklyScanQueue().add(
     'weekly-feed',
     {},
     { repeat: { pattern: '0 2 * * 0' }, jobId: 'weekly-feed-recurring' },
@@ -63,5 +69,6 @@ export async function scheduleWeeklyScan() {
 }
 
 export async function triggerImmediateScan(batchId?: string) {
-  return weeklyScanQueue.add('weekly-feed', { batchId }, { priority: 1 });
+  if (!redisConfigured()) return null;
+  return weeklyScanQueue().add('weekly-feed', { batchId }, { priority: 1 });
 }

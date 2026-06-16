@@ -1,7 +1,8 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/utils';
-import { Package, DollarSign, TrendingUp, ShoppingCart } from 'lucide-react';
+import { DollarSign, TrendingUp, ShoppingCart, Package } from 'lucide-react';
+import { AddItemModal } from '@/components/inventory/AddItemModal';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inventory' };
@@ -42,9 +43,7 @@ export default async function InventoryPage() {
           <h1 className="page-title">Inventory</h1>
           <p className="page-subtitle">Track what you've purchased and listed</p>
         </div>
-        <button className="btn-primary text-sm">
-          <Package className="w-4 h-4" />Add Item
-        </button>
+        <AddItemModal />
       </div>
 
       {/* Stats */}

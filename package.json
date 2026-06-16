@@ -13,8 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "worker:dev": "tsx --watch src/workers/index.ts",
-    "worker:start": "tsx src/workers/index.ts"
+    "worker:dev": "tsx --watch src/workers/start.ts",
+    "worker:start": "tsx src/workers/start.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

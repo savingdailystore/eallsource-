@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   });
 
   // Enqueue
-  await enqueueScrape({ retailer, orgId, jobId: job.id });
+  await enqueueScrape({ retailer, orgId, scanJobId: job.id });
 
   await prisma.auditLog.create({
     data: {

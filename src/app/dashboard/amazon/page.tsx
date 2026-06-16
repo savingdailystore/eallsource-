@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { ConnectForm } from '@/components/amazon/ConnectForm';
 import { Link2, CheckCircle2, XCircle, Zap, AlertTriangle } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -72,42 +73,25 @@ export default async function AmazonPage() {
         <div className="card p-6">
           <h2 className="font-semibold text-slate-900 mb-1">Connect Amazon Seller Account</h2>
           <p className="text-sm text-slate-500 mb-5">
-            Enter your SP-API credentials. Tokens are encrypted with AES-256-GCM.
+            Enter your SP-API credentials. Tokens are encrypted with AES-256-GCM before storage.
           </p>
 
           <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-5 flex gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-amber-700">
               You must have a registered SP-API application. See{' '}
-              <a href="https://developer-docs.amazon.com/sp-api/docs/registering-your-application" target="_blank" rel="noopener noreferrer" className="underline">SP-API documentation</a>.
+              <a
+                href="https://developer-docs.amazon.com/sp-api/docs/registering-your-application"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                SP-API documentation
+              </a>.
             </p>
           </div>
 
-          <form method="POST" action="/api/amazon/connect" className="space-y-4">
-            <div>
-              <label className="label">Seller ID</label>
-              <input name="sellerId" type="text" required className="input" placeholder="AXXXXXXXXXX" />
-            </div>
-            <div>
-              <label className="label">Marketplace ID</label>
-              <input name="marketplaceId" type="text" required className="input" placeholder="ATVPDKIKX0DER" defaultValue="ATVPDKIKX0DER" />
-            </div>
-            <div>
-              <label className="label">Refresh Token</label>
-              <input name="refreshToken" type="password" required className="input" placeholder="Atzr|..." />
-            </div>
-            <div>
-              <label className="label">LWA Client ID</label>
-              <input name="clientId" type="text" required className="input" />
-            </div>
-            <div>
-              <label className="label">LWA Client Secret</label>
-              <input name="clientSecret" type="password" required className="input" />
-            </div>
-            <button type="submit" className="btn-primary w-full justify-center">
-              <Link2 className="w-4 h-4" />Connect Account
-            </button>
-          </form>
+          <ConnectForm />
         </div>
       )}
 
@@ -122,7 +106,10 @@ export default async function AmazonPage() {
               ['Orders API', 'Track sales and fulfilled orders', true],
               ['Reports API', 'Download settlement and inventory reports', false],
             ].map(([name, desc, active]) => (
-              <div key={name as string} className={`rounded-xl border p-4 ${active ? 'border-green-100 bg-green-50/30' : 'border-slate-100 bg-slate-50/50 opacity-60'}`}>
+              <div
+                key={name as string}
+                className={`rounded-xl border p-4 ${active ? 'border-green-100 bg-green-50/30' : 'border-slate-100 bg-slate-50/50 opacity-60'}`}
+              >
                 <div className="font-medium text-slate-800 text-sm">{name as string}</div>
                 <div className="text-xs text-slate-500 mt-1">{desc as string}</div>
                 {!active && <div className="text-xs text-amber-600 mt-2">Coming soon</div>}

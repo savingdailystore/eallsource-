@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink, Package, ChevronLeft, ChevronRight, ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react';
 import { formatCurrency, formatPercent, cn, buildAmazonUrl } from '@/lib/utils';
 import { scoreLabel } from '@/engines/scoring';
@@ -59,8 +59,8 @@ export function ProductsTable({ products, total, page, pageSize }: Props) {
                 const amazonUrl = p.amazonUrl ?? buildAmazonUrl(p.asin);
                 const discounts = (p.availableDiscounts as Discount[] | null) ?? [];
                 return (
-                  <>
-                    <tr key={p.id} className="cursor-pointer hover:bg-slate-50/60 transition-colors" onClick={() => setExpanded(isExp ? null : p.id)}>
+                  <React.Fragment key={p.id}>
+                    <tr className="cursor-pointer hover:bg-slate-50/60 transition-colors" onClick={() => setExpanded(isExp ? null : p.id)}>
                       <td className="table-td">
                         <div className="flex items-center gap-3" style={{ minWidth: '180px' }}>
                           <div className="w-9 h-9 rounded-lg border bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
@@ -106,7 +106,7 @@ export function ProductsTable({ products, total, page, pageSize }: Props) {
                       </td>
                     </tr>
                     {isExp && (
-                      <tr key={`${p.id}-exp`} className="bg-slate-50/50">
+                      <tr className="bg-slate-50/50">
                         <td colSpan={11} className="px-4 py-3">
                           <div className="grid md:grid-cols-3 gap-3 text-xs">
                             <div>
@@ -143,7 +143,7 @@ export function ProductsTable({ products, total, page, pageSize }: Props) {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </React.Fragment>
                 );
               })}
             </tbody>

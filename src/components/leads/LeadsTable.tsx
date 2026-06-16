@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import {
   ChevronDown, ChevronUp, ExternalLink, TrendingUp,
@@ -235,9 +235,8 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                 const isExpanded = expanded === lead.id;
 
                 return (
-                  <>
+                  <React.Fragment key={lead.id}>
                     <tr
-                      key={lead.id}
                       className="cursor-pointer hover:bg-slate-50/60 transition-colors"
                       onClick={() => setExpanded(isExpanded ? null : lead.id)}
                     >
@@ -314,8 +313,8 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                       </td>
                     </tr>
 
-                    {isExpanded && <ExpandedPanel key={`${lead.id}-exp`} lead={lead} />}
-                  </>
+                    {isExpanded && <ExpandedPanel lead={lead} />}
+                  </React.Fragment>
                 );
               })}
             </tbody>

@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { Settings, Users, Building2, Bell } from 'lucide-react';
+import { OrgForm } from '@/components/settings/OrgForm';
+import { PasswordForm } from '@/components/settings/PasswordForm';
+import { Users, Building2, Settings } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Settings' };
@@ -36,20 +38,11 @@ export default async function SettingsPage() {
           <Building2 className="w-4 h-4 text-slate-500" />
           <h2 className="font-semibold text-slate-900">Organization</h2>
         </div>
-        <form method="POST" action="/api/settings/org" className="space-y-4">
-          <div>
-            <label className="label">Organization Name</label>
-            <input name="name" type="text" defaultValue={org?.name} className="input" />
-          </div>
-          <div>
-            <label className="label">Slug</label>
-            <input type="text" value={org?.slug} disabled className="input opacity-60 cursor-not-allowed" />
-            <p className="text-xs text-slate-400 mt-1">Slug cannot be changed after creation.</p>
-          </div>
-          {canManageUsers && (
-            <button type="submit" className="btn-primary text-sm">Save changes</button>
-          )}
-        </form>
+        <OrgForm
+          orgName={org?.name ?? ''}
+          orgSlug={org?.slug ?? ''}
+          canEdit={canManageUsers}
+        />
       </div>
 
       {/* Team */}
@@ -60,7 +53,7 @@ export default async function SettingsPage() {
             <h2 className="font-semibold text-slate-900">Team Members</h2>
           </div>
           {canManageUsers && session!.user.plan !== 'STARTER' && (
-            <button className="btn-secondary text-xs">Invite member</button>
+            <span className="text-xs text-slate-400 italic">Invite via admin console (coming soon)</span>
           )}
         </div>
 
@@ -88,19 +81,9 @@ export default async function SettingsPage() {
       <div className="card p-6">
         <div className="flex items-center gap-2 mb-4">
           <Settings className="w-4 h-4 text-slate-500" />
-          <h2 className="font-semibold text-slate-900">Account</h2>
+          <h2 className="font-semibold text-slate-900">Change Password</h2>
         </div>
-        <form method="POST" action="/api/settings/password" className="space-y-4">
-          <div>
-            <label className="label">Current Password</label>
-            <input name="current" type="password" className="input" autoComplete="current-password" />
-          </div>
-          <div>
-            <label className="label">New Password</label>
-            <input name="new" type="password" minLength={8} className="input" autoComplete="new-password" />
-          </div>
-          <button type="submit" className="btn-secondary text-sm">Change password</button>
-        </form>
+        <PasswordForm />
       </div>
     </div>
   );

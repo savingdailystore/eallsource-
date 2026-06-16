@@ -5,7 +5,6 @@ import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import type { Metadata } from 'next';
 
 export default function LoginPage() {
   const router      = useRouter();

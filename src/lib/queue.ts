@@ -42,7 +42,7 @@ const inventoryQ = () => q('inventory_sync',   _inventoryQ, (v) => { _inventoryQ
 const repriceQ   = () => q('reprice_listing',  _repriceQ,   (v) => { _repriceQ   = v; });
 const reportQ    = () => q('generate_report',  _reportQ,    (v) => { _reportQ    = v; });
 
-export async function enqueueScrape(payload: { retailer: string; orgId: string; scanJobId: string }) {
+export async function enqueueScrape(payload: { retailer: string; orgId: string; scanJobId: string; query: string }) {
   if (!redisConfigured()) return null;
   return scrapeQ().add('scrape', payload, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
 }

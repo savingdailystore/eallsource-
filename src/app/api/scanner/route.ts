@@ -34,11 +34,11 @@ export async function POST(req: NextRequest) {
 
   // Create job record
   const job = await prisma.scanJob.create({
-    data: { orgId, type: 'SCRAPE', retailer, status: 'PENDING' },
+    data: { orgId, type: 'SCRAPE', retailer, query: query ?? '', status: 'PENDING' },
   });
 
   // Enqueue
-  await enqueueScrape({ retailer, orgId, scanJobId: job.id });
+  await enqueueScrape({ retailer, orgId, scanJobId: job.id, query: query ?? '' });
 
   await prisma.auditLog.create({
     data: {

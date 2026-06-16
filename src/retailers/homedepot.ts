@@ -2,47 +2,45 @@ import { BaseRetailer } from './base';
 import { runApifyActor } from '@/lib/apify';
 import type { RetailerProduct } from '@/types';
 
-// Apify actor handles Walmart's PerimeterX bot-detection/proxy rotation for us.
-// https://apify.com/automation-lab/walmart-scraper
-const ACTOR_ID = 'automation-lab/walmart-scraper';
+// Apify actor handles Home Depot's bot-detection/proxy rotation for us.
+// https://apify.com/crawlerbros/homedepot-scraper
+const ACTOR_ID = 'crawlerbros/homedepot-scraper';
 
-interface ApifyWalmartItem {
-  name?: string;
+interface ApifyHomeDepotItem {
+  title?: string;
   brand?: string;
   price?: number;
   url?: string;
-  thumbnail?: string;
-  seller?: string;
+  imageUrl?: string;
 }
 
-export class WalmartRetailer extends BaseRetailer {
-  name         = 'Walmart';
-  baseUrl      = 'https://www.walmart.com';
+export class HomeDepotRetailer extends BaseRetailer {
+  name         = 'Home Depot';
+  baseUrl      = 'https://www.homedepot.com';
   supportsApi  = false;
 
   async search(query: string, category?: string): Promise<RetailerProduct[]> {
     try {
       const term = category ? `${query} ${category}` : query;
-      const items = await runApifyActor<ApifyWalmartItem>(ACTOR_ID, {
-        searchQueries: [term],
-        maxProductsPerSearch: 50,
-        maxSearchPages: 2,
+      const items = await runApifyActor<ApifyHomeDepotItem>(ACTOR_ID, {
+        searchQuery: term,
+        maxItems: 50,
       });
 
       return items
-        .filter((item) => item.name && typeof item.price === 'number' && item.url)
+        .filter((item) => item.title && typeof item.price === 'number' && item.url)
         .map((item) =>
           this.normalize({
-            title: item.name,
-            brand: item.brand || undefined,
+            title: item.title,
+            brand: item.brand,
             price: item.price,
             inStock: true,
             url: item.url,
-            imageUrl: item.thumbnail,
+            imageUrl: item.imageUrl,
           })
         );
     } catch (err) {
-      console.error('[walmart] search error:', err);
+      console.error('[homedepot] search error:', err);
       return [];
     }
   }

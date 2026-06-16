@@ -5,6 +5,10 @@ const config: NextConfig = {
     remotePatterns: [
       { protocol: 'https', hostname: 'images-na.ssl-images-amazon.com' },
       { protocol: 'https', hostname: 'm.media-amazon.com' },
+      { protocol: 'https', hostname: 'images.thdstatic.com' },
+      { protocol: 'https', hostname: '**.walmartimages.com' },
+      { protocol: 'https', hostname: 'target.scene7.com' },
+      { protocol: 'https', hostname: '**.target.com' },
     ],
   },
 };

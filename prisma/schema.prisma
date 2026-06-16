@@ -215,8 +215,8 @@ model Product {
 
   leads Lead[]
 
+  @@unique([orgId, asin])
   @@index([orgId])
-  @@index([orgId, asin])
   @@index([orgId, score])
   @@index([orgId, roi])
   @@index([orgId, createdAt])
@@ -347,6 +347,7 @@ model ScanJob {
 
   type        String
   retailer    String?
+  query       String?
   status      String   @default("PENDING")
   error       String?
   result      Json?

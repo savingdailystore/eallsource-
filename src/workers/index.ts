@@ -6,6 +6,8 @@ import { assessDemand } from '@/engines/demand';
 import { calculateScore } from '@/engines/scoring';
 import { validateProduct } from '@/engines/validation';
 import { calculateReprice } from '@/engines/repricing';
+import { processRetailerProduct } from '@/services/pipeline';
+import type { RetailerProduct } from '@/types';
 
 function makeWorker(queueName: string, redisUrl: string, handler: (job: Job) => Promise<unknown>) {
   return new Worker(queueName, handler, { connection: { url: redisUrl } });
@@ -14,16 +16,32 @@ function makeWorker(queueName: string, redisUrl: string, handler: (job: Job) => 
 export function startWorkers(redisUrl: string) {
   // ─── Retailer scrape worker ────────────────────────────────────────────────
   makeWorker('scrape_retailer', redisUrl, async (job) => {
-    const { retailer, query, scanJobId } = job.data as { retailer: string; query: string; scanJobId: string };
+    const { retailer, orgId, scanJobId, query } = job.data as { retailer: string; orgId: string; scanJobId: string; query: string };
+
+    await prisma.scanJob.update({ where: { id: scanJobId }, data: { status: 'RUNNING' } });
+
     const { getRetailer } = await import('@/retailers/index');
     const plugin = getRetailer(retailer);
     if (!plugin) throw new Error(`Unknown retailer: ${retailer}`);
+
     const products = await plugin.search(query);
+
+    // Run each product through the full pipeline
+    const results = { created: 0, updated: 0, skipped: 0, errors: 0 };
+    for (const product of products as RetailerProduct[]) {
+      const outcome = await processRetailerProduct(product, orgId);
+      if (outcome.outcome === 'lead_created') results.created++;
+      else if (outcome.outcome === 'lead_updated') results.updated++;
+      else if (outcome.outcome === 'error') results.errors++;
+      else results.skipped++;
+    }
+
     await prisma.scanJob.update({
       where: { id: scanJobId },
-      data: { status: 'COMPLETED', result: products as object, completedAt: new Date() },
+      data: { status: 'COMPLETED', result: results as object, completedAt: new Date() },
     });
-    return products;
+
+    return results;
   });
 
   // ─── Validation worker ───────────────────────────────────────────────────

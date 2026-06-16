@@ -1,17 +1,18 @@
 import type { RetailerPlugin } from '@/types';
 import { WalmartRetailer } from './walmart';
 import { TargetRetailer }  from './target';
+import { HomeDepotRetailer } from './homedepot';
 
 // Registry of all available retailer plugins
 const RETAILERS: RetailerPlugin[] = [
-  new WalmartRetailer(),
   new TargetRetailer(),
+  new WalmartRetailer(),
+  new HomeDepotRetailer(),
   // Add more retailers here as they are implemented:
   // new WalgreensRetailer(),
   // new CvsRetailer(),
   // new KohlsRetailer(),
   // new MacysRetailer(),
-  // new HomeDepotRetailer(),
   // new LowesRetailer(),
   // new OfficeDepotRetailer(),
   // new VitacostRetailer(),

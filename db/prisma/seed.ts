@@ -43,7 +43,7 @@ async function main() {
     });
   }
 
-  console.log(`✓ admin@eallsource.com / ${process.env.ADMIN_PASSWORD ?? 'Admin123!'}`);
+  console.log(`✓ ${process.env.ADMIN_EMAIL ?? 'admin@eallsource.com'} / ${process.env.ADMIN_PASSWORD ?? 'Admin123!'}`);
   console.log('✓ demo@eallsource.com / Demo123!');
   console.log(`✓ ${MOCK_PRODUCTS.length} products + leads seeded`);
   console.log('Seeding complete.');

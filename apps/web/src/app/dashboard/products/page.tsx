@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ProductsTable } from '@/components/products/ProductsTable';
+import type { ProductRow } from '@/components/products/ProductsTable';
 import { Filters } from '@/components/dashboard/Filters';
 import { Download, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import type { Product, ProductFilters } from '@lib/types';
+import type { ProductFilters } from '@lib/types';
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);

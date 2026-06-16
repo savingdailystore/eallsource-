@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Flame, ExternalLink, TrendingUp, Filter, RefreshCw,
-  Play, CheckCircle, Eye, XCircle, Loader2, Clock,
-  ShieldCheck, ShieldAlert, ShieldX, ChevronDown, ChevronUp,
-  AlertCircle, Search,
+  Play, Loader2, Clock,
+  ChevronDown, ChevronUp, Search,
 } from 'lucide-react';
 import { formatCurrency } from '@lib/utils';
 
@@ -13,42 +12,29 @@ import { formatCurrency } from '@lib/utils';
 
 interface Lead {
   id: string;
-  asin: string;
-  title: string;
-  category?: string;
-  imageUrl?: string;
-  sourceRetailer: string;
-  sourcePrice: number;
-  sourceUrl: string;
-  amazonPrice: number;
-  amazonUrl: string;
-  finalCost: number;
-  netProfit: number;
-  roi: number;
+  productId: string;
   score: number;
-  bsr?: number;
-  fbaSellers: number;
   status: string;
-  alertSent: boolean;
   createdAt: string;
-  scoreBreakdown: {
-    roi?: number;
-    profit?: number;
-    velocity?: number;
-    competition?: number;
-    risk?: number;
+  product: {
+    id: string;
+    asin: string;
+    title: string;
+    price: number;
+    fees: number;
+    profit: number;
+    roi: number;
+    score: number;
+    createdAt: string;
   };
 }
 
 interface ScrapeJob {
   id: string;
-  query?: string;
+  type: string;
+  url: string;
   status: string;
-  itemsFound: number;
-  leadsCreated: number;
-  error?: string;
   createdAt: string;
-  completedAt?: string;
 }
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -120,6 +106,9 @@ function ScoreBar({ label, value }: { label: string; value?: number }) {
 
 function LeadRow({ lead, onStatusChange }: { lead: Lead; onStatusChange: (id: string, s: string) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const { product } = lead;
+  const amazonUrl = `https://www.amazon.com/dp/${product.asin}`;
+  const sourceCost = Math.max(0, product.price - product.fees - product.profit);
 
   return (
     <>
@@ -135,46 +124,46 @@ function LeadRow({ lead, onStatusChange }: { lead: Lead; onStatusChange: (id: st
         {/* Product */}
         <td className="px-3 py-3">
           <div className="flex items-center gap-3">
-            {lead.imageUrl ? (
-              <img src={lead.imageUrl} alt={lead.title} className="w-9 h-9 rounded-lg object-contain flex-shrink-0 border border-gray-100" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            ) : (
-              <div className="w-9 h-9 rounded-lg bg-gray-100 flex-shrink-0" />
-            )}
+            <div className="w-9 h-9 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+              <img
+                src={`https://images-na.ssl-images-amazon.com/images/P/${product.asin}.01._SL75_.jpg`}
+                alt={product.title}
+                className="w-9 h-9 object-contain"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
             <div className="min-w-0">
-              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-1">{lead.title}</div>
-              <div className="text-xs text-gray-400 font-mono">{lead.asin}</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-1">{product.title}</div>
+              <div className="text-xs text-gray-400 font-mono">{product.asin}</div>
             </div>
           </div>
         </td>
 
-        {/* Source */}
+        {/* Est. Source Cost */}
         <td className="px-3 py-3">
-          <a href={lead.sourceUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium">
-            {lead.sourceRetailer} <ExternalLink className="w-3 h-3" />
-          </a>
-          <div className="text-xs text-gray-500 mt-0.5">{formatCurrency(lead.sourcePrice)}</div>
+          <div className="text-xs text-gray-500 font-medium">Est. Cost</div>
+          <div className="text-xs text-gray-700 mt-0.5">{formatCurrency(sourceCost)}</div>
         </td>
 
         {/* Amazon */}
         <td className="px-3 py-3">
-          <a href={lead.amazonUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-xs text-orange-600 hover:underline font-medium">
+          <a href={amazonUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-xs text-orange-600 hover:underline font-medium">
             Amazon <ExternalLink className="w-3 h-3" />
           </a>
-          <div className="text-xs text-gray-500 mt-0.5">{formatCurrency(lead.amazonPrice)}</div>
+          <div className="text-xs text-gray-500 mt-0.5">{formatCurrency(product.price)}</div>
         </td>
 
         {/* Profit */}
         <td className="px-3 py-3 text-right">
-          <div className={`text-sm font-bold ${lead.netProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-            {formatCurrency(lead.netProfit)}
+          <div className={`text-sm font-bold ${product.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            {formatCurrency(product.profit)}
           </div>
-          <div className="text-xs text-gray-400">{lead.roi.toFixed(1)}% ROI</div>
+          <div className="text-xs text-gray-400">{product.roi.toFixed(1)}% ROI</div>
         </td>
 
-        {/* BSR */}
+        {/* Score bar */}
         <td className="px-3 py-3 text-right">
-          <div className="text-sm text-gray-700 dark:text-gray-300">{lead.bsr ? `#${lead.bsr.toLocaleString()}` : '—'}</div>
-          <div className="text-xs text-gray-400">{lead.fbaSellers} FBA</div>
+          <div className="text-sm text-gray-700 dark:text-gray-300">{lead.score}/100</div>
         </td>
 
         {/* Status */}
@@ -192,26 +181,16 @@ function LeadRow({ lead, onStatusChange }: { lead: Lead; onStatusChange: (id: st
         <tr className="bg-purple-50/30 dark:bg-purple-900/10">
           <td colSpan={8} className="px-6 py-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Score breakdown */}
-              <div className="col-span-2 space-y-2">
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Score Breakdown</div>
-                <ScoreBar label="ROI"         value={lead.scoreBreakdown.roi} />
-                <ScoreBar label="Profit"      value={lead.scoreBreakdown.profit} />
-                <ScoreBar label="Velocity"    value={lead.scoreBreakdown.velocity} />
-                <ScoreBar label="Competition" value={lead.scoreBreakdown.competition} />
-                <ScoreBar label="Risk"        value={lead.scoreBreakdown.risk} />
-              </div>
               {/* Profit math */}
-              <div>
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Profit Math</div>
+              <div className="col-span-2">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Profit Math</div>
                 <div className="space-y-1">
                   {[
-                    ['Source Price',    formatCurrency(lead.sourcePrice)],
-                    ['Final Cost',      formatCurrency(lead.finalCost)],
-                    ['Amazon Sell',     formatCurrency(lead.amazonPrice)],
-                    ['Amazon Fees',     formatCurrency(lead.amazonPrice - lead.netProfit - lead.finalCost)],
-                    ['Net Profit',      formatCurrency(lead.netProfit)],
-                    ['ROI',             `${lead.roi.toFixed(1)}%`],
+                    ['Est. Source Cost', formatCurrency(sourceCost)],
+                    ['Amazon Fees',      formatCurrency(product.fees)],
+                    ['Resell Price',     formatCurrency(product.price)],
+                    ['Net Profit',       formatCurrency(product.profit)],
+                    ['ROI',              `${product.roi.toFixed(1)}%`],
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between text-xs">
                       <span className="text-gray-400">{k}</span>
@@ -222,23 +201,15 @@ function LeadRow({ lead, onStatusChange }: { lead: Lead; onStatusChange: (id: st
               </div>
               {/* Links */}
               <div>
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Links</div>
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Links</div>
                 <div className="space-y-2">
-                  <a href={lead.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-                    <ExternalLink className="w-3 h-3" />{lead.sourceRetailer}
-                  </a>
-                  <a href={lead.amazonUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-orange-600 hover:underline">
+                  <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-orange-600 hover:underline">
                     <ExternalLink className="w-3 h-3" />Amazon
                   </a>
-                  <a href={`https://keepa.com/#!product/1-${lead.asin}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-purple-600 hover:underline">
+                  <a href={`https://keepa.com/#!product/1-${product.asin}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-purple-600 hover:underline">
                     <TrendingUp className="w-3 h-3" />Keepa History
                   </a>
                 </div>
-                {lead.alertSent && (
-                  <div className="mt-2 text-[10px] text-green-600 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" />Discord alert sent
-                  </div>
-                )}
               </div>
             </div>
           </td>
@@ -422,9 +393,9 @@ export default function LeadsPage() {
                 {jobs.slice(0, 5).map((job) => (
                   <div key={job.id} className="flex items-center gap-3 text-xs bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
                     <JobStatusChip status={job.status} />
-                    <span className="text-gray-700 dark:text-gray-300 font-medium flex-1 truncate">"{job.query}"</span>
-                    <span className="text-gray-400">{job.itemsFound} found · {job.leadsCreated} leads</span>
-                    {job.error && <span title={job.error}><AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" /></span>}
+                    <span className="text-gray-500 dark:text-gray-400 text-[10px]">{job.type}</span>
+                    <span className="text-gray-700 dark:text-gray-300 font-medium flex-1 truncate">{job.url}</span>
+                    <span className="text-gray-400">{new Date(job.createdAt).toLocaleTimeString()}</span>
                   </div>
                 ))}
               </div>

@@ -51,10 +51,10 @@ export default async function DashboardPage() {
   const inventoryProfit = inventoryStats._sum.estimatedProfit ?? 0;
 
   const STAT_CARDS = [
-    { label: 'Active Leads',      value: Number(stats.total).toLocaleString(), sub: `+${Number(stats.new_today)} today`,      icon: TrendingUp, color: 'text-blue-600',    bg: 'bg-blue-50'   },
-    { label: 'Avg ROI',           value: formatPercent(stats.avg_roi ?? 0),    sub: 'Across active leads',                    icon: BarChart3,  color: 'text-indigo-600',  bg: 'bg-indigo-50' },
-    { label: 'Inventory Value',   value: formatCurrency(inventoryValue),        sub: `${inventoryStats._count.id} items`,      icon: Package,    color: 'text-purple-600',  bg: 'bg-purple-50' },
-    { label: 'Est. Inventory Profit', value: formatCurrency(inventoryProfit),   sub: 'Based on current prices',                icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50'},
+    { label: 'Active Leads',      value: Number(stats.total).toLocaleString(), sub: `+${Number(stats.new_today)} today`,      icon: TrendingUp, color: 'text-blue-600',    bg: 'bg-blue-50',    href: '/dashboard/leads'     },
+    { label: 'Avg ROI',           value: formatPercent(stats.avg_roi ?? 0),    sub: 'Across active leads',                    icon: BarChart3,  color: 'text-indigo-600',  bg: 'bg-indigo-50',  href: null                   },
+    { label: 'Inventory Value',   value: formatCurrency(inventoryValue),        sub: `${inventoryStats._count.id} items`,      icon: Package,    color: 'text-purple-600',  bg: 'bg-purple-50',  href: '/dashboard/inventory' },
+    { label: 'Est. Inventory Profit', value: formatCurrency(inventoryProfit),   sub: 'Based on current prices',                icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', href: null                   },
   ];
 
   return (
@@ -72,21 +72,30 @@ export default async function DashboardPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {STAT_CARDS.map((s) => (
-          <div key={s.label} className="card p-5">
-            <div className="flex items-start justify-between">
-              <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center`}>
-                <s.icon className={`w-5 h-5 ${s.color}`} />
+        {STAT_CARDS.map((s) => {
+          const inner = (
+            <>
+              <div className="flex items-start justify-between">
+                <div className={`w-10 h-10 rounded-xl ${s.bg} flex items-center justify-center`}>
+                  <s.icon className={`w-5 h-5 ${s.color}`} />
+                </div>
+                <ArrowUpRight className={`w-4 h-4 ${s.href ? 'text-slate-400' : 'text-slate-200'}`} />
               </div>
-              <ArrowUpRight className="w-4 h-4 text-slate-300" />
-            </div>
-            <div className="mt-3">
-              <div className="text-2xl font-semibold text-slate-900">{s.value}</div>
-              <div className="text-xs text-slate-500 mt-0.5">{s.label}</div>
-              <div className="text-xs text-slate-400 mt-1">{s.sub}</div>
-            </div>
-          </div>
-        ))}
+              <div className="mt-3">
+                <div className="text-2xl font-semibold text-slate-900">{s.value}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{s.label}</div>
+                <div className="text-xs text-slate-400 mt-1">{s.sub}</div>
+              </div>
+            </>
+          );
+          return s.href ? (
+            <Link key={s.label} href={s.href} className="card p-5 block hover:shadow-md hover:border-slate-200 transition-all">
+              {inner}
+            </Link>
+          ) : (
+            <div key={s.label} className="card p-5">{inner}</div>
+          );
+        })}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

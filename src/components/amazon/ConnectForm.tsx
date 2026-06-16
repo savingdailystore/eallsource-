@@ -53,14 +53,14 @@ export function ConnectForm() {
       <div>
         <label className="label">LWA Refresh Token</label>
         <input value={form.refreshToken} onChange={set('refreshToken')} type="password" required className="input" placeholder="Atzr|..." />
-        <p className="text-xs text-slate-400 mt-1">Your Login With Amazon (LWA) refresh token from SP-API OAuth.</p>
+        <p className="text-xs mt-1" style={{ color: '#71717a' }}>Your Login With Amazon (LWA) refresh token from SP-API OAuth.</p>
       </div>
       <div>
         <label className="label">LWA Access Token</label>
         <input value={form.accessToken} onChange={set('accessToken')} type="password" required className="input" placeholder="Atza|..." />
-        <p className="text-xs text-slate-400 mt-1">Current access token. Will be refreshed automatically using your refresh token.</p>
+        <p className="text-xs mt-1" style={{ color: '#71717a' }}>Current access token. Will be refreshed automatically using your refresh token.</p>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
       <button type="submit" disabled={loading} className="btn-primary w-full justify-center">
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Link2 className="w-4 h-4" />Connect Account</>}
       </button>

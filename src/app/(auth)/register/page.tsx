@@ -41,7 +41,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // Auto sign-in after registration
     const { signIn } = await import('next-auth/react');
     await signIn('credentials', { email, password, redirect: false });
     router.push('/dashboard');
@@ -49,20 +48,20 @@ export default function RegisterPage() {
 
   return (
     <>
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Start your free trial</h1>
-      <p className="text-slate-500 text-sm mb-4">14 days free. No credit card required.</p>
+      <h1 className="text-2xl font-bold mb-1" style={{ color: '#fafafa' }}>Start your free trial</h1>
+      <p className="text-sm mb-4" style={{ color: '#71717a' }}>14 days free. No credit card required.</p>
 
       <ul className="space-y-1 mb-6">
         {FEATURES.map((f) => (
-          <li key={f} className="flex items-center gap-2 text-xs text-slate-600">
-            <Check className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+          <li key={f} className="flex items-center gap-2 text-xs" style={{ color: '#a1a1aa' }}>
+            <Check className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
             {f}
           </li>
         ))}
       </ul>
 
       {error && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-100 text-red-700 text-sm">
+        <div className="mb-4 px-4 py-3 rounded-xl text-sm text-red-400" style={{ background: 'rgba(239,68,68,0.1)', border: '0.5px solid rgba(239,68,68,0.2)' }}>
           {error}
         </div>
       )}
@@ -113,7 +112,10 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={() => setShowPw(!showPw)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
+              style={{ color: '#71717a' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#a1a1aa')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#71717a')}
             >
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -125,16 +127,16 @@ export default function RegisterPage() {
         </button>
       </form>
 
-      <p className="text-center text-xs text-slate-400 mt-4">
+      <p className="text-center text-xs mt-4" style={{ color: '#52525b' }}>
         By signing up you agree to our{' '}
-        <Link href="/terms" className="underline">Terms of Service</Link>
+        <Link href="/terms" className="underline" style={{ color: '#71717a' }}>Terms of Service</Link>
         {' '}and{' '}
-        <Link href="/privacy" className="underline">Privacy Policy</Link>.
+        <Link href="/privacy" className="underline" style={{ color: '#71717a' }}>Privacy Policy</Link>.
       </p>
 
-      <p className="text-center text-sm text-slate-500 mt-4">
+      <p className="text-center text-sm mt-4" style={{ color: '#71717a' }}>
         Already have an account?{' '}
-        <Link href="/login" className="text-green-600 font-medium hover:underline">Sign in</Link>
+        <Link href="/login" className="font-medium" style={{ color: '#a78bfa' }}>Sign in</Link>
       </p>
     </>
   );

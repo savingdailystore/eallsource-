@@ -28,15 +28,39 @@ model ProductRaw {
 }
 
 model Product {
-  id        String   @id @default(cuid())
-  asin      String
-  title     String
-  price     Float
-  fees      Float
-  profit    Float
-  roi       Float
-  score     Float
-  createdAt DateTime @default(now())
+  id                   String   @id @default(cuid())
+  asin                 String
+  title                String
+  upc                  String?
+  category             String?
+  imageUrl             String?
+  sourceUrl            String?
+  sourceRetailer       String?
+  sourcePrice          Float?
+  availableDiscounts   Json?
+  discountSources      Json?
+  finalCost            Float?
+  amazonUrl            String?
+  buyBoxPrice          Float?
+  lowestListedPrice    Float?
+  estimatedResellPrice Float?
+  price                Float
+  amazonFees           Float?
+  prepFee              Float?
+  taxAmount            Float?
+  fees                 Float
+  profit               Float
+  roi                  Float
+  bsr                  Int?
+  bsrPercentage        Float?
+  autoUngated          Boolean  @default(false)
+  buyBoxOwner          String?
+  amazonIsSeller       Boolean  @default(false)
+  amazonOwnsBuyBox     Boolean  @default(false)
+  ipRiskScore          String?
+  keepaLink            String?
+  score                Float     @default(0)
+  createdAt            DateTime  @default(now())
 
   leads Lead[]
 

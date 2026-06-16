@@ -161,14 +161,42 @@ export async function qualifyProduct(raw: RawProduct): Promise<QualificationResu
 export async function saveQualifiedProduct(
   product: Omit<Product, 'id' | 'dateAdded' | 'status' | 'weeklyBatchId'>,
 ) {
+  const fees   = (product.amazonFees ?? 0) + (product.prepFee ?? 0) + (product.taxAmount ?? 0);
+  const profit = product.netProfit ?? 0;
+  const roi    = product.roi ?? 0;
+
   const data = {
-    asin:   product.asin,
-    title:  product.name,
-    price:  product.estimatedResellPrice,
-    fees:   product.amazonFees + product.prepFee + product.taxAmount,
-    profit: product.netProfit,
-    roi:    product.roi,
-    score:  0,
+    asin:                product.asin,
+    title:               product.name,
+    upc:                 product.upc,
+    category:            product.category,
+    imageUrl:            product.imageUrl,
+    sourceUrl:           product.sourceUrl,
+    sourceRetailer:      product.sourceRetailer,
+    sourcePrice:         product.sourcePrice,
+    availableDiscounts:  product.availableDiscounts as object[] ?? [],
+    discountSources:     product.discountSources ?? [],
+    finalCost:           product.finalCost,
+    amazonUrl:           product.amazonUrl,
+    buyBoxPrice:         product.buyBoxPrice,
+    lowestListedPrice:   product.lowestListedPrice,
+    estimatedResellPrice: product.estimatedResellPrice,
+    price:               product.estimatedResellPrice ?? 0,
+    amazonFees:          product.amazonFees,
+    prepFee:             product.prepFee,
+    taxAmount:           product.taxAmount,
+    fees,
+    profit,
+    roi,
+    bsr:                 product.bsr,
+    bsrPercentage:       product.bsrPercentage,
+    autoUngated:         product.autoUngated ?? false,
+    buyBoxOwner:         product.buyBoxOwner,
+    amazonIsSeller:      product.amazonIsSeller ?? false,
+    amazonOwnsBuyBox:    product.amazonOwnsBuyBox ?? false,
+    ipRiskScore:         product.ipRiskScore,
+    keepaLink:           product.keepaLink,
+    score:               0,
   };
 
   const existing = await prisma.product.findFirst({ where: { asin: product.asin } });

@@ -143,10 +143,8 @@ export default async function DashboardPage() {
                   <Link
                     key={lead.id}
                     href={`/dashboard/leads/${lead.id}`}
-                    className="flex items-center gap-4 px-5 py-3.5 transition-colors"
+                    className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-[#1c1c1c]"
                     style={{ borderBottomColor: '#2a2a2a' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#1c1c1c')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate" style={{ color: '#f9fafb' }}>

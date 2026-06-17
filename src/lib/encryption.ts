@@ -18,6 +18,16 @@ function getKey(): Buffer {
   return Buffer.from(hex, 'hex');
 }
 
+/** True if a valid ENCRYPTION_KEY is configured. Lets routes fail gracefully. */
+export function isEncryptionConfigured(): boolean {
+  try {
+    getKey();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function encrypt(text: string): string {
   const iv     = randomBytes(12);
   const cipher = createCipheriv(ALGO, getKey(), iv);

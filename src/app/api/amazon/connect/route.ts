@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { encrypt } from '@/lib/encryption';
+import { encrypt, isEncryptionConfigured } from '@/lib/encryption';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +20,13 @@ export async function POST(req: NextRequest) {
 
   if (session.user.plan === 'STARTER') {
     return NextResponse.json({ error: 'Amazon SP-API requires a PRO or ENTERPRISE plan' }, { status: 403 });
+  }
+
+  if (!isEncryptionConfigured()) {
+    return NextResponse.json(
+      { error: 'Server encryption key (ENCRYPTION_KEY) is not configured. Contact your administrator.' },
+      { status: 503 },
+    );
   }
 
   const body = await req.json();

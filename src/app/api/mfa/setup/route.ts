@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { encrypt } from '@/lib/encryption';
+import { encrypt, isEncryptionConfigured } from '@/lib/encryption';
 import { generateMfaSecret, buildOtpAuthUrl } from '@/lib/mfa';
 import QRCode from 'qrcode';
 
@@ -12,6 +12,13 @@ export const dynamic = 'force-dynamic';
 export async function POST() {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  if (!isEncryptionConfigured()) {
+    return NextResponse.json(
+      { error: 'Server encryption key (ENCRYPTION_KEY) is not configured. Contact your administrator.' },
+      { status: 503 },
+    );
+  }
 
   const secret    = generateMfaSecret();
   const otpauth   = buildOtpAuthUrl(session.user.email, secret);

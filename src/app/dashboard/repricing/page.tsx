@@ -112,7 +112,7 @@ export default async function RepricingPage() {
   const inactiveRules = rules.filter((r) => !r.isActive);
 
   return (
-    <div className="p-6 lg:p-8 max-w-6xl space-y-6">
+    <div className="p-6 lg:p-8 space-y-6">
       <div className="page-header">
         <div>
           <h1 className="page-title">Repricing</h1>

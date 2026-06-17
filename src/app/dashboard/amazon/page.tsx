@@ -17,8 +17,8 @@ export default async function AmazonPage() {
           <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Zap className="w-7 h-7 text-amber-500" />
           </div>
-          <h2 className="text-xl font-bold text-zinc-50 mb-2">Amazon SP-API requires Pro</h2>
-          <p className="text-zinc-400 text-sm mb-5">
+          <h2 className="text-xl font-bold text-slate-50 mb-2">Amazon SP-API requires Pro</h2>
+          <p className="text-slate-400 text-sm mb-5">
             Connect your Amazon Seller Central account to sync inventory, update listings, and automate repricing.
           </p>
           <a href="/dashboard/billing" className="btn-primary">Upgrade to Pro →</a>
@@ -49,13 +49,13 @@ export default async function AmazonPage() {
         <div className="flex items-center gap-3">
           {isConnected
             ? <CheckCircle2 className="w-6 h-6 text-green-500" />
-            : <XCircle className="w-6 h-6 text-zinc-600" />}
+            : <XCircle className="w-6 h-6 text-slate-600" />}
           <div>
-            <div className="font-semibold text-zinc-50">
+            <div className="font-semibold text-slate-50">
               {isConnected ? 'Connected' : 'Not connected'}
             </div>
             {isConnected && cred && (
-              <div className="text-xs text-zinc-400 mt-0.5">
+              <div className="text-xs text-slate-400 mt-0.5">
                 Seller ID: {cred.sellerId} · Marketplace: {cred.marketplaceId}
               </div>
             )}
@@ -71,8 +71,8 @@ export default async function AmazonPage() {
       {/* Connect form */}
       {!isConnected && (
         <div className="card p-6">
-          <h2 className="font-semibold text-zinc-50 mb-1">Connect Amazon Seller Account</h2>
-          <p className="text-sm text-zinc-400 mb-5">
+          <h2 className="font-semibold text-slate-50 mb-1">Connect Amazon Seller Account</h2>
+          <p className="text-sm text-slate-400 mb-5">
             Enter your SP-API credentials. Tokens are encrypted with AES-256-GCM before storage.
           </p>
 
@@ -98,7 +98,7 @@ export default async function AmazonPage() {
       {/* Available integrations */}
       {isConnected && (
         <div className="card p-5">
-          <h2 className="font-semibold text-zinc-50 mb-4">Available Integrations</h2>
+          <h2 className="font-semibold text-slate-50 mb-4">Available Integrations</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
               ['Inventory Sync', 'Pull current FBA inventory levels', true],
@@ -108,10 +108,10 @@ export default async function AmazonPage() {
             ].map(([name, desc, active]) => (
               <div
                 key={name as string}
-                className={`rounded-xl border p-4 ${active ? 'border-green-500/30 bg-green-500/10' : 'border-zinc-800 bg-zinc-800/40 opacity-60'}`}
+                className={`rounded-xl border p-4 ${active ? 'border-green-500/30 bg-green-500/10' : 'border-slate-800 bg-slate-800/40 opacity-60'}`}
               >
-                <div className="font-medium text-zinc-100 text-sm">{name as string}</div>
-                <div className="text-xs text-zinc-400 mt-1">{desc as string}</div>
+                <div className="font-medium text-slate-100 text-sm">{name as string}</div>
+                <div className="text-xs text-slate-400 mt-1">{desc as string}</div>
                 {!active && <div className="text-xs text-amber-400 mt-2">Coming soon</div>}
               </div>
             ))}

@@ -48,13 +48,13 @@ export default function RegisterPage() {
 
   return (
     <>
-      <h1 className="text-2xl font-bold text-zinc-50 mb-1">Start your free trial</h1>
-      <p className="text-zinc-400 text-sm mb-4">14 days free. No credit card required.</p>
+      <h1 className="text-2xl font-bold text-slate-50 mb-1">Start your free trial</h1>
+      <p className="text-slate-400 text-sm mb-4">14 days free. No credit card required.</p>
 
       <ul className="space-y-1 mb-6">
         {FEATURES.map((f) => (
-          <li key={f} className="flex items-center gap-2 text-xs text-zinc-300">
-            <Check className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+          <li key={f} className="flex items-center gap-2 text-xs text-slate-300">
+            <Check className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
             {f}
           </li>
         ))}
@@ -79,7 +79,7 @@ export default function RegisterPage() {
           <label className="label" htmlFor="password">Password</label>
           <div className="relative">
             <input id="password" type={showPw ? 'text' : 'password'} required minLength={12} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="input pr-10" placeholder="Min 12 chars, upper, lower, number, symbol" />
-            <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors">
+            <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
@@ -89,15 +89,15 @@ export default function RegisterPage() {
         </button>
       </form>
 
-      <p className="text-center text-xs text-zinc-500 mt-4">
+      <p className="text-center text-xs text-slate-500 mt-4">
         By signing up you agree to our{' '}
-        <Link href="/terms" className="underline hover:text-zinc-300">Terms of Service</Link>
+        <Link href="/terms" className="underline hover:text-slate-300">Terms of Service</Link>
         {' '}and{' '}
-        <Link href="/privacy" className="underline hover:text-zinc-300">Privacy Policy</Link>.
+        <Link href="/privacy" className="underline hover:text-slate-300">Privacy Policy</Link>.
       </p>
-      <p className="text-center text-sm text-zinc-400 mt-4">
+      <p className="text-center text-sm text-slate-400 mt-4">
         Already have an account?{' '}
-        <Link href="/login" className="text-orange-600 font-medium hover:text-orange-400">Sign in</Link>
+        <Link href="/login" className="text-blue-600 font-medium hover:text-blue-400">Sign in</Link>
       </p>
     </>
   );

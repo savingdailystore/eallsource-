@@ -27,7 +27,7 @@ export function DeleteItemButton({ id, title }: { id: string; title: string }) {
         </button>
         <button
           onClick={() => setConfirm(false)}
-          className="text-xs text-zinc-500 hover:text-zinc-300 px-1"
+          className="text-xs text-slate-500 hover:text-slate-300 px-1"
         >
           Cancel
         </button>
@@ -39,7 +39,7 @@ export function DeleteItemButton({ id, title }: { id: string; title: string }) {
     <button
       onClick={() => setConfirm(true)}
       title={`Delete "${title}"`}
-      className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all"
+      className="p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-all"
     >
       <Trash2 className="w-3.5 h-3.5" />
     </button>

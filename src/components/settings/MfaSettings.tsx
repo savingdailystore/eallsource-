@@ -76,7 +76,7 @@ export function MfaSettings({ enabled }: { enabled: boolean }) {
   if (mode === 'disable') {
     return (
       <form onSubmit={confirmDisable} className="space-y-3 max-w-sm">
-        <p className="text-sm text-zinc-300">Enter your password to turn off two-factor authentication.</p>
+        <p className="text-sm text-slate-300">Enter your password to turn off two-factor authentication.</p>
         <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="input" placeholder="Your password" autoComplete="current-password" />
         {error && <p className="text-sm text-red-400">{error}</p>}
         <div className="flex gap-2">
@@ -92,13 +92,13 @@ export function MfaSettings({ enabled }: { enabled: boolean }) {
   if (mode === 'setup') {
     return (
       <form onSubmit={confirmEnable} className="space-y-4 max-w-sm">
-        <p className="text-sm text-zinc-300">
+        <p className="text-sm text-slate-300">
           Scan this QR code with an authenticator app (Google Authenticator, Authy, 1Password), then enter the 6-digit code to confirm.
         </p>
-        {qr && <img src={qr} alt="MFA QR code" className="w-44 h-44 border border-zinc-800 rounded-xl" />}
-        <div className="text-xs text-zinc-400">
+        {qr && <img src={qr} alt="MFA QR code" className="w-44 h-44 border border-slate-800 rounded-xl" />}
+        <div className="text-xs text-slate-400">
           Can't scan? Enter this key manually:
-          <div className="font-mono text-zinc-200 break-all mt-1 bg-zinc-800/40 rounded-lg px-2 py-1">{secret}</div>
+          <div className="font-mono text-slate-200 break-all mt-1 bg-slate-800/40 rounded-lg px-2 py-1">{secret}</div>
         </div>
         <div>
           <label className="label">6-digit code</label>
@@ -118,8 +118,8 @@ export function MfaSettings({ enabled }: { enabled: boolean }) {
   // Disabled + idle
   return (
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2 text-sm text-zinc-400">
-        <ShieldOff className="w-4 h-4 text-zinc-500" />
+      <div className="flex items-center gap-2 text-sm text-slate-400">
+        <ShieldOff className="w-4 h-4 text-slate-500" />
         <span>Two-factor authentication is off</span>
       </div>
       <button onClick={startSetup} disabled={loading} className="btn-secondary text-xs py-1.5">

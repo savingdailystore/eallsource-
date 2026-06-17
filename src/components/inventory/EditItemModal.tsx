@@ -72,16 +72,16 @@ export function EditItemModal({ item }: { item: Item }) {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} title="Edit item" className="p-1.5 rounded-lg text-zinc-600 hover:text-orange-500 hover:bg-orange-500/10 transition-all">
+      <button onClick={() => setOpen(true)} title="Edit item" className="p-1.5 rounded-lg text-slate-600 hover:text-blue-500 hover:bg-blue-500/10 transition-all">
         <Pencil className="w-3.5 h-3.5" />
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div className="bg-zinc-900 rounded-2xl shadow-xl w-full max-w-lg">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-              <h2 className="font-semibold text-zinc-50">Edit Inventory Item</h2>
-              <button onClick={close} className="text-zinc-500 hover:text-zinc-300 transition-colors">
+          <div className="bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+              <h2 className="font-semibold text-slate-50">Edit Inventory Item</h2>
+              <button onClick={close} className="text-slate-500 hover:text-slate-300 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>

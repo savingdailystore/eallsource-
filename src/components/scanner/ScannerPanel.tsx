@@ -16,7 +16,7 @@ interface Job {
 
 const STATUS_STYLE: Record<string, { cls: string; icon: React.ComponentType<{ className?: string }> }> = {
   PENDING: { cls: 'bg-amber-500/15 text-amber-400',  icon: Clock },
-  RUNNING: { cls: 'bg-orange-500/15 text-orange-400',    icon: Loader2 },
+  RUNNING: { cls: 'bg-blue-500/15 text-blue-400',    icon: Loader2 },
   DONE:    { cls: 'bg-green-500/15 text-green-400',   icon: CheckCircle2 },
   FAILED:  { cls: 'bg-red-500/15 text-red-400',       icon: XCircle },
 };
@@ -75,8 +75,8 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
       {/* Start scan form */}
       <div className="card p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Radar className="w-4 h-4 text-orange-500" />
-          <h2 className="font-semibold text-zinc-50">Start a scan</h2>
+          <Radar className="w-4 h-4 text-blue-500" />
+          <h2 className="font-semibold text-slate-50">Start a scan</h2>
         </div>
 
         <form onSubmit={startScan} className="space-y-4">
@@ -92,7 +92,7 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
               <input value={query} onChange={(e) => setQuery(e.target.value)} className="input" placeholder="e.g. coffee maker" />
             </div>
             <div>
-              <label className="label">Category <span className="text-zinc-500 font-normal">(optional)</span></label>
+              <label className="label">Category <span className="text-slate-500 font-normal">(optional)</span></label>
               <input value={category} onChange={(e) => setCategory(e.target.value)} className="input" placeholder="e.g. Home & Kitchen" />
             </div>
           </div>
@@ -114,41 +114,41 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
           </div>
         </form>
 
-        <p className="text-xs text-zinc-500 mt-4 leading-relaxed">
-          <span className="font-medium text-zinc-400">Start scan</span> runs on a background worker via Apify — a job stays
+        <p className="text-xs text-slate-500 mt-4 leading-relaxed">
+          <span className="font-medium text-slate-400">Start scan</span> runs on a background worker via Apify — a job stays
           <span className="font-medium text-amber-400"> Pending</span> until the worker, Redis queue, and
           <span className="font-mono"> APIFY_TOKEN</span> are configured.{' '}
-          <span className="font-medium text-zinc-400">Run demo scan</span> generates realistic sample products instantly (no Apify
+          <span className="font-medium text-slate-400">Run demo scan</span> generates realistic sample products instantly (no Apify
           needed) so you can test the flow — results appear in your Lead Feed and Products.
         </p>
       </div>
 
       {/* Recent jobs */}
       <div className="card overflow-hidden">
-        <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
-          <h2 className="font-semibold text-zinc-50">Recent scans</h2>
-          {hasActive && <span className="text-xs text-orange-600 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Live</span>}
+        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-50">Recent scans</h2>
+          {hasActive && <span className="text-xs text-blue-600 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Live</span>}
         </div>
 
         {jobs.length === 0 ? (
-          <div className="py-12 text-center text-sm text-zinc-500">No scans yet. Start one above.</div>
+          <div className="py-12 text-center text-sm text-slate-500">No scans yet. Start one above.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-800/40">
+                <tr className="border-b border-slate-800 bg-slate-800/40">
                   {['Retailer', 'Query', 'Status', 'Started'].map((h) => (
                     <th key={h} className="table-th">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800">
+              <tbody className="divide-y divide-slate-800">
                 {jobs.map((job) => {
                   const s = STATUS_STYLE[job.status] ?? STATUS_STYLE.PENDING;
                   return (
-                    <tr key={job.id} className="hover:bg-zinc-800/40">
-                      <td className="table-td font-medium text-zinc-100">{job.retailer ?? '—'}</td>
-                      <td className="table-td text-zinc-300">{job.query || <span className="text-zinc-500">all</span>}</td>
+                    <tr key={job.id} className="hover:bg-slate-800/40">
+                      <td className="table-td font-medium text-slate-100">{job.retailer ?? '—'}</td>
+                      <td className="table-td text-slate-300">{job.query || <span className="text-slate-500">all</span>}</td>
                       <td className="table-td">
                         <span className={`badge text-xs ${s.cls}`}>
                           <s.icon className={`w-3 h-3 mr-1 ${job.status === 'RUNNING' ? 'animate-spin' : ''}`} />
@@ -158,7 +158,7 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                           <div className="text-[10px] text-red-400 mt-1 max-w-xs truncate" title={job.error}>{job.error}</div>
                         )}
                       </td>
-                      <td className="table-td text-zinc-400 text-xs">{new Date(job.createdAt).toLocaleString()}</td>
+                      <td className="table-td text-slate-400 text-xs">{new Date(job.createdAt).toLocaleString()}</td>
                     </tr>
                   );
                 })}

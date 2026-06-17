@@ -72,8 +72,8 @@ function LoginForm() {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold text-zinc-50 mb-1">Welcome back</h1>
-      <p className="text-sm text-zinc-400 mb-6">Sign in to your account</p>
+      <h1 className="text-2xl font-semibold text-slate-50 mb-1">Welcome back</h1>
+      <p className="text-sm text-slate-400 mb-6">Sign in to your account</p>
 
       {error && (
         <div className="mb-4 px-4 py-3 rounded-xl text-sm bg-red-500/10 border border-red-500/30 text-red-400">
@@ -101,7 +101,7 @@ function LoginForm() {
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="label mb-0" htmlFor="password">Password</label>
-            <Link href="/forgot-password" className="text-xs text-orange-600 hover:text-orange-400 transition-colors">
+            <Link href="/forgot-password" className="text-xs text-blue-600 hover:text-blue-400 transition-colors">
               Forgot password?
             </Link>
           </div>
@@ -120,7 +120,7 @@ function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPw(!showPw)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
             >
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -143,7 +143,7 @@ function LoginForm() {
               placeholder="000000"
               maxLength={6}
             />
-            <p className="text-xs text-zinc-500 mt-1">Enter the 6-digit code from your authenticator app.</p>
+            <p className="text-xs text-slate-500 mt-1">Enter the 6-digit code from your authenticator app.</p>
           </div>
         )}
 
@@ -155,16 +155,16 @@ function LoginForm() {
           <button
             type="button"
             onClick={() => { setMfaStep(false); setTotp(''); setError(''); }}
-            className="text-xs text-zinc-400 hover:text-zinc-200 w-full text-center"
+            className="text-xs text-slate-400 hover:text-slate-200 w-full text-center"
           >
             ← Use a different account
           </button>
         )}
       </form>
 
-      <p className="text-center text-sm text-zinc-400 mt-6">
+      <p className="text-center text-sm text-slate-400 mt-6">
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="text-orange-600 font-medium hover:text-orange-400 transition-colors">
+        <Link href="/register" className="text-blue-600 font-medium hover:text-blue-400 transition-colors">
           Start free trial
         </Link>
       </p>

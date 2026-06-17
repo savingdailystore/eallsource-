@@ -81,12 +81,12 @@ function ScorePill({ score }: { score: number }) {
 function ProductImage({ asin, imageUrl, title }: { asin: string; imageUrl?: string | null; title: string }) {
   const [failed, setFailed] = useState(false);
   if (failed) return (
-    <div className="w-10 h-10 rounded-lg border bg-zinc-800/40 flex items-center justify-center flex-shrink-0">
-      <Package className="w-4 h-4 text-zinc-600" />
+    <div className="w-10 h-10 rounded-lg border bg-slate-800/40 flex items-center justify-center flex-shrink-0">
+      <Package className="w-4 h-4 text-slate-600" />
     </div>
   );
   return (
-    <div className="w-10 h-10 rounded-lg border bg-zinc-900 flex items-center justify-center flex-shrink-0 overflow-hidden">
+    <div className="w-10 h-10 rounded-lg border bg-slate-900 flex items-center justify-center flex-shrink-0 overflow-hidden">
       <img
         src={imageUrl ?? `https://images-na.ssl-images-amazon.com/images/P/${asin}.01._SL75_.jpg`}
         alt={title}
@@ -105,15 +105,15 @@ function ExpandedPanel({ lead }: { lead: LeadRow }) {
   const keepaUrl  = p.keepaLink ?? `https://keepa.com/#!product/1-${p.asin}`;
 
   return (
-    <tr className="bg-zinc-800/40">
+    <tr className="bg-slate-800/40">
       <td colSpan={11} className="px-4 py-4">
         <div className="grid md:grid-cols-3 gap-4">
           {/* Profitability */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-            <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Profitability Formula</div>
+          <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Profitability Formula</div>
             {p.sourcePrice != null && (
               <div className="flex justify-between text-xs py-0.5">
-                <span className="text-zinc-400">Source Price</span>
+                <span className="text-slate-400">Source Price</span>
                 <span>{formatCurrency(p.sourcePrice)}</span>
               </div>
             )}
@@ -144,25 +144,25 @@ function ExpandedPanel({ lead }: { lead: LeadRow }) {
               <p className="text-[10px] text-amber-400 mt-1">~ Cashback rates at scan time — verify before purchasing.</p>
             )}
             {p.finalCost != null && (
-              <div className="flex justify-between text-xs font-semibold border-t border-zinc-800 pt-1 mt-1">
+              <div className="flex justify-between text-xs font-semibold border-t border-slate-800 pt-1 mt-1">
                 <span>Final Cost</span><span>{formatCurrency(p.finalCost)}</span>
               </div>
             )}
-            <div className="my-2 border-t border-zinc-800" />
-            <div className="text-[10px] text-zinc-500 mb-1">From resell price {resell ? formatCurrency(resell) : '—'}</div>
-            {p.amazonFees != null && <div className="flex justify-between text-xs py-0.5"><span className="text-zinc-400">Amazon Fees</span><span className="text-red-400">−{formatCurrency(p.amazonFees)}</span></div>}
-            {p.prepFee   != null && <div className="flex justify-between text-xs py-0.5"><span className="text-zinc-400">Prep Fee</span><span className="text-red-400">−{formatCurrency(p.prepFee)}</span></div>}
-            {p.taxAmount != null && <div className="flex justify-between text-xs py-0.5"><span className="text-zinc-400">Tax</span><span className="text-red-400">−{formatCurrency(p.taxAmount)}</span></div>}
-            <div className="flex justify-between text-xs font-bold border-t border-zinc-800 pt-1 mt-1">
+            <div className="my-2 border-t border-slate-800" />
+            <div className="text-[10px] text-slate-500 mb-1">From resell price {resell ? formatCurrency(resell) : '—'}</div>
+            {p.amazonFees != null && <div className="flex justify-between text-xs py-0.5"><span className="text-slate-400">Amazon Fees</span><span className="text-red-400">−{formatCurrency(p.amazonFees)}</span></div>}
+            {p.prepFee   != null && <div className="flex justify-between text-xs py-0.5"><span className="text-slate-400">Prep Fee</span><span className="text-red-400">−{formatCurrency(p.prepFee)}</span></div>}
+            {p.taxAmount != null && <div className="flex justify-between text-xs py-0.5"><span className="text-slate-400">Tax</span><span className="text-red-400">−{formatCurrency(p.taxAmount)}</span></div>}
+            <div className="flex justify-between text-xs font-bold border-t border-slate-800 pt-1 mt-1">
               <span>Net Profit</span>
               <span className={p.profit >= 0 ? 'text-green-400' : 'text-red-400'}>{formatCurrency(p.profit)}</span>
             </div>
-            <div className="text-[10px] text-zinc-500 mt-1">ROI = {formatPercent(p.roi)}</div>
+            <div className="text-[10px] text-slate-500 mt-1">ROI = {formatPercent(p.roi)}</div>
           </div>
 
           {/* Amazon data */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 space-y-1.5">
-            <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Market Data</div>
+          <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 space-y-1.5">
+            <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Market Data</div>
             {[
               ['Buy Box', p.buyBoxPrice != null ? formatCurrency(p.buyBoxPrice) : '—'],
               ['Lowest FBA', p.lowestFbaPrice != null ? formatCurrency(p.lowestFbaPrice) : '—'],
@@ -174,16 +174,16 @@ function ExpandedPanel({ lead }: { lead: LeadRow }) {
               ['Match Confidence', p.matchConfidence != null ? `${p.matchConfidence.toFixed(0)}%` : '—'],
             ].map(([label, value]) => (
               <div key={label} className="flex justify-between text-xs">
-                <span className="text-zinc-500">{label}</span>
-                <span className="font-medium text-zinc-200">{value}</span>
+                <span className="text-slate-500">{label}</span>
+                <span className="font-medium text-slate-200">{value}</span>
               </div>
             ))}
           </div>
 
           {/* Links & validation */}
           <div className="space-y-3">
-            <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-              <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">Validation</div>
+            <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Validation</div>
               {[
                 ['Identity', p.identityScore],
                 ['URL', p.urlScore],
@@ -191,7 +191,7 @@ function ExpandedPanel({ lead }: { lead: LeadRow }) {
                 ['Inventory', p.inventoryScore],
               ].map(([label, val]) => (
                 <div key={label as string} className="flex items-center justify-between text-xs py-0.5">
-                  <span className="text-zinc-500">{label as string}</span>
+                  <span className="text-slate-500">{label as string}</span>
                   <span className={`font-medium ${(val as number ?? 0) >= 95 ? 'text-green-400' : 'text-red-400'}`}>
                     {val != null ? `${(val as number).toFixed(0)}%` : '—'}
                   </span>
@@ -231,9 +231,9 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
   if (!leads.length) {
     return (
       <div className="card py-16 text-center">
-        <TrendingUp className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-        <p className="text-zinc-400 font-medium">No leads match your filters</p>
-        <p className="text-sm text-zinc-500 mt-1">Run a scanner job to discover new opportunities</p>
+        <TrendingUp className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+        <p className="text-slate-400 font-medium">No leads match your filters</p>
+        <p className="text-sm text-slate-500 mt-1">Run a scanner job to discover new opportunities</p>
       </div>
     );
   }
@@ -244,13 +244,13 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
         <div className="overflow-x-auto">
           <table className="w-full text-sm" style={{ minWidth: '960px' }}>
             <thead>
-              <tr className="border-b border-zinc-800 bg-zinc-800/40">
+              <tr className="border-b border-slate-800 bg-slate-800/40">
                 {['Product', 'Retailer', 'Cost', 'Resell', 'Amazon Fees', 'Profit', 'ROI', 'Demand', 'IP Risk', 'Score', ''].map((h) => (
                   <th key={h} className="table-th">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800">
+            <tbody className="divide-y divide-slate-800">
               {leads.map((lead) => {
                 const p          = lead.product;
                 const isExpanded = expanded === lead.id;
@@ -258,7 +258,7 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                 return (
                   <React.Fragment key={lead.id}>
                     <tr
-                      className="cursor-pointer hover:bg-zinc-800/40 transition-colors"
+                      className="cursor-pointer hover:bg-slate-800/40 transition-colors"
                       onClick={() => setExpanded(isExpanded ? null : lead.id)}
                     >
                       {/* Product */}
@@ -266,15 +266,15 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                         <div className="flex items-center gap-3" style={{ minWidth: '200px' }}>
                           <ProductImage asin={p.asin} imageUrl={p.imageUrl} title={p.title} />
                           <div className="min-w-0">
-                            <div className="font-medium text-zinc-50 text-sm leading-tight line-clamp-1">{p.title}</div>
-                            <div className="text-xs text-zinc-500 font-mono mt-0.5">{p.asin}</div>
-                            {p.category && <div className="text-xs text-zinc-500">{p.category}</div>}
+                            <div className="font-medium text-slate-50 text-sm leading-tight line-clamp-1">{p.title}</div>
+                            <div className="text-xs text-slate-500 font-mono mt-0.5">{p.asin}</div>
+                            {p.category && <div className="text-xs text-slate-500">{p.category}</div>}
                           </div>
                         </div>
                       </td>
 
                       {/* Retailer */}
-                      <td className="table-td text-zinc-300 text-xs">{p.sourceRetailer ?? '—'}</td>
+                      <td className="table-td text-slate-300 text-xs">{p.sourceRetailer ?? '—'}</td>
 
                       {/* Cost */}
                       <td className="table-td text-right">
@@ -287,17 +287,17 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                       {/* Resell */}
                       <td className="table-td text-right">
                         <div className="text-xs font-medium">{p.lowestFbaPrice != null ? formatCurrency(p.lowestFbaPrice) : '—'}</div>
-                        {p.buyBoxPrice != null && <div className="text-[10px] text-zinc-500">BB: {formatCurrency(p.buyBoxPrice)}</div>}
+                        {p.buyBoxPrice != null && <div className="text-[10px] text-slate-500">BB: {formatCurrency(p.buyBoxPrice)}</div>}
                       </td>
 
                       {/* Amazon Fees */}
-                      <td className="table-td text-right text-xs text-zinc-300">
+                      <td className="table-td text-right text-xs text-slate-300">
                         {p.amazonFees != null ? formatCurrency(p.amazonFees) : '—'}
                       </td>
 
                       {/* Profit */}
                       <td className="table-td text-right">
-                        <div className={`text-sm font-bold ${p.profit >= 10 ? 'text-green-400' : p.profit >= 0 ? 'text-orange-600' : 'text-red-400'}`}>
+                        <div className={`text-sm font-bold ${p.profit >= 10 ? 'text-green-400' : p.profit >= 0 ? 'text-blue-600' : 'text-red-400'}`}>
                           {formatCurrency(p.profit)}
                         </div>
                       </td>
@@ -307,7 +307,7 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                         <span className={cn(
                           'badge text-xs font-bold',
                           p.roi >= 60 ? 'bg-green-500/15 text-green-400' :
-                          p.roi >= 30 ? 'bg-orange-500/15 text-orange-400' :
+                          p.roi >= 30 ? 'bg-blue-500/15 text-blue-400' :
                           'bg-red-500/15 text-red-400',
                         )}>
                           {formatPercent(p.roi)}
@@ -327,7 +327,7 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                       <td className="table-td" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => setExpanded(isExpanded ? null : lead.id)}
-                          className="p-1.5 rounded-lg text-zinc-500 hover:text-green-400 hover:bg-green-500/10 transition-all"
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-green-400 hover:bg-green-500/10 transition-all"
                         >
                           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
@@ -346,7 +346,7 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm">
-          <span className="text-zinc-400">
+          <span className="text-slate-400">
             {((page - 1) * pageSize + 1).toLocaleString()}–{Math.min(page * pageSize, total).toLocaleString()} of {total.toLocaleString()} leads
           </span>
           <div className="flex items-center gap-2">
@@ -356,7 +356,7 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
             >
               <ChevronLeft className="w-3.5 h-3.5" />Prev
             </a>
-            <span className="text-zinc-300 px-2">Page {page} of {totalPages}</span>
+            <span className="text-slate-300 px-2">Page {page} of {totalPages}</span>
             <a
               href={`?page=${page + 1}`}
               className={cn('btn-secondary text-xs py-1.5', page >= totalPages && 'pointer-events-none opacity-40')}

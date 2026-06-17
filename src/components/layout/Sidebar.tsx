@@ -35,9 +35,9 @@ const BOTTOM_NAV: NavItem[] = [
 ];
 
 const PLAN_COLORS: Record<Plan, string> = {
-  STARTER:    'bg-zinc-700 text-zinc-200',
-  PRO:        'bg-orange-500 text-white',
-  ENTERPRISE: 'bg-orange-600 text-white',
+  STARTER:    'bg-slate-700 text-slate-200',
+  PRO:        'bg-blue-500 text-white',
+  ENTERPRISE: 'bg-blue-600 text-white',
 };
 
 interface SidebarProps {
@@ -50,9 +50,9 @@ interface SidebarProps {
 function BrandIcon() {
   return (
     <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect x="2"  y="18" width="7" height="12" rx="2" fill="#f97316" fillOpacity="0.45" />
-      <rect x="12" y="10" width="7" height="20" rx="2" fill="#f97316" fillOpacity="0.75" />
-      <rect x="22" y="2"  width="7" height="28" rx="2" fill="#f97316" />
+      <rect x="2"  y="18" width="7" height="12" rx="2" fill="#3b82f6" fillOpacity="0.45" />
+      <rect x="12" y="10" width="7" height="20" rx="2" fill="#3b82f6" fillOpacity="0.75" />
+      <rect x="22" y="2"  width="7" height="28" rx="2" fill="#3b82f6" />
     </svg>
   );
 }
@@ -72,8 +72,8 @@ export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
         className={cn(
           'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
           isActive
-            ? 'bg-orange-600 text-white'
-            : 'text-zinc-400 hover:bg-zinc-800 hover:text-white',
+            ? 'bg-blue-600 text-white'
+            : 'text-slate-400 hover:bg-slate-800 hover:text-white',
           isLocked && 'opacity-60',
         )}
       >
@@ -88,16 +88,16 @@ export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
   return (
     <aside
       className="fixed inset-y-0 left-0 z-40 flex flex-col"
-      style={{ width: 'var(--sidebar-width)', background: '#18181b', borderRight: '1px solid #27272a' }}
+      style={{ width: 'var(--sidebar-width)', background: '#0f172a', borderRight: '1px solid #1e293b' }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-5" style={{ borderBottom: '1px solid #27272a' }}>
+      <div className="flex items-center gap-2.5 px-4 py-5" style={{ borderBottom: '1px solid #1e293b' }}>
         <BrandIcon />
         <div className="min-w-0">
           <div className="font-semibold text-sm leading-tight truncate text-white">
-            Arbitrage Pro <span className="text-orange-500">AI</span>
+            Arbitrage Pro <span className="text-blue-500">AI</span>
           </div>
-          <div className="text-[10px] text-zinc-500 truncate">{orgName}</div>
+          <div className="text-[10px] text-slate-500 truncate">{orgName}</div>
         </div>
         <span className={cn('ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0', PLAN_COLORS[plan])}>
           {plan}
@@ -110,7 +110,7 @@ export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
           <NavLink key={item.href} item={item} />
         ))}
 
-        <div className="my-3 border-t border-zinc-800" />
+        <div className="my-3 border-t border-slate-800" />
 
         {visibleBottom.map((item) => (
           <NavLink key={item.href} item={item} />
@@ -118,16 +118,16 @@ export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
       </nav>
 
       {/* User footer */}
-      <div className="px-3 py-3" style={{ borderTop: '1px solid #27272a' }}>
+      <div className="px-3 py-3" style={{ borderTop: '1px solid #1e293b' }}>
         <div className="flex items-center gap-2 px-2 mb-2">
-          <div className="w-7 h-7 rounded-full bg-orange-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
             <span className="text-white text-xs font-bold">{userEmail[0]?.toUpperCase()}</span>
           </div>
-          <span className="text-xs text-zinc-400 truncate flex-1">{userEmail}</span>
+          <span className="text-xs text-slate-400 truncate flex-1">{userEmail}</span>
         </div>
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs text-zinc-400 hover:bg-zinc-800 hover:text-white"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
         >
           <LogOut className="w-3.5 h-3.5" />
           Sign out

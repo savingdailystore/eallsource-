@@ -6,17 +6,14 @@ import { z } from 'zod';
 export const dynamic = 'force-dynamic';
 
 const updateSchema = z.object({
-  title:           z.string().min(1).optional(),
-  asin:            z.string().min(1).optional(),
-  retailer:        z.string().optional().nullable(),
-  costBasis:       z.number().nonnegative().optional(),
-  quantity:        z.number().int().positive().optional(),
-  purchaseDate:    z.string().optional(),
-  listedPrice:     z.number().nonnegative().optional().nullable(),
-  status:          z.enum(['IN_STOCK', 'LISTED', 'SOLD']).optional(),
-  estimatedProfit: z.number().optional().nullable(),
-  actualProfit:    z.number().optional().nullable(),
-  soldAt:          z.string().datetime().optional().nullable(),
+  sku:               z.string().nullable().optional(),
+  fnsku:             z.string().nullable().optional(),
+  asin:              z.string().min(1).optional(),
+  productName:       z.string().min(1).optional(),
+  availableQuantity: z.number().int().nonnegative().optional(),
+  reservedQuantity:  z.number().int().nonnegative().optional(),
+  inboundQuantity:   z.number().int().nonnegative().optional(),
+  totalQuantity:     z.number().int().nonnegative().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -33,30 +30,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { purchaseDate, soldAt, costBasis, listedPrice, ...rest } = parsed.data;
-
-  const estimatedProfit =
-    rest.estimatedProfit !== undefined
-      ? rest.estimatedProfit
-      : costBasis !== undefined || listedPrice !== undefined
-        ? (() => {
-            const cost   = costBasis   ?? existing.costBasis;
-            const listed = listedPrice ?? existing.listedPrice;
-            const qty    = rest.quantity ?? existing.quantity;
-            return listed != null ? (listed - cost) * qty : null;
-          })()
-        : undefined;
-
   const item = await prisma.inventoryItem.update({
     where: { id },
-    data: {
-      ...rest,
-      ...(costBasis    !== undefined ? { costBasis }                      : {}),
-      ...(listedPrice  !== undefined ? { listedPrice }                    : {}),
-      ...(purchaseDate               ? { purchaseDate: new Date(purchaseDate) } : {}),
-      ...(soldAt !== undefined       ? { soldAt: soldAt ? new Date(soldAt) : null } : {}),
-      ...(estimatedProfit !== undefined ? { estimatedProfit } : {}),
-    },
+    data:  parsed.data,
   });
 
   return NextResponse.json(item);

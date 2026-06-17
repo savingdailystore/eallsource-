@@ -5,15 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Pencil, X, Loader2 } from 'lucide-react';
 
 interface Item {
-  id:           string;
-  title:        string;
-  asin:         string;
-  retailer:     string | null;
-  costBasis:    number;
-  quantity:     number;
-  purchaseDate: Date | string;
-  listedPrice:  number | null;
-  status:       'IN_STOCK' | 'LISTED' | 'SOLD';
+  id:                string;
+  sku:               string | null;
+  fnsku:             string | null;
+  asin:              string;
+  productName:       string;
+  availableQuantity: number;
+  reservedQuantity:  number;
+  inboundQuantity:   number;
+  totalQuantity:     number;
 }
 
 export function EditItemModal({ item }: { item: Item }) {
@@ -23,19 +23,18 @@ export function EditItemModal({ item }: { item: Item }) {
   const [error, setError]     = useState('');
 
   const [form, setForm] = useState({
-    asin:         item.asin,
-    title:        item.title,
-    retailer:     item.retailer ?? '',
-    costBasis:    String(item.costBasis),
-    quantity:     String(item.quantity),
-    purchaseDate: new Date(item.purchaseDate).toISOString().split('T')[0],
-    listedPrice:  item.listedPrice != null ? String(item.listedPrice) : '',
-    status:       item.status,
+    sku:               item.sku ?? '',
+    fnsku:             item.fnsku ?? '',
+    asin:              item.asin,
+    productName:       item.productName,
+    availableQuantity: String(item.availableQuantity),
+    reservedQuantity:  String(item.reservedQuantity),
+    inboundQuantity:   String(item.inboundQuantity),
+    totalQuantity:     String(item.totalQuantity),
   });
 
   function set(field: keyof typeof form) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setForm((f) => ({ ...f, [field]: e.target.value }));
+    return (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
   function close() { setOpen(false); setError(''); }
@@ -49,14 +48,14 @@ export function EditItemModal({ item }: { item: Item }) {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        asin:         form.asin.trim().toUpperCase(),
-        title:        form.title.trim(),
-        retailer:     form.retailer.trim() || null,
-        costBasis:    parseFloat(form.costBasis),
-        quantity:     parseInt(form.quantity, 10),
-        purchaseDate: form.purchaseDate,
-        listedPrice:  form.listedPrice ? parseFloat(form.listedPrice) : null,
-        status:       form.status,
+        sku:               form.sku.trim() || null,
+        fnsku:             form.fnsku.trim() || null,
+        asin:              form.asin.trim().toUpperCase(),
+        productName:       form.productName.trim(),
+        availableQuantity: parseInt(form.availableQuantity, 10) || 0,
+        reservedQuantity:  parseInt(form.reservedQuantity, 10) || 0,
+        inboundQuantity:   parseInt(form.inboundQuantity, 10) || 0,
+        totalQuantity:     parseInt(form.totalQuantity, 10) || 0,
       }),
     });
 
@@ -73,11 +72,7 @@ export function EditItemModal({ item }: { item: Item }) {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        title="Edit item"
-        className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all"
-      >
+      <button onClick={() => setOpen(true)} title="Edit item" className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
         <Pencil className="w-3.5 h-3.5" />
       </button>
 
@@ -94,47 +89,43 @@ export function EditItemModal({ item }: { item: Item }) {
             <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">ASIN <span className="text-red-500">*</span></label>
-                  <input value={form.asin} onChange={set('asin')} type="text" required className="input" />
+                  <label className="label">SKU</label>
+                  <input value={form.sku} onChange={set('sku')} type="text" className="input" />
                 </div>
                 <div>
-                  <label className="label">Retailer</label>
-                  <input value={form.retailer} onChange={set('retailer')} type="text" className="input" placeholder="Walmart, Target…" />
-                </div>
-              </div>
-
-              <div>
-                <label className="label">Product Title <span className="text-red-500">*</span></label>
-                <input value={form.title} onChange={set('title')} type="text" required className="input" />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="label">Cost Basis ($) <span className="text-red-500">*</span></label>
-                  <input value={form.costBasis} onChange={set('costBasis')} type="number" step="0.01" min="0" required className="input" />
-                </div>
-                <div>
-                  <label className="label">Qty</label>
-                  <input value={form.quantity} onChange={set('quantity')} type="number" min="1" className="input" />
-                </div>
-                <div>
-                  <label className="label">Listed Price ($)</label>
-                  <input value={form.listedPrice} onChange={set('listedPrice')} type="number" step="0.01" min="0" className="input" placeholder="0.00" />
+                  <label className="label">FNSKU</label>
+                  <input value={form.fnsku} onChange={set('fnsku')} type="text" className="input" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">Purchase Date <span className="text-red-500">*</span></label>
-                  <input value={form.purchaseDate} onChange={set('purchaseDate')} type="date" required className="input" />
+                  <label className="label">ASIN <span className="text-red-500">*</span></label>
+                  <input value={form.asin} onChange={set('asin')} type="text" required className="input" />
                 </div>
                 <div>
-                  <label className="label">Status</label>
-                  <select value={form.status} onChange={set('status')} className="input">
-                    <option value="IN_STOCK">In Stock</option>
-                    <option value="LISTED">Listed</option>
-                    <option value="SOLD">Sold</option>
-                  </select>
+                  <label className="label">Total Quantity</label>
+                  <input value={form.totalQuantity} onChange={set('totalQuantity')} type="number" min="0" className="input" />
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Product Name <span className="text-red-500">*</span></label>
+                <input value={form.productName} onChange={set('productName')} type="text" required className="input" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="label">Available</label>
+                  <input value={form.availableQuantity} onChange={set('availableQuantity')} type="number" min="0" className="input" />
+                </div>
+                <div>
+                  <label className="label">Reserved</label>
+                  <input value={form.reservedQuantity} onChange={set('reservedQuantity')} type="number" min="0" className="input" />
+                </div>
+                <div>
+                  <label className="label">Inbound</label>
+                  <input value={form.inboundQuantity} onChange={set('inboundQuantity')} type="number" min="0" className="input" />
                 </div>
               </div>
 

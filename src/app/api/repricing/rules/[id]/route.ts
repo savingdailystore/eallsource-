@@ -91,20 +91,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const rule = await getRule(id, session.user.orgId);
   if (!rule) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  // Prefer scanned Amazon market data; fall back to manually-entered inventory.
-  const [product, inv] = await Promise.all([
-    prisma.product.findFirst({ where: { orgId: session.user.orgId, asin: rule.asin } }),
-    prisma.inventoryItem.findFirst({ where: { orgId: session.user.orgId, asin: rule.asin } }),
-  ]);
+  // Repricing requires scanned Amazon market data (buy box, cost, resale price).
+  const product = await prisma.product.findFirst({
+    where: { orgId: session.user.orgId, asin: rule.asin },
+  });
 
-  const costBasis    = product?.totalLandedCost ?? product?.sourcePrice ?? inv?.costBasis ?? 0;
-  const currentPrice = rule.lastRecommendedPrice ?? product?.estimatedResellPrice ?? inv?.listedPrice ?? 0;
+  const costBasis    = product?.totalLandedCost ?? product?.sourcePrice ?? 0;
+  const currentPrice = rule.lastRecommendedPrice ?? product?.estimatedResellPrice ?? 0;
   const buyBoxPrice  = product?.buyBoxPrice ?? 0;
   const fbaSellers   = product?.fbaSellers ?? 0;
 
   if (costBasis <= 0 || currentPrice <= 0) {
     return NextResponse.json(
-      { error: 'No price data for this ASIN — add a cost basis and listed price to the inventory item.' },
+      { error: 'No market data for this ASIN — run a scan to populate product pricing first.' },
       { status: 400 },
     );
   }

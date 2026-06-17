@@ -42,19 +42,19 @@ export default async function DashboardPage() {
     prisma.inventoryItem.aggregate({
       where: { orgId },
       _count: { id: true },
-      _sum: { costBasis: true, estimatedProfit: true },
+      _sum: { availableQuantity: true, totalQuantity: true },
     }),
   ]);
 
-  const stats           = leadStats[0] ?? { total: 0n, avg_roi: 0, avg_score: 0, new_today: 0n };
-  const inventoryValue  = inventoryStats._sum.costBasis ?? 0;
-  const inventoryProfit = inventoryStats._sum.estimatedProfit ?? 0;
+  const stats         = leadStats[0] ?? { total: 0n, avg_roi: 0, avg_score: 0, new_today: 0n };
+  const totalUnits    = inventoryStats._sum.totalQuantity ?? 0;
+  const availableUnits = inventoryStats._sum.availableQuantity ?? 0;
 
   const STAT_CARDS = [
-    { label: 'Active Leads',      value: Number(stats.total).toLocaleString(), sub: `+${Number(stats.new_today)} today`,      icon: TrendingUp, color: 'text-blue-600',    bg: 'bg-blue-50',    href: '/dashboard/leads'     },
-    { label: 'Avg ROI',           value: formatPercent(stats.avg_roi ?? 0),    sub: 'Across active leads',                    icon: BarChart3,  color: 'text-indigo-600',  bg: 'bg-indigo-50',  href: null                   },
-    { label: 'Inventory Value',   value: formatCurrency(inventoryValue),        sub: `${inventoryStats._count.id} items`,      icon: Package,    color: 'text-purple-600',  bg: 'bg-purple-50',  href: '/dashboard/inventory' },
-    { label: 'Est. Inventory Profit', value: formatCurrency(inventoryProfit),   sub: 'Based on current prices',                icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', href: null                   },
+    { label: 'Active Leads',     value: Number(stats.total).toLocaleString(), sub: `+${Number(stats.new_today)} today`,   icon: TrendingUp, color: 'text-blue-600',    bg: 'bg-blue-50',    href: '/dashboard/leads'     },
+    { label: 'Avg ROI',          value: formatPercent(stats.avg_roi ?? 0),    sub: 'Across active leads',                 icon: BarChart3,  color: 'text-indigo-600',  bg: 'bg-indigo-50',  href: null                   },
+    { label: 'Inventory SKUs',   value: inventoryStats._count.id.toLocaleString(), sub: `${availableUnits.toLocaleString()} available`, icon: Package, color: 'text-purple-600', bg: 'bg-purple-50', href: '/dashboard/inventory' },
+    { label: 'Total Units',      value: totalUnits.toLocaleString(),          sub: 'Across all FBA inventory',            icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', href: '/dashboard/inventory' },
   ];
 
   return (

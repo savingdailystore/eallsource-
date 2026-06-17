@@ -7,12 +7,19 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 interface FbaInventorySummary {
-  asin:         string;
-  productName?: string;
-  sellerSku?:   string;
-  totalQuantity: number;
+  asin:          string;
+  fnSku?:        string;
+  sellerSku?:    string;
+  productName?:  string;
+  totalQuantity?: number;
   inventoryDetails?: {
-    fulfillableQuantity?: number;
+    fulfillableQuantity?:        number;
+    inboundWorkingQuantity?:     number;
+    inboundShippedQuantity?:     number;
+    inboundReceivingQuantity?:   number;
+    reservedQuantity?: {
+      totalReservedQuantity?:    number;
+    };
   };
 }
 
@@ -52,25 +59,26 @@ export async function POST() {
     for (const item of allItems) {
       if (!item.asin) continue;
 
-      const qty = item.inventoryDetails?.fulfillableQuantity ?? item.totalQuantity ?? 0;
+      const d         = item.inventoryDetails ?? {};
+      const available = d.fulfillableQuantity ?? 0;
+      const reserved  = d.reservedQuantity?.totalReservedQuantity ?? 0;
+      const inbound   = (d.inboundWorkingQuantity ?? 0) + (d.inboundShippedQuantity ?? 0) + (d.inboundReceivingQuantity ?? 0);
+      const total     = item.totalQuantity ?? available + reserved + inbound;
+
+      const data = {
+        sku:               item.sellerSku ?? null,
+        fnsku:             item.fnSku ?? null,
+        productName:       item.productName ?? item.sellerSku ?? item.asin,
+        availableQuantity: available,
+        reservedQuantity:  reserved,
+        inboundQuantity:   inbound,
+        totalQuantity:     total,
+      };
 
       await prisma.inventoryItem.upsert({
-        where: { orgId_asin: { orgId, asin: item.asin } },
-        create: {
-          orgId,
-          asin:         item.asin,
-          title:        item.productName ?? item.sellerSku ?? item.asin,
-          retailer:     'Amazon FBA',
-          costBasis:    0,
-          quantity:     qty,
-          purchaseDate: new Date(),
-          status:       qty > 0 ? 'LISTED' : 'IN_STOCK',
-        },
-        update: {
-          quantity: qty,
-          status:   qty > 0 ? 'LISTED' : 'IN_STOCK',
-          ...(item.productName ? { title: item.productName } : {}),
-        },
+        where:  { orgId_asin: { orgId, asin: item.asin } },
+        create: { orgId, asin: item.asin, ...data },
+        update: data,
       });
       synced++;
     }

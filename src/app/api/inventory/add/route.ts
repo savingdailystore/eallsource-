@@ -9,30 +9,35 @@ export async function POST(req: Request) {
   const orgId = session.user.orgId;
   const body  = await req.json();
 
-  const { asin, title, retailer, costBasis, quantity, purchaseDate, listedPrice, status } = body;
+  const { sku, fnsku, asin, productName, availableQuantity, reservedQuantity, inboundQuantity, totalQuantity } = body;
 
-  if (!asin || !title || !costBasis || !purchaseDate) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  if (!asin || !productName) {
+    return NextResponse.json({ error: 'ASIN and Product Name are required.' }, { status: 400 });
   }
 
-  const costNum    = parseFloat(costBasis);
-  const listedNum  = listedPrice ? parseFloat(listedPrice) : null;
-  const qtyNum     = parseInt(quantity ?? '1', 10);
+  const toInt = (v: any) => parseInt(v ?? '0', 10) || 0;
 
-  const estimatedProfit = listedNum != null ? (listedNum - costNum) * qtyNum : null;
-
-  const item = await prisma.inventoryItem.create({
-    data: {
+  const item = await prisma.inventoryItem.upsert({
+    where:  { orgId_asin: { orgId, asin: String(asin).trim().toUpperCase() } },
+    create: {
       orgId,
-      asin:            asin.trim().toUpperCase(),
-      title:           title.trim(),
-      retailer:        retailer?.trim() || null,
-      costBasis:       costNum,
-      quantity:        qtyNum,
-      purchaseDate:    new Date(purchaseDate),
-      listedPrice:     listedNum,
-      estimatedProfit,
-      status:          status ?? 'IN_STOCK',
+      sku:               sku?.trim() || null,
+      fnsku:             fnsku?.trim() || null,
+      asin:              String(asin).trim().toUpperCase(),
+      productName:       String(productName).trim(),
+      availableQuantity: toInt(availableQuantity),
+      reservedQuantity:  toInt(reservedQuantity),
+      inboundQuantity:   toInt(inboundQuantity),
+      totalQuantity:     toInt(totalQuantity),
+    },
+    update: {
+      sku:               sku?.trim() || null,
+      fnsku:             fnsku?.trim() || null,
+      productName:       String(productName).trim(),
+      availableQuantity: toInt(availableQuantity),
+      reservedQuantity:  toInt(reservedQuantity),
+      inboundQuantity:   toInt(inboundQuantity),
+      totalQuantity:     toInt(totalQuantity),
     },
   });
 

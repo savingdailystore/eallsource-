@@ -21,7 +21,7 @@ export async function POST() {
 
   // ── 1. Auto-create rules from inventory items that don't have one ──────────
   const [inventory, existingRules] = await Promise.all([
-    prisma.inventoryItem.findMany({ where: { orgId, status: { not: 'SOLD' } } }),
+    prisma.inventoryItem.findMany({ where: { orgId } }),
     prisma.repricingRule.findMany({ where: { orgId }, select: { asin: true } }),
   ]);
 
@@ -33,7 +33,7 @@ export async function POST() {
     if (ruledAsins.has(item.asin) || seen.has(item.asin)) continue;
     seen.add(item.asin);
     await prisma.repricingRule.create({
-      data: { orgId, asin: item.asin, title: item.title, minRoi: 30, minProfit: 5, strategy: 'COMPETITIVE' },
+      data: { orgId, asin: item.asin, title: item.productName, minRoi: 30, minProfit: 5, strategy: 'COMPETITIVE' },
     });
     created++;
   }
@@ -46,11 +46,10 @@ export async function POST() {
 
   for (const rule of rules) {
     const product = await prisma.product.findFirst({ where: { orgId, asin: rule.asin } });
-    const inv     = inventory.find((i) => i.asin === rule.asin);
 
-    // Prefer scanned Amazon market data; fall back to manually-entered inventory.
-    const costBasis    = product?.totalLandedCost ?? product?.sourcePrice ?? inv?.costBasis ?? 0;
-    const currentPrice = rule.lastRecommendedPrice ?? product?.estimatedResellPrice ?? inv?.listedPrice ?? 0;
+    // Repricing requires scanned Amazon market data (buy box, cost, resale price).
+    const costBasis    = product?.totalLandedCost ?? product?.sourcePrice ?? 0;
+    const currentPrice = rule.lastRecommendedPrice ?? product?.estimatedResellPrice ?? 0;
     const buyBoxPrice  = product?.buyBoxPrice ?? 0;
     const fbaSellers   = product?.fbaSellers ?? 0;
 

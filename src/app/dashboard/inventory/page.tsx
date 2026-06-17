@@ -1,7 +1,6 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { formatCurrency } from '@/lib/utils';
-import { DollarSign, TrendingUp, ShoppingCart, Package } from 'lucide-react';
+import { TrendingUp, ShoppingCart, Package, Boxes } from 'lucide-react';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
 import { AmazonSyncButton } from '@/components/inventory/AmazonSyncButton';
 import { ImportCsvModal } from '@/components/inventory/ImportCsvModal';
@@ -17,13 +16,11 @@ export default async function InventoryPage() {
   const [items, stats, amazonCred] = await Promise.all([
     prisma.inventoryItem.findMany({
       where: { orgId },
-      orderBy: { purchaseDate: 'desc' },
+      orderBy: { totalQuantity: 'desc' },
     }),
-    prisma.inventoryItem.groupBy({
-      by: ['status'],
+    prisma.inventoryItem.aggregate({
       where: { orgId },
-      _count: { id: true },
-      _sum: { costBasis: true, estimatedProfit: true },
+      _sum: { availableQuantity: true, reservedQuantity: true, inboundQuantity: true, totalQuantity: true },
     }),
     prisma.amazonCredential.findUnique({
       where: { orgId },
@@ -33,11 +30,10 @@ export default async function InventoryPage() {
 
   const amazonConnected = !!amazonCred?.isActive;
 
-  const totalValue  = stats.reduce((s, g) => s + (g._sum.costBasis ?? 0), 0);
-  const totalProfit = stats.reduce((s, g) => s + (g._sum.estimatedProfit ?? 0), 0);
-  const inStock     = stats.find((g) => g.status === 'IN_STOCK')?._count.id ?? 0;
-  const listed      = stats.find((g) => g.status === 'LISTED')?._count.id ?? 0;
-  const sold        = stats.find((g) => g.status === 'SOLD')?._count.id ?? 0;
+  const available = stats._sum.availableQuantity ?? 0;
+  const reserved  = stats._sum.reservedQuantity ?? 0;
+  const inbound   = stats._sum.inboundQuantity ?? 0;
+  const total     = stats._sum.totalQuantity ?? 0;
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl space-y-6">
@@ -56,10 +52,10 @@ export default async function InventoryPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'In Stock', value: inStock, icon: Package, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Listed', value: listed, icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Total Value', value: formatCurrency(totalValue), icon: DollarSign, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Est. Profit', value: formatCurrency(totalProfit), icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Available', value: available, icon: Package, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Reserved', value: reserved, icon: ShoppingCart, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Inbound', value: inbound, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Total Units', value: total, icon: Boxes, color: 'text-purple-600', bg: 'bg-purple-50' },
         ].map((s) => (
           <div key={s.label} className="card p-5">
             <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>

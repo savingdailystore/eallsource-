@@ -3,30 +3,22 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2, Loader2, X } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
 import { EditItemModal } from './EditItemModal';
 import { DeleteItemButton } from './DeleteItemButton';
 
-interface Item {
-  id:              string;
-  title:           string;
-  asin:            string;
-  retailer:        string | null;
-  costBasis:       number;
-  quantity:        number;
-  purchaseDate:    Date | string;
-  listedPrice:     number | null;
-  estimatedProfit: number | null;
-  status:          'IN_STOCK' | 'LISTED' | 'SOLD';
+export interface InventoryRow {
+  id:                string;
+  sku:               string | null;
+  fnsku:             string | null;
+  asin:              string;
+  productName:       string;
+  availableQuantity: number;
+  reservedQuantity:  number;
+  inboundQuantity:   number;
+  totalQuantity:     number;
 }
 
-const STATUS_COLORS: Record<Item['status'], string> = {
-  IN_STOCK: 'bg-green-100 text-green-700',
-  LISTED:   'bg-blue-100 text-blue-700',
-  SOLD:     'bg-purple-100 text-purple-700',
-};
-
-export function InventoryTable({ items }: { items: Item[] }) {
+export function InventoryTable({ items }: { items: InventoryRow[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
@@ -35,7 +27,6 @@ export function InventoryTable({ items }: { items: Item[] }) {
   const allSelected  = items.length > 0 && selected.size === items.length;
   const someSelected = selected.size > 0 && !allSelected;
 
-  // Native indeterminate state can only be set via JS.
   useEffect(() => {
     if (headerRef.current) headerRef.current.indeterminate = someSelected;
   }, [someSelected]);
@@ -98,7 +89,7 @@ export function InventoryTable({ items }: { items: Item[] }) {
                   className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-400 cursor-pointer"
                 />
               </th>
-              {['Product', 'ASIN', 'Retailer', 'Cost Basis', 'Qty', 'Listed Price', 'Est. Profit', 'Purchase Date', 'Status', ''].map((h) => (
+              {['SKU', 'FNSKU', 'ASIN', 'Product Name', 'Available', 'Reserved', 'Inbound', 'Total', ''].map((h) => (
                 <th key={h} className="table-th">{h}</th>
               ))}
             </tr>
@@ -116,31 +107,20 @@ export function InventoryTable({ items }: { items: Item[] }) {
                       className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-400 cursor-pointer"
                     />
                   </td>
-                  <td className="table-td">
-                    <div className="font-medium text-slate-900 max-w-xs truncate">{item.title}</div>
-                  </td>
+                  <td className="table-td font-mono text-slate-600 text-xs">{item.sku ?? '—'}</td>
+                  <td className="table-td font-mono text-slate-500 text-xs">{item.fnsku ?? '—'}</td>
                   <td className="table-td font-mono text-slate-500 text-xs">{item.asin}</td>
-                  <td className="table-td text-slate-600">{item.retailer ?? '—'}</td>
-                  <td className="table-td font-medium">{formatCurrency(item.costBasis)}</td>
-                  <td className="table-td">{item.quantity}</td>
-                  <td className="table-td">{item.listedPrice ? formatCurrency(item.listedPrice) : '—'}</td>
                   <td className="table-td">
-                    {item.estimatedProfit != null ? (
-                      <span className={item.estimatedProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
-                        {formatCurrency(item.estimatedProfit)}
-                      </span>
-                    ) : '—'}
+                    <div className="font-medium text-slate-900 max-w-xs truncate">{item.productName}</div>
                   </td>
-                  <td className="table-td text-slate-500">
-                    {new Date(item.purchaseDate).toLocaleDateString()}
-                  </td>
-                  <td className="table-td">
-                    <span className={`badge ${STATUS_COLORS[item.status]}`}>{item.status}</span>
-                  </td>
+                  <td className="table-td font-medium text-slate-900">{item.availableQuantity}</td>
+                  <td className="table-td text-slate-600">{item.reservedQuantity}</td>
+                  <td className="table-td text-slate-600">{item.inboundQuantity}</td>
+                  <td className="table-td font-semibold text-slate-900">{item.totalQuantity}</td>
                   <td className="table-td">
                     <div className="flex items-center gap-0.5">
                       <EditItemModal item={item} />
-                      <DeleteItemButton id={item.id} title={item.title} />
+                      <DeleteItemButton id={item.id} title={item.productName} />
                     </div>
                   </td>
                 </tr>

@@ -1,4 +1,4 @@
-import type { Plan, Role, LeadStatus, InventoryStatus, DemandLevel, GatingRisk } from '@prisma/client';
+import type { Plan, Role, LeadStatus, DemandLevel, GatingRisk } from '@prisma/client';
 
 // ─── NextAuth session augmentation ─────────────────────────────────────────
 
@@ -221,4 +221,4 @@ export const PLAN_LIMITS: Record<Plan, { leadsPerDay: number; repricing: boolean
   ENTERPRISE: { leadsPerDay: 9999, repricing: true,  spApi: true,  apiAccess: true,  maxUsers: 99 },
 };
 
-export { Plan, Role, LeadStatus, InventoryStatus, DemandLevel, GatingRisk };
+export { Plan, Role, LeadStatus, DemandLevel, GatingRisk };

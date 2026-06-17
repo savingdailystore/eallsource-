@@ -42,14 +42,14 @@ function parseDelimited(text: string, delimiter: ',' | '\t'): string[][] {
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const COLUMN_ALIASES: Record<string, string[]> = {
-  asin:         ['asin'],
-  title:        ['title', 'productname', 'itemname', 'name', 'description'],
-  quantity:     ['quantity', 'qty', 'afnfulfillablequantity', 'fulfillablequantity', 'availablequantity', 'units'],
-  listedPrice:  ['listedprice', 'price', 'yourprice', 'sellingprice', 'listprice'],
-  costBasis:    ['costbasis', 'cost', 'unitcost', 'buyprice', 'purchaseprice', 'cogs'],
-  retailer:     ['retailer', 'source', 'supplier', 'store', 'sourceretailer'],
-  purchaseDate: ['purchasedate', 'date', 'datepurchased', 'boughton'],
-  status:       ['status', 'condition'],
+  sku:               ['sku', 'sellersku', 'merchantsku', 'msku'],
+  fnsku:             ['fnsku', 'fulfillmentnetworksku'],
+  asin:              ['asin'],
+  productName:       ['productname', 'title', 'itemname', 'name', 'description'],
+  availableQuantity: ['available', 'availablequantity', 'afnfulfillablequantity', 'fulfillablequantity'],
+  reservedQuantity:  ['reserved', 'reservedquantity', 'afnreservedquantity'],
+  inboundQuantity:   ['inbound', 'inboundquantity', 'afninboundworkingquantity', 'afninboundshippedquantity', 'afninboundreceivingquantity'],
+  totalQuantity:     ['total', 'totalquantity', 'afntotalquantity', 'quantity', 'qty'],
 };
 
 function mapHeaders(headers: string[]): Record<string, number> {
@@ -60,13 +60,6 @@ function mapHeaders(headers: string[]): Record<string, number> {
     if (idx !== -1) map[field] = idx;
   }
   return map;
-}
-
-function normalizeStatus(raw?: string): 'IN_STOCK' | 'LISTED' | 'SOLD' {
-  const s = (raw ?? '').toLowerCase();
-  if (s.includes('sold')) return 'SOLD';
-  if (s.includes('list') || s.includes('active')) return 'LISTED';
-  return 'IN_STOCK';
 }
 
 export async function POST(req: Request) {
@@ -102,45 +95,37 @@ export async function POST(req: Request) {
   let skipped  = 0;
   const errors: string[] = [];
 
+  // Inbound may span several Amazon columns (working/shipped/receiving) — sum them.
+  const inboundIdxs = rows[0]
+    .map((h, idx) => (COLUMN_ALIASES.inboundQuantity.includes(norm(h)) ? idx : -1))
+    .filter((idx) => idx !== -1);
+
+  const toInt = (v?: string) => parseInt(v ?? '', 10) || 0;
+
   for (let i = 1; i < rows.length; i++) {
     const row  = rows[i];
     const asin = cell(row, 'asin')?.toUpperCase();
     if (!asin) { skipped++; continue; }
 
-    const costBasis   = parseFloat(cell(row, 'costBasis') ?? '') || 0;
-    const quantity    = parseInt(cell(row, 'quantity') ?? '', 10) || 1;
-    const listedRaw   = cell(row, 'listedPrice');
-    const listedPrice = listedRaw ? parseFloat(listedRaw) : null;
-    const dateRaw     = cell(row, 'purchaseDate');
-    const parsedDate  = dateRaw ? new Date(dateRaw) : null;
-    const purchaseDate = parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate : new Date();
-    const estimatedProfit = listedPrice != null ? (listedPrice - costBasis) * quantity : null;
+    const inbound = inboundIdxs.length
+      ? inboundIdxs.reduce((sum, idx) => sum + (parseInt(row[idx]?.trim() ?? '', 10) || 0), 0)
+      : toInt(cell(row, 'inboundQuantity'));
+
+    const data = {
+      sku:               cell(row, 'sku') || null,
+      fnsku:             cell(row, 'fnsku') || null,
+      productName:       cell(row, 'productName') || asin,
+      availableQuantity: toInt(cell(row, 'availableQuantity')),
+      reservedQuantity:  toInt(cell(row, 'reservedQuantity')),
+      inboundQuantity:   inbound,
+      totalQuantity:     toInt(cell(row, 'totalQuantity')),
+    };
 
     try {
       await prisma.inventoryItem.upsert({
-        where: { orgId_asin: { orgId, asin } },
-        create: {
-          orgId,
-          asin,
-          title:        cell(row, 'title') || asin,
-          retailer:     cell(row, 'retailer') || null,
-          costBasis,
-          quantity,
-          purchaseDate,
-          listedPrice,
-          estimatedProfit,
-          status:       normalizeStatus(cell(row, 'status')),
-        },
-        update: {
-          title:        cell(row, 'title') || asin,
-          retailer:     cell(row, 'retailer') || undefined,
-          costBasis,
-          quantity,
-          purchaseDate,
-          listedPrice,
-          estimatedProfit,
-          status:       normalizeStatus(cell(row, 'status')),
-        },
+        where:  { orgId_asin: { orgId, asin } },
+        create: { orgId, asin, ...data },
+        update: data,
       });
       imported++;
     } catch {

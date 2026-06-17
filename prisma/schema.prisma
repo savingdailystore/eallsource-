@@ -30,12 +30,6 @@ enum LeadStatus {
   EXPIRED
 }
 
-enum InventoryStatus {
-  IN_STOCK
-  LISTED
-  SOLD
-}
-
 enum DemandLevel {
   LOW
   MEDIUM
@@ -251,26 +245,20 @@ model InventoryItem {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  asin         String
-  title        String
-  imageUrl     String?
-  costBasis    Float
-  quantity     Int      @default(1)
-  purchaseDate DateTime
-  retailer     String?
-  status       InventoryStatus @default(IN_STOCK)
-
-  listedPrice     Float?
-  estimatedProfit Float?
-  actualProfit    Float?
-  soldAt          DateTime?
+  sku               String?
+  fnsku             String?
+  asin              String
+  productName       String
+  availableQuantity Int @default(0)
+  reservedQuantity  Int @default(0)
+  inboundQuantity   Int @default(0)
+  totalQuantity     Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([orgId, asin])
   @@index([orgId])
-  @@index([orgId, status])
   @@index([asin])
   @@map("inventory_items")
 }

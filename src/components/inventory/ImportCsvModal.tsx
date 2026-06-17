@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Upload, X, Loader2, FileText, Download, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const TEMPLATE =
-  'asin,title,retailer,costBasis,quantity,listedPrice,purchaseDate,status\n' +
-  'B08N5WRWNW,Example Product,Walmart,12.50,3,29.99,2026-06-01,IN_STOCK\n';
+  'sku,fnsku,asin,productName,availableQuantity,reservedQuantity,inboundQuantity,totalQuantity\n' +
+  'MY-SKU-001,X00ABC1234,B08N5WRWNW,Example Product,10,2,5,17\n';
 
 export function ImportCsvModal() {
   const router = useRouter();
@@ -82,7 +82,7 @@ export function ImportCsvModal() {
               <p className="text-sm text-slate-500">
                 Upload a <span className="font-medium">.csv</span> or tab-delimited <span className="font-medium">.txt</span> file
                 (such as an exported Amazon FBA inventory report). The only required column is <span className="font-mono text-slate-700">asin</span>.
-                Recognized columns: <span className="font-mono text-xs">asin, title, retailer, costBasis, quantity, listedPrice, purchaseDate, status</span>.
+                Recognized columns: <span className="font-mono text-xs">sku, fnsku, asin, productName, availableQuantity, reservedQuantity, inboundQuantity, totalQuantity</span>.
                 Rows with an existing ASIN are updated.
               </p>
 

@@ -187,6 +187,7 @@ export interface RepricingInput {
   minRoi: number;
   minProfit: number;
   strategy: 'COMPETITIVE' | 'FLOOR' | 'CEILING';
+  floorPrice?: number; // optional manual hard floor
 }
 
 export interface RepricingResult {

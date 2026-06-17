@@ -282,11 +282,12 @@ model RepricingRule {
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  asin      String
-  title     String?
-  minRoi    Float   @default(30)
-  minProfit Float   @default(5)
-  strategy  String  @default("COMPETITIVE")
+  asin       String
+  title      String?
+  minRoi     Float   @default(30)
+  minProfit  Float   @default(5)
+  strategy   String  @default("COMPETITIVE")
+  floorPrice Float?  // optional hard floor — price never drops below this
 
   lastRecommendedPrice Float?
   lastDirection        String?

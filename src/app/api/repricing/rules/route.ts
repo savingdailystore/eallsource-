@@ -6,11 +6,12 @@ import { z } from 'zod';
 export const dynamic = 'force-dynamic';
 
 const createSchema = z.object({
-  asin:      z.string().min(10).max(10),
-  title:     z.string().max(500).optional(),
-  minRoi:    z.number().min(0).max(500).default(30),
-  minProfit: z.number().min(0).default(5),
-  strategy:  z.enum(['COMPETITIVE', 'FLOOR', 'CEILING']).default('COMPETITIVE'),
+  asin:       z.string().min(10).max(10),
+  title:      z.string().max(500).optional(),
+  minRoi:     z.number().min(0).max(500).default(30),
+  minProfit:  z.number().min(0).default(5),
+  strategy:   z.enum(['COMPETITIVE', 'FLOOR', 'CEILING']).default('COMPETITIVE'),
+  floorPrice: z.number().min(0).optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
-  const { asin, title, minRoi, minProfit, strategy } = parsed.data;
+  const { asin, title, minRoi, minProfit, strategy, floorPrice } = parsed.data;
 
   const existing = await prisma.repricingRule.findUnique({
     where: { orgId_asin: { orgId: session.user.orgId, asin } },
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
       minRoi,
       minProfit,
       strategy,
+      floorPrice: floorPrice ?? null,
     },
   });
 

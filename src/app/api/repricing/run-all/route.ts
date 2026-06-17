@@ -66,6 +66,7 @@ export async function POST() {
       minRoi:       rule.minRoi,
       minProfit:    rule.minProfit,
       strategy:     rule.strategy as 'COMPETITIVE' | 'FLOOR' | 'CEILING',
+      floorPrice:   rule.floorPrice ?? undefined,
     });
 
     await prisma.$transaction([

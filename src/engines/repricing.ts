@@ -2,20 +2,12 @@ import type { RepricingInput, RepricingResult } from '@/types';
 import { calculateProfitability } from './profitability';
 
 export function calculateReprice(input: RepricingInput): RepricingResult {
-  const { costBasis, currentPrice, buyBoxPrice, fbaSellers, minRoi, minProfit, strategy } = input;
+  const { costBasis, currentPrice, buyBoxPrice, fbaSellers, minRoi, minProfit, strategy, floorPrice: manualFloor } = input;
 
-  // Calculate floor price — never go below break-even + min ROI
-  const { profit: profitAtCurrent } = calculateProfitability({
-    sourcePrice: costBasis,
-    discounts: [],
-    resellPrice: currentPrice,
-    category: 'default',
-    prepFee: 0,
-  });
-
-  // Find the minimum viable price
-  let floorPrice = costBasis;
-  for (let price = costBasis; price <= buyBoxPrice * 2; price += 0.01) {
+  // Find the minimum viable price that still clears Min ROI + Min Profit
+  let roiFloor = costBasis;
+  const searchCeiling = Math.max(buyBoxPrice * 2, currentPrice * 2, costBasis * 3);
+  for (let price = costBasis; price <= searchCeiling; price += 0.01) {
     const result = calculateProfitability({
       sourcePrice: costBasis,
       discounts: [],
@@ -24,22 +16,32 @@ export function calculateReprice(input: RepricingInput): RepricingResult {
       prepFee: 0,
     });
     if (result.roi >= minRoi && result.profit >= minProfit) {
-      floorPrice = price;
+      roiFloor = price;
       break;
     }
   }
-  floorPrice = Math.round(floorPrice * 100) / 100;
+  roiFloor = Math.round(roiFloor * 100) / 100;
+
+  // Effective floor = the higher of the ROI-based floor and the manual floor.
+  // The manual floor lets the user set a hard price ceiling-down they never cross,
+  // while the ROI floor protects them if their manual floor is set too low.
+  const floorPrice = Math.max(roiFloor, manualFloor ?? 0);
 
   let recommendedPrice = currentPrice;
   let direction: 'UP' | 'DOWN' | 'HOLD' = 'HOLD';
   let riskScore = 50;
   let reason = 'No action needed';
 
+  // Describe which floor is binding, for clearer reason text.
+  const floorLabel = (manualFloor ?? 0) >= roiFloor && (manualFloor ?? 0) > 0
+    ? `manual floor $${floorPrice.toFixed(2)}`
+    : `${minRoi}% ROI floor`;
+
   if (strategy === 'FLOOR') {
     // Always price at floor
     recommendedPrice = floorPrice;
     direction = currentPrice > floorPrice ? 'DOWN' : currentPrice < floorPrice ? 'UP' : 'HOLD';
-    reason = `Pricing at floor (${minRoi}% ROI minimum)`;
+    reason = `Pricing at ${floorLabel}`;
     riskScore = 20;
   } else if (strategy === 'CEILING') {
     // Price at buy box or slightly above
@@ -67,7 +69,7 @@ export function calculateReprice(input: RepricingInput): RepricingResult {
         // Target price below floor — can't compete, hold at floor
         recommendedPrice = floorPrice;
         direction = currentPrice > floorPrice ? 'DOWN' : 'HOLD';
-        reason = `Buy box too low — pricing at ${minRoi}% ROI floor`;
+        reason = `Buy box below your floor — holding at ${floorLabel}`;
         riskScore = 60;
       }
     }
@@ -77,7 +79,7 @@ export function calculateReprice(input: RepricingInput): RepricingResult {
   if (recommendedPrice < floorPrice) {
     recommendedPrice = floorPrice;
     direction = 'UP';
-    reason = `Price protected at ${minRoi}% ROI floor`;
+    reason = `Price protected at ${floorLabel}`;
     riskScore = Math.max(riskScore, 30);
   }
 

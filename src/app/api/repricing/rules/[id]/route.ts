@@ -7,11 +7,12 @@ import { z } from 'zod';
 export const dynamic = 'force-dynamic';
 
 const updateSchema = z.object({
-  minRoi:    z.number().min(0).max(500).optional(),
-  minProfit: z.number().min(0).optional(),
-  strategy:  z.enum(['COMPETITIVE', 'FLOOR', 'CEILING']).optional(),
-  isActive:  z.boolean().optional(),
-  title:     z.string().max(500).optional(),
+  minRoi:     z.number().min(0).max(500).optional(),
+  minProfit:  z.number().min(0).optional(),
+  strategy:   z.enum(['COMPETITIVE', 'FLOOR', 'CEILING']).optional(),
+  isActive:   z.boolean().optional(),
+  title:      z.string().max(500).optional(),
+  floorPrice: z.number().min(0).nullable().optional(),
 });
 
 async function getRule(id: string, orgId: string) {
@@ -117,6 +118,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     minRoi:       rule.minRoi,
     minProfit:    rule.minProfit,
     strategy:     rule.strategy as 'COMPETITIVE' | 'FLOOR' | 'CEILING',
+    floorPrice:   rule.floorPrice ?? undefined,
   });
 
   await prisma.$transaction([

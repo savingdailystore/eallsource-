@@ -5,19 +5,20 @@ import { useRouter } from 'next/navigation';
 import { SlidersHorizontal, X, Loader2 } from 'lucide-react';
 
 interface Rule {
-  id:        string;
-  asin:      string;
-  title:     string | null;
-  minRoi:    number;
-  minProfit: number;
-  strategy:  string;
-  isActive:  boolean;
+  id:         string;
+  asin:       string;
+  title:      string | null;
+  minRoi:     number;
+  minProfit:  number;
+  strategy:   string;
+  isActive:   boolean;
+  floorPrice: number | null;
 }
 
 const STRATEGIES = [
-  { value: 'COMPETITIVE', label: 'Competitive', desc: 'Price just below the Buy Box (0.5%) to compete without a price war.' },
-  { value: 'FLOOR',       label: 'Floor',       desc: 'Always price at your lowest viable price that still hits Min ROI.' },
-  { value: 'CEILING',     label: 'Ceiling',     desc: 'Price at or slightly above the Buy Box to maximize margin.' },
+  { value: 'COMPETITIVE', label: 'Competitive + Floor', desc: 'Chase the Buy Box (price 0.5% below it) but never drop below your floor — the higher of your manual floor price and your Min ROI floor.' },
+  { value: 'FLOOR',       label: 'Floor only',          desc: 'Always sit at your floor price — the lowest price that still clears your floor / Min ROI.' },
+  { value: 'CEILING',     label: 'Ceiling',             desc: 'Price at or slightly above the Buy Box to maximize margin.' },
 ];
 
 export function EditRuleModal({ rule }: { rule: Rule }) {
@@ -27,10 +28,11 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
   const [error, setError]     = useState('');
 
   const [form, setForm] = useState({
-    strategy:  rule.strategy,
-    minRoi:    String(rule.minRoi),
-    minProfit: String(rule.minProfit),
-    isActive:  rule.isActive,
+    strategy:   rule.strategy,
+    minRoi:     String(rule.minRoi),
+    minProfit:  String(rule.minProfit),
+    floorPrice: rule.floorPrice != null ? String(rule.floorPrice) : '',
+    isActive:   rule.isActive,
   });
 
   function close() { setOpen(false); setError(''); }
@@ -44,10 +46,11 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        strategy:  form.strategy,
-        minRoi:    parseFloat(form.minRoi),
-        minProfit: parseFloat(form.minProfit),
-        isActive:  form.isActive,
+        strategy:   form.strategy,
+        minRoi:     parseFloat(form.minRoi),
+        minProfit:  parseFloat(form.minProfit),
+        floorPrice: form.floorPrice.trim() === '' ? null : parseFloat(form.floorPrice),
+        isActive:   form.isActive,
       }),
     });
 
@@ -107,6 +110,19 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
                   <label className="label">Min Profit ($)</label>
                   <input value={form.minProfit} onChange={(e) => setForm((f) => ({ ...f, minProfit: e.target.value }))} type="number" step="0.01" min="0" required className="input" />
                 </div>
+              </div>
+
+              <div>
+                <label className="label">Manual Floor Price ($) <span className="text-slate-400 font-normal">(optional)</span></label>
+                <input
+                  value={form.floorPrice}
+                  onChange={(e) => setForm((f) => ({ ...f, floorPrice: e.target.value }))}
+                  type="number" step="0.01" min="0" className="input"
+                  placeholder="Leave blank to use Min ROI floor"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  A hard price the rule will never sell below. Effective floor = the higher of this and your Min ROI floor.
+                </p>
               </div>
 
               <label className="flex items-center gap-2.5 cursor-pointer pt-1">

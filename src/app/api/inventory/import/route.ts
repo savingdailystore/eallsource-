@@ -5,8 +5,16 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// Minimal RFC-4180-ish CSV parser (handles quoted fields, escaped quotes, CRLF).
-function parseCsv(text: string): string[][] {
+// Detect whether the file is tab-delimited (Amazon reports) or comma-delimited.
+function detectDelimiter(text: string): ',' | '\t' {
+  const firstLine = text.split('\n').find((l) => l.trim() !== '') ?? '';
+  const tabs   = (firstLine.match(/\t/g) ?? []).length;
+  const commas = (firstLine.match(/,/g) ?? []).length;
+  return tabs > commas ? '\t' : ',';
+}
+
+// Minimal RFC-4180-ish parser (handles quoted fields, escaped quotes, CRLF, custom delimiter).
+function parseDelimited(text: string, delimiter: ',' | '\t'): string[][] {
   const rows: string[][] = [];
   let cur: string[] = [];
   let field = '';
@@ -21,7 +29,7 @@ function parseCsv(text: string): string[][] {
       } else field += c;
     } else {
       if (c === '"') inQuotes = true;
-      else if (c === ',') { cur.push(field); field = ''; }
+      else if (c === delimiter) { cur.push(field); field = ''; }
       else if (c === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; }
       else if (c === '\r') { /* ignore */ }
       else field += c;
@@ -69,12 +77,12 @@ export async function POST(req: Request) {
   const { csv } = await req.json().catch(() => ({ csv: '' }));
 
   if (!csv || typeof csv !== 'string') {
-    return NextResponse.json({ error: 'No CSV content provided.' }, { status: 400 });
+    return NextResponse.json({ error: 'No file content provided.' }, { status: 400 });
   }
 
-  const rows = parseCsv(csv);
+  const rows = parseDelimited(csv, detectDelimiter(csv));
   if (rows.length < 2) {
-    return NextResponse.json({ error: 'CSV needs a header row and at least one data row.' }, { status: 400 });
+    return NextResponse.json({ error: 'File needs a header row and at least one data row.' }, { status: 400 });
   }
 
   const headerMap = mapHeaders(rows[0]);

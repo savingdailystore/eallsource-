@@ -65,14 +65,14 @@ export function ImportCsvModal() {
   return (
     <>
       <button onClick={() => setOpen(true)} className="btn-secondary text-sm">
-        <Upload className="w-4 h-4" />Import CSV
+        <Upload className="w-4 h-4" />Import File
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900">Import Inventory from CSV</h2>
+              <h2 className="font-semibold text-slate-900">Import Inventory from File</h2>
               <button onClick={close} className="text-slate-400 hover:text-slate-600 transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -80,7 +80,8 @@ export function ImportCsvModal() {
 
             <div className="px-6 py-5 space-y-4">
               <p className="text-sm text-slate-500">
-                Upload a CSV with your inventory. The only required column is <span className="font-mono text-slate-700">asin</span>.
+                Upload a <span className="font-medium">.csv</span> or tab-delimited <span className="font-medium">.txt</span> file
+                (such as an exported Amazon FBA inventory report). The only required column is <span className="font-mono text-slate-700">asin</span>.
                 Recognized columns: <span className="font-mono text-xs">asin, title, retailer, costBasis, quantity, listedPrice, purchaseDate, status</span>.
                 Rows with an existing ASIN are updated.
               </p>
@@ -94,7 +95,7 @@ export function ImportCsvModal() {
                 onClick={() => fileRef.current?.click()}
                 className="border-2 border-dashed border-slate-200 rounded-xl px-4 py-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
               >
-                <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onPick} className="hidden" />
+                <input ref={fileRef} type="file" accept=".csv,.txt,text/csv,text/plain,text/tab-separated-values" onChange={onPick} className="hidden" />
                 {fileName ? (
                   <div className="flex items-center justify-center gap-2 text-sm text-slate-700">
                     <FileText className="w-4 h-4 text-blue-500" />{fileName}
@@ -102,7 +103,7 @@ export function ImportCsvModal() {
                 ) : (
                   <div className="text-sm text-slate-400">
                     <Upload className="w-6 h-6 mx-auto mb-2 text-slate-300" />
-                    Click to choose a CSV file
+                    Click to choose a .csv or .txt file
                   </div>
                 )}
               </div>

@@ -2,7 +2,8 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/utils';
-import { RefreshCw, ArrowUp, ArrowDown, Minus, Zap } from 'lucide-react';
+import { ArrowUp, ArrowDown, Minus, Zap } from 'lucide-react';
+import { RunAllButton } from '@/components/repricing/RunAllButton';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Repricing' };
@@ -58,9 +59,7 @@ export default async function RepricingPage() {
           <h1 className="page-title">Repricing</h1>
           <p className="page-subtitle">{rules.length} active repricing rules</p>
         </div>
-        <button className="btn-primary text-sm">
-          <RefreshCw className="w-4 h-4" />Run All Now
-        </button>
+        <RunAllButton />
       </div>
 
       {/* Rules table */}
@@ -70,7 +69,8 @@ export default async function RepricingPage() {
         </div>
         {rules.length === 0 ? (
           <div className="py-12 text-center text-slate-400 text-sm">
-            No repricing rules yet. Add inventory items to create rules.
+            No repricing rules yet. Add inventory items with a listed price, then click
+            <span className="font-medium text-slate-600"> Run All Now</span> to generate and run rules.
           </div>
         ) : (
           <div className="overflow-x-auto">

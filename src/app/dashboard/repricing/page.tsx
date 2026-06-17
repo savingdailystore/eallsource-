@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowUp, ArrowDown, Minus, Zap } from 'lucide-react';
 import { RunAllButton } from '@/components/repricing/RunAllButton';
+import { EditRuleModal } from '@/components/repricing/EditRuleModal';
+import { DeleteRuleButton } from '@/components/repricing/DeleteRuleButton';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Repricing' };
@@ -77,7 +79,7 @@ export default async function RepricingPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  {['ASIN', 'Product', 'Strategy', 'Min ROI', 'Min Profit', 'Last Price', 'Direction', 'Last Run'].map((h) => (
+                  {['ASIN', 'Product', 'Strategy', 'Min ROI', 'Min Profit', 'Last Price', 'Direction', 'Last Run', ''].map((h) => (
                     <th key={h} className="table-th">{h}</th>
                   ))}
                 </tr>
@@ -88,13 +90,14 @@ export default async function RepricingPage() {
                   const dir = (last?.direction ?? 'HOLD') as 'UP' | 'DOWN' | 'HOLD';
                   const { icon: DirIcon, cls } = DIRECTION_ICON[dir];
                   return (
-                    <tr key={rule.id} className="hover:bg-slate-50">
+                    <tr key={rule.id} className={`hover:bg-slate-50 ${rule.isActive ? '' : 'opacity-50'}`}>
                       <td className="table-td font-mono text-xs text-slate-500">{rule.asin}</td>
                       <td className="table-td">
                         <div className="font-medium text-slate-900 max-w-xs truncate">{rule.title ?? '—'}</div>
                       </td>
                       <td className="table-td">
                         <span className="badge bg-slate-100 text-slate-600 text-xs">{rule.strategy}</span>
+                        {!rule.isActive && <span className="badge bg-amber-100 text-amber-700 text-xs ml-1">Paused</span>}
                       </td>
                       <td className="table-td">{rule.minRoi}%</td>
                       <td className="table-td">{formatCurrency(rule.minProfit)}</td>
@@ -106,6 +109,12 @@ export default async function RepricingPage() {
                       </td>
                       <td className="table-td text-slate-500 text-xs">
                         {rule.lastRepricedAt ? new Date(rule.lastRepricedAt).toLocaleString() : 'Never'}
+                      </td>
+                      <td className="table-td">
+                        <div className="flex items-center gap-0.5">
+                          <EditRuleModal rule={rule} />
+                          <DeleteRuleButton id={rule.id} asin={rule.asin} />
+                        </div>
                       </td>
                     </tr>
                   );

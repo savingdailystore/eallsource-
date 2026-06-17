@@ -1,0 +1,137 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { SlidersHorizontal, X, Loader2 } from 'lucide-react';
+
+interface Rule {
+  id:        string;
+  asin:      string;
+  title:     string | null;
+  minRoi:    number;
+  minProfit: number;
+  strategy:  string;
+  isActive:  boolean;
+}
+
+const STRATEGIES = [
+  { value: 'COMPETITIVE', label: 'Competitive', desc: 'Price just below the Buy Box (0.5%) to compete without a price war.' },
+  { value: 'FLOOR',       label: 'Floor',       desc: 'Always price at your lowest viable price that still hits Min ROI.' },
+  { value: 'CEILING',     label: 'Ceiling',     desc: 'Price at or slightly above the Buy Box to maximize margin.' },
+];
+
+export function EditRuleModal({ rule }: { rule: Rule }) {
+  const router = useRouter();
+  const [open, setOpen]       = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+
+  const [form, setForm] = useState({
+    strategy:  rule.strategy,
+    minRoi:    String(rule.minRoi),
+    minProfit: String(rule.minProfit),
+    isActive:  rule.isActive,
+  });
+
+  function close() { setOpen(false); setError(''); }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const res = await fetch(`/api/repricing/rules/${rule.id}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        strategy:  form.strategy,
+        minRoi:    parseFloat(form.minRoi),
+        minProfit: parseFloat(form.minProfit),
+        isActive:  form.isActive,
+      }),
+    });
+
+    setLoading(false);
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? 'Failed to save changes.');
+    } else {
+      close();
+      router.refresh();
+    }
+  }
+
+  const activeStrategy = STRATEGIES.find((s) => s.value === form.strategy);
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        title="Customize rule"
+        className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all"
+      >
+        <SlidersHorizontal className="w-3.5 h-3.5" />
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="font-semibold text-slate-900">Customize Repricing Rule</h2>
+                <p className="text-xs text-slate-400 font-mono mt-0.5">{rule.asin}</p>
+              </div>
+              <button onClick={close} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+              <div>
+                <label className="label">Strategy</label>
+                <select value={form.strategy} onChange={(e) => setForm((f) => ({ ...f, strategy: e.target.value }))} className="input">
+                  {STRATEGIES.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+                {activeStrategy && <p className="text-xs text-slate-400 mt-1">{activeStrategy.desc}</p>}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Min ROI (%)</label>
+                  <input value={form.minRoi} onChange={(e) => setForm((f) => ({ ...f, minRoi: e.target.value }))} type="number" step="1" min="0" max="500" required className="input" />
+                </div>
+                <div>
+                  <label className="label">Min Profit ($)</label>
+                  <input value={form.minProfit} onChange={(e) => setForm((f) => ({ ...f, minProfit: e.target.value }))} type="number" step="0.01" min="0" required className="input" />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                  className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-400"
+                />
+                <span className="text-sm text-slate-700">Rule active</span>
+                <span className="text-xs text-slate-400">— inactive rules are skipped on Run All</span>
+              </label>
+
+              {error && <p className="text-sm text-red-600">{error}</p>}
+
+              <div className="flex justify-end gap-3 pt-1">
+                <button type="button" onClick={close} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={loading} className="btn-primary">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Rule'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

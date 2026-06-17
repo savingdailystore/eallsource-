@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 const connectSchema = z.object({
   sellerId: z.string().min(1),
   marketplaceId: z.string().min(1),
-  accessToken: z.string().min(1),
+  accessToken: z.string().optional(),          // derived from refreshToken on first call
   refreshToken: z.string().min(1),
   tokenExpiresAt: z.string().datetime().optional(),
 });
@@ -28,23 +28,28 @@ export async function POST(req: NextRequest) {
 
   const { sellerId, marketplaceId, accessToken, refreshToken, tokenExpiresAt } = parsed.data;
 
+  // accessToken is optional — when blank, store an empty placeholder and leave
+  // tokenExpiresAt null so getSpApiClient() refreshes it from refreshToken on first call.
+  const encAccessToken = encrypt(accessToken ?? '');
+  const expiresAt      = accessToken && tokenExpiresAt ? new Date(tokenExpiresAt) : null;
+
   const cred = await prisma.amazonCredential.upsert({
     where: { orgId: session.user.orgId },
     create: {
       orgId: session.user.orgId,
       sellerId,
       marketplaceId,
-      accessToken: encrypt(accessToken),
+      accessToken: encAccessToken,
       refreshToken: encrypt(refreshToken),
-      tokenExpiresAt: tokenExpiresAt ? new Date(tokenExpiresAt) : null,
+      tokenExpiresAt: expiresAt,
       isActive: true,
     },
     update: {
       sellerId,
       marketplaceId,
-      accessToken: encrypt(accessToken),
+      accessToken: encAccessToken,
       refreshToken: encrypt(refreshToken),
-      tokenExpiresAt: tokenExpiresAt ? new Date(tokenExpiresAt) : null,
+      tokenExpiresAt: expiresAt,
       isActive: true,
     },
   });

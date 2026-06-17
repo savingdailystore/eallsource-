@@ -56,9 +56,9 @@ export function ConnectForm() {
         <p className="text-xs text-slate-400 mt-1">Your Login With Amazon (LWA) refresh token from SP-API OAuth.</p>
       </div>
       <div>
-        <label className="label">LWA Access Token</label>
-        <input value={form.accessToken} onChange={set('accessToken')} type="password" required className="input" placeholder="Atza|..." />
-        <p className="text-xs text-slate-400 mt-1">Current access token. Will be refreshed automatically using your refresh token.</p>
+        <label className="label">LWA Access Token <span className="text-slate-400 font-normal">(optional)</span></label>
+        <input value={form.accessToken} onChange={set('accessToken')} type="password" className="input" placeholder="Atza|… (leave blank — auto-generated)" />
+        <p className="text-xs text-slate-400 mt-1">Leave blank. It is generated automatically from your refresh token on first sync.</p>
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" disabled={loading} className="btn-primary w-full justify-center">

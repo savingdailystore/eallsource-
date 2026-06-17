@@ -44,17 +44,17 @@ export default async function InventoryPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Available', value: available, icon: Package, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Reserved', value: reserved, icon: ShoppingCart, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Inbound', value: inbound, icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Total Units', value: total, icon: Boxes, color: 'text-zinc-700', bg: 'bg-zinc-100' },
+          { label: 'Available', value: available, icon: Package, color: 'text-green-400', bg: 'bg-green-500/10' },
+          { label: 'Reserved', value: reserved, icon: ShoppingCart, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+          { label: 'Inbound', value: inbound, icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-500/10' },
+          { label: 'Total Units', value: total, icon: Boxes, color: 'text-zinc-300', bg: 'bg-zinc-800' },
         ].map((s) => (
           <div key={s.label} className="card p-5">
             <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>
               <s.icon className={`w-5 h-5 ${s.color}`} />
             </div>
-            <div className="text-2xl font-bold text-slate-900">{s.value}</div>
-            <div className="text-xs text-slate-500 mt-0.5">{s.label}</div>
+            <div className="text-2xl font-bold text-zinc-50">{s.value}</div>
+            <div className="text-xs text-zinc-400 mt-0.5">{s.label}</div>
           </div>
         ))}
       </div>
@@ -63,9 +63,9 @@ export default async function InventoryPage() {
       <div className="card overflow-hidden">
         {items.length === 0 ? (
           <div className="py-16 text-center">
-            <Package className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-medium">No inventory items yet</p>
-            <p className="text-sm text-slate-400 mt-1">Purchase a lead to start tracking inventory</p>
+            <Package className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+            <p className="text-zinc-400 font-medium">No inventory items yet</p>
+            <p className="text-sm text-zinc-500 mt-1">Purchase a lead to start tracking inventory</p>
           </div>
         ) : (
           <InventoryTable items={items} />

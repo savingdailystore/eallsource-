@@ -32,7 +32,7 @@ export function RunAllButton() {
   return (
     <div className="flex items-center gap-3">
       {result && (
-        <span className={`flex items-center gap-1.5 text-xs ${result.ok ? 'text-green-600' : 'text-red-600'}`}>
+        <span className={`flex items-center gap-1.5 text-xs ${result.ok ? 'text-green-400' : 'text-red-400'}`}>
           {result.ok ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
           {result.message}
         </span>

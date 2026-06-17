@@ -51,11 +51,11 @@ export function AddItemModal() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900">Add Inventory Item</h2>
-              <button onClick={close} className="text-slate-400 hover:text-slate-600 transition-colors">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="bg-zinc-900 rounded-2xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+              <h2 className="font-semibold text-zinc-50">Add Inventory Item</h2>
+              <button onClick={close} className="text-zinc-500 hover:text-zinc-300 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -74,7 +74,7 @@ export function AddItemModal() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="label">ASIN <span className="text-red-500">*</span></label>
+                  <label className="label">ASIN <span className="text-red-400">*</span></label>
                   <input value={form.asin} onChange={set('asin')} type="text" required className="input" placeholder="B08N5WRWNW" />
                 </div>
                 <div>
@@ -84,7 +84,7 @@ export function AddItemModal() {
               </div>
 
               <div>
-                <label className="label">Product Name <span className="text-red-500">*</span></label>
+                <label className="label">Product Name <span className="text-red-400">*</span></label>
                 <input value={form.productName} onChange={set('productName')} type="text" required className="input" placeholder="Product name" />
               </div>
 
@@ -103,7 +103,7 @@ export function AddItemModal() {
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="text-sm text-red-400">{error}</p>}
 
               <div className="flex justify-end gap-3 pt-1">
                 <button type="button" onClick={close} className="btn-secondary">Cancel</button>

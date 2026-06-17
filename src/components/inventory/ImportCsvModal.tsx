@@ -69,47 +69,47 @@ export function ImportCsvModal() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900">Import Inventory from File</h2>
-              <button onClick={close} className="text-slate-400 hover:text-slate-600 transition-colors">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="bg-zinc-900 rounded-2xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+              <h2 className="font-semibold text-zinc-50">Import Inventory from File</h2>
+              <button onClick={close} className="text-zinc-500 hover:text-zinc-300 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="px-6 py-5 space-y-4">
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-zinc-400">
                 Upload a <span className="font-medium">.csv</span> or tab-delimited <span className="font-medium">.txt</span> file
-                (such as an exported Amazon FBA inventory report). The only required column is <span className="font-mono text-slate-700">asin</span>.
+                (such as an exported Amazon FBA inventory report). The only required column is <span className="font-mono text-zinc-200">asin</span>.
                 Recognized columns: <span className="font-mono text-xs">sku, fnsku, asin, productName, availableQuantity, reservedQuantity, inboundQuantity, totalQuantity</span>.
                 Rows with an existing ASIN are updated.
               </p>
 
-              <button onClick={downloadTemplate} className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-700 font-medium">
+              <button onClick={downloadTemplate} className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-400 font-medium">
                 <Download className="w-3.5 h-3.5" />Download template
               </button>
 
               {/* File picker */}
               <div
                 onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-slate-200 rounded-xl px-4 py-8 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-50/40 transition-colors"
+                className="border-2 border-dashed border-zinc-800 rounded-xl px-4 py-8 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-500/10 transition-colors"
               >
                 <input ref={fileRef} type="file" accept=".csv,.txt,text/csv,text/plain,text/tab-separated-values" onChange={onPick} className="hidden" />
                 {fileName ? (
-                  <div className="flex items-center justify-center gap-2 text-sm text-slate-700">
+                  <div className="flex items-center justify-center gap-2 text-sm text-zinc-200">
                     <FileText className="w-4 h-4 text-orange-500" />{fileName}
                   </div>
                 ) : (
-                  <div className="text-sm text-slate-400">
-                    <Upload className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+                  <div className="text-sm text-zinc-500">
+                    <Upload className="w-6 h-6 mx-auto mb-2 text-zinc-600" />
                     Click to choose a .csv or .txt file
                   </div>
                 )}
               </div>
 
               {result && (
-                <div className={`flex items-center gap-2 text-sm ${result.ok ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`flex items-center gap-2 text-sm ${result.ok ? 'text-green-400' : 'text-red-400'}`}>
                   {result.ok ? <CheckCircle2 className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
                   {result.message}
                 </div>

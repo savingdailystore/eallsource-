@@ -82,8 +82,8 @@ export function ProfitabilityCalculator({
       {/* Source price */}
       {sourcePrice > 0 && (
         <div className="flex justify-between text-sm">
-          <span className="text-slate-500">Source Price ({sourceRetailer})</span>
-          <span className="font-medium text-slate-800">{formatCurrency(sourcePrice)}</span>
+          <span className="text-zinc-400">Source Price ({sourceRetailer})</span>
+          <span className="font-medium text-zinc-100">{formatCurrency(sourcePrice)}</span>
         </div>
       )}
 
@@ -101,13 +101,13 @@ export function ProfitabilityCalculator({
                 value={d.source}
                 onChange={(e) => updateField(d._id, 'source', e.target.value)}
                 placeholder="Source name"
-                className="text-xs border border-slate-200 rounded px-1.5 py-0.5 w-28 text-slate-700 focus:outline-none focus:border-orange-400"
+                className="text-xs border border-zinc-800 rounded px-1.5 py-0.5 w-28 text-zinc-200 focus:outline-none focus:border-orange-400"
               />
             ) : (
-              <span className="text-green-600 flex items-center gap-1 min-w-0">
+              <span className="text-green-400 flex items-center gap-1 min-w-0">
                 {url ? (
                   <a href={url} target="_blank" rel="noopener noreferrer"
-                    className="underline underline-offset-2 decoration-green-400 hover:text-green-700 flex items-center gap-0.5">
+                    className="underline underline-offset-2 decoration-green-400 hover:text-green-400 flex items-center gap-0.5">
                     {d.source}<ExternalLink className="w-3 h-3 flex-shrink-0" />
                   </a>
                 ) : d.source}
@@ -118,7 +118,7 @@ export function ProfitabilityCalculator({
               <select
                 value={d.type}
                 onChange={(e) => updateField(d._id, 'type', e.target.value)}
-                className="text-[11px] border border-slate-200 rounded px-1 py-0.5 text-slate-500 focus:outline-none focus:border-orange-400"
+                className="text-[11px] border border-zinc-800 rounded px-1 py-0.5 text-zinc-400 focus:outline-none focus:border-orange-400"
               >
                 <option value="coupon">coupon</option>
                 <option value="cashback">cashback</option>
@@ -130,28 +130,28 @@ export function ProfitabilityCalculator({
             )}
 
             {d.code && (
-              <span className="font-mono text-xs bg-green-50 border border-green-100 px-1 rounded">{d.code}</span>
+              <span className="font-mono text-xs bg-green-500/10 border border-green-500/30 px-1 rounded">{d.code}</span>
             )}
 
             {isCashback && !d._custom && d.amount > 0 && (
-              <span className="text-xs text-slate-400" title="Rate at scan time">
+              <span className="text-xs text-zinc-500" title="Rate at scan time">
                 ~{d.percentage ?? ''}%
               </span>
             )}
 
             <span className="ml-auto flex items-center gap-1 flex-shrink-0">
-              <span className="text-[11px] text-slate-400 mr-0.5">$</span>
+              <span className="text-[11px] text-zinc-500 mr-0.5">$</span>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 value={d.amount === 0 && d._custom ? '' : d.amount}
                 onChange={(e) => updateAmount(d._id, e.target.value)}
-                className="w-20 text-right text-sm font-medium text-green-600 border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-orange-400"
+                className="w-20 text-right text-sm font-medium text-green-400 border border-zinc-800 rounded px-1.5 py-0.5 focus:outline-none focus:border-orange-400"
               />
               <button
                 onClick={() => removeDiscount(d._id)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-300 hover:text-red-400 ml-0.5"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-600 hover:text-red-400 ml-0.5"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -162,7 +162,7 @@ export function ProfitabilityCalculator({
 
       {/* Cashback rate note */}
       {discounts.some((d) => d.type === 'cashback' || d.type === 'rewards') && (
-        <p className="text-[10px] text-amber-600">
+        <p className="text-[10px] text-amber-400">
           ~ Cashback rates at scan time — verify before purchasing.
         </p>
       )}
@@ -170,21 +170,21 @@ export function ProfitabilityCalculator({
       {/* Add / Reset controls */}
       <div className="flex items-center gap-2 pt-1">
         <button onClick={addDiscount}
-          className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-medium">
+          className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-400 font-medium">
           <Plus className="w-3.5 h-3.5" />Add discount
         </button>
         {!isReset && (
           <button onClick={reset}
-            className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 ml-auto">
+            className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 ml-auto">
             <RotateCcw className="w-3 h-3" />Reset
           </button>
         )}
       </div>
 
       {/* Final Cost */}
-      <div className="flex justify-between text-sm font-semibold border-t border-slate-100 pt-2 mt-1">
+      <div className="flex justify-between text-sm font-semibold border-t border-zinc-800 pt-2 mt-1">
         <span>Final Cost</span>
-        <span className={profitChanged ? (costDelta > 0 ? 'text-green-600' : 'text-red-500') : ''}>
+        <span className={profitChanged ? (costDelta > 0 ? 'text-green-400' : 'text-red-400') : ''}>
           {formatCurrency(finalCost)}
           {profitChanged && (
             <span className="text-[10px] font-normal ml-1">
@@ -195,35 +195,35 @@ export function ProfitabilityCalculator({
       </div>
 
       {/* Separator */}
-      <div className="pt-2 mt-1 border-t border-dashed border-slate-100">
-        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+      <div className="pt-2 mt-1 border-t border-dashed border-zinc-800">
+        <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2">
           Deductions from Resell Price ({formatCurrency(resellPrice)})
         </div>
         {amazonFees > 0 && (
           <div className="flex justify-between text-sm">
-            <span className="text-slate-500">Amazon Fees (referral + FBA)</span>
-            <span className="text-red-500">−{formatCurrency(amazonFees)}</span>
+            <span className="text-zinc-400">Amazon Fees (referral + FBA)</span>
+            <span className="text-red-400">−{formatCurrency(amazonFees)}</span>
           </div>
         )}
         {prepFee != null && (
           <div className="flex justify-between text-sm">
-            <span className="text-slate-500">Prep Fee</span>
-            <span className="text-red-500">−{formatCurrency(prepFee)}</span>
+            <span className="text-zinc-400">Prep Fee</span>
+            <span className="text-red-400">−{formatCurrency(prepFee)}</span>
           </div>
         )}
         {taxAmount != null && (
           <div className="flex justify-between text-sm">
-            <span className="text-slate-500">Tax</span>
-            <span className="text-red-500">−{formatCurrency(taxAmount)}</span>
+            <span className="text-zinc-400">Tax</span>
+            <span className="text-red-400">−{formatCurrency(taxAmount)}</span>
           </div>
         )}
       </div>
 
       {/* Summary */}
-      <div className="border-t border-slate-100 pt-2 mt-1 space-y-1">
+      <div className="border-t border-zinc-800 pt-2 mt-1 space-y-1">
         <div className="flex justify-between text-sm font-bold">
           <span>Net Profit</span>
-          <span className={profit >= 0 ? 'text-green-600' : 'text-red-500'}>
+          <span className={profit >= 0 ? 'text-green-400' : 'text-red-400'}>
             {formatCurrency(profit)}
             {profitChanged && (
               <span className="text-[10px] font-normal ml-1">
@@ -233,18 +233,18 @@ export function ProfitabilityCalculator({
           </span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-slate-500">ROI</span>
-          <span className={`font-semibold ${roi >= 30 ? 'text-green-600' : 'text-red-500'}`}>
+          <span className="text-zinc-400">ROI</span>
+          <span className={`font-semibold ${roi >= 30 ? 'text-green-400' : 'text-red-400'}`}>
             {formatPercent(roi)}
             {profitChanged && (
-              <span className="text-[10px] font-normal ml-1 text-slate-400">
+              <span className="text-[10px] font-normal ml-1 text-zinc-500">
                 ({roi > (finalCost > 0 ? (originalProfit / originalFinalCost) * 100 : 0) ? '+' : ''}
                 {(roi - (originalFinalCost > 0 ? (originalProfit / originalFinalCost) * 100 : 0)).toFixed(1)}%)
               </span>
             )}
           </span>
         </div>
-        <div className="text-xs text-slate-400">
+        <div className="text-xs text-zinc-500">
           ROI = (Net Profit ÷ Final Cost) × 100
         </div>
       </div>

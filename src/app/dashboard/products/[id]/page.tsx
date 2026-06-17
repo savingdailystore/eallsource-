@@ -40,13 +40,13 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="p-6 lg:p-8 max-w-5xl">
       <div className="flex items-center gap-3 mb-5">
-        <Link href="/dashboard/products" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700">
+        <Link href="/dashboard/products" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200">
           <ArrowLeft className="w-4 h-4" />Back to Products
         </Link>
         {lead && (
           <>
-            <span className="text-slate-300">·</span>
-            <Link href={`/dashboard/leads/${lead.id}`} className="inline-flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700">
+            <span className="text-zinc-600">·</span>
+            <Link href={`/dashboard/leads/${lead.id}`} className="inline-flex items-center gap-1 text-sm text-orange-600 hover:text-orange-400">
               View Lead <ExternalLink className="w-3.5 h-3.5" />
             </Link>
           </>
@@ -56,18 +56,18 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
         {p.imageUrl ? (
-          <img src={p.imageUrl} alt={p.title} className="w-20 h-20 object-contain rounded-xl border border-slate-100 bg-white flex-shrink-0" />
+          <img src={p.imageUrl} alt={p.title} className="w-20 h-20 object-contain rounded-xl border border-zinc-800 bg-zinc-900 flex-shrink-0" />
         ) : (
-          <div className="w-20 h-20 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-center flex-shrink-0">
-            <Package className="w-8 h-8 text-slate-300" />
+          <div className="w-20 h-20 rounded-xl border border-zinc-800 bg-zinc-800/40 flex items-center justify-center flex-shrink-0">
+            <Package className="w-8 h-8 text-zinc-600" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-slate-900 leading-snug">{p.title}</h1>
+          <h1 className="text-xl font-bold text-zinc-50 leading-snug">{p.title}</h1>
           <div className="flex flex-wrap items-center gap-3 mt-1">
-            <span className="font-mono text-xs text-slate-500">{p.asin}</span>
-            {p.brand    && <span className="text-xs text-slate-500">{p.brand}</span>}
-            {p.category && <span className="badge bg-slate-100 text-slate-600">{p.category}</span>}
+            <span className="font-mono text-xs text-zinc-400">{p.asin}</span>
+            {p.brand    && <span className="text-xs text-zinc-400">{p.brand}</span>}
+            {p.category && <span className="badge bg-zinc-800 text-zinc-300">{p.category}</span>}
           </div>
           <div className="flex items-center gap-3 mt-3">
             <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs py-1.5">
@@ -86,7 +86,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <div className="flex-shrink-0 text-center">
           <div className={`text-4xl font-black ${color}`}>{Math.round(p.score)}</div>
           <div className={`text-sm font-bold ${color}`}>{label}</div>
-          <div className="text-xs text-slate-400 mt-1">Score</div>
+          <div className="text-xs text-zinc-500 mt-1">Score</div>
         </div>
       </div>
 
@@ -94,26 +94,26 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <div className="lg:col-span-2 space-y-5">
           {/* Profitability */}
           <div className="card p-5">
-            <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-green-600" />Profitability Breakdown
+            <h2 className="font-semibold text-zinc-50 mb-4 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-green-400" />Profitability Breakdown
             </h2>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs text-slate-500 mb-1">Net Profit</div>
-                <div className={`text-2xl font-black ${p.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+              <div className="bg-zinc-800/40 rounded-xl p-4">
+                <div className="text-xs text-zinc-400 mb-1">Net Profit</div>
+                <div className={`text-2xl font-black ${p.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {formatCurrency(p.profit)}
                 </div>
               </div>
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs text-slate-500 mb-1">ROI</div>
-                <div className={`text-2xl font-black ${p.roi >= 30 ? 'text-green-600' : 'text-red-500'}`}>
+              <div className="bg-zinc-800/40 rounded-xl p-4">
+                <div className="text-xs text-zinc-400 mb-1">ROI</div>
+                <div className={`text-2xl font-black ${p.roi >= 30 ? 'text-green-400' : 'text-red-400'}`}>
                   {formatPercent(p.roi)}
                 </div>
               </div>
             </div>
 
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-3">
               Profitability Formula
             </div>
             <ProfitabilityCalculator
@@ -131,7 +131,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
           {/* Amazon Data */}
           <div className="card p-5">
-            <h2 className="font-semibold text-slate-900 mb-4">Amazon Market Data</h2>
+            <h2 className="font-semibold text-zinc-50 mb-4">Amazon Market Data</h2>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {[
                 ['Buy Box Price',   p.buyBoxPrice    != null ? formatCurrency(p.buyBoxPrice)          : '—'],
@@ -144,8 +144,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 ['Price Stability', (p as any).priceStability ?? '—'],
               ].map(([lbl, val]) => (
                 <div key={lbl as string}>
-                  <div className="text-xs text-slate-400">{lbl}</div>
-                  <div className="text-sm font-medium text-slate-800 mt-0.5">{val}</div>
+                  <div className="text-xs text-zinc-500">{lbl}</div>
+                  <div className="text-sm font-medium text-zinc-100 mt-0.5">{val}</div>
                 </div>
               ))}
             </div>
@@ -156,10 +156,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         <div className="space-y-5">
           {/* Validation */}
           <div className="card p-5">
-            <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+            <h2 className="font-semibold text-zinc-50 mb-3 flex items-center gap-2">
               {p.validationPassed
-                ? <CheckCircle2 className="w-4 h-4 text-green-600" />
-                : <XCircle className="w-4 h-4 text-red-500" />}
+                ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+                : <XCircle className="w-4 h-4 text-red-400" />}
               Validation
             </h2>
             {[
@@ -170,32 +170,32 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               ['Match',     (p as any).matchConfidence, ((p as any).matchConfidence ?? 0) >= 70],
             ].map(([lbl, val, pass]) => (
               <div key={lbl as string} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                <span className="text-sm text-slate-600">{lbl as string}</span>
+                <span className="text-sm text-zinc-300">{lbl as string}</span>
                 <div className="flex items-center gap-2">
-                  <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="w-24 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full ${(val as number) >= 95 ? 'bg-green-500' : (val as number) >= 70 ? 'bg-amber-400' : 'bg-red-400'}`}
                       style={{ width: `${val ?? 0}%` }}
                     />
                   </div>
-                  <span className="text-xs font-mono w-10 text-right text-slate-700">{((val as number) ?? 0).toFixed(0)}%</span>
+                  <span className="text-xs font-mono w-10 text-right text-zinc-200">{((val as number) ?? 0).toFixed(0)}%</span>
                   {(pass as boolean)
                     ? <CheckCircle2 className="w-4 h-4 text-green-500" />
                     : <XCircle className="w-4 h-4 text-red-400" />}
                 </div>
               </div>
             ))}
-            <div className="mt-3 text-xs text-slate-400">All scores must be ≥ 95% to display. Match ≥ 70%.</div>
+            <div className="mt-3 text-xs text-zinc-500">All scores must be ≥ 95% to display. Match ≥ 70%.</div>
           </div>
 
           {/* Risk */}
           <div className="card p-5">
-            <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+            <h2 className="font-semibold text-zinc-50 mb-3 flex items-center gap-2">
               {p.gatingRisk === 'LOW'
-                ? <ShieldCheck className="w-4 h-4 text-green-600" />
+                ? <ShieldCheck className="w-4 h-4 text-green-400" />
                 : p.gatingRisk === 'MEDIUM'
                 ? <ShieldAlert className="w-4 h-4 text-amber-500" />
-                : <ShieldX    className="w-4 h-4 text-red-500" />}
+                : <ShieldX    className="w-4 h-4 text-red-400" />}
               Risk Assessment
             </h2>
             <div className="space-y-2">
@@ -208,8 +208,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 ['Category Gated',    (p as any).isCategoryGated   ? 'Yes ⚠️' : 'No', !(p as any).isCategoryGated],
               ].map(([lbl, val, good]) => (
                 <div key={lbl as string} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
-                  <span className="text-sm text-slate-500">{lbl as string}</span>
-                  <span className={`text-sm font-medium ${good ? 'text-green-600' : 'text-red-500'}`}>{val as string}</span>
+                  <span className="text-sm text-zinc-400">{lbl as string}</span>
+                  <span className={`text-sm font-medium ${good ? 'text-green-400' : 'text-red-400'}`}>{val as string}</span>
                 </div>
               ))}
             </div>

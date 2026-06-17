@@ -12,7 +12,7 @@ export const metadata = { title: 'Billing' };
 
 const PLANS: { key: Plan; name: string; price: number; icon: any; color: string; features: string[] }[] = [
   {
-    key: 'STARTER', name: 'Starter', price: 0, icon: Zap, color: 'text-slate-600',
+    key: 'STARTER', name: 'Starter', price: 0, icon: Zap, color: 'text-zinc-300',
     features: ['20 leads/day', 'ROI calculator', 'Validation engine', 'Export to CSV', '1 user'],
   },
   {
@@ -20,7 +20,7 @@ const PLANS: { key: Plan; name: string; price: number; icon: any; color: string;
     features: ['500 leads/day', 'Everything in Starter', 'Inventory management', 'Repricing engine', 'Amazon SP-API', '5 users'],
   },
   {
-    key: 'ENTERPRISE', name: 'Enterprise', price: 297, icon: Building2, color: 'text-zinc-800',
+    key: 'ENTERPRISE', name: 'Enterprise', price: 297, icon: Building2, color: 'text-zinc-200',
     features: ['Unlimited leads', 'Everything in Pro', 'API access', 'Unlimited users', 'Priority support', 'Custom integrations'],
   },
 ];
@@ -54,14 +54,14 @@ export default async function BillingPage() {
 
       {/* Current subscription status */}
       {subscription && (
-        <div className="card p-5 border-green-100 bg-green-50/30">
+        <div className="card p-5 border-green-500/30 bg-green-500/10">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-semibold text-slate-900">
+              <div className="text-sm font-semibold text-zinc-50">
                 {subscription.status === 'trialing' ? 'Free Trial' : `${currentPlan} Plan`}
               </div>
               {subscription.currentPeriodEnd && (
-                <div className="text-xs text-slate-500 mt-0.5">
+                <div className="text-xs text-zinc-400 mt-0.5">
                   {subscription.cancelAtPeriodEnd ? 'Cancels' : 'Renews'}{' '}
                   {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
                 </div>
@@ -85,7 +85,7 @@ export default async function BillingPage() {
           return (
             <div
               key={plan.key}
-              className={`card p-6 relative ${isCurrent ? 'border-green-200 ring-2 ring-green-500 ring-offset-2' : ''}`}
+              className={`card p-6 relative ${isCurrent ? 'border-green-500/30 ring-2 ring-green-500 ring-offset-2' : ''}`}
             >
               {isCurrent && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -93,31 +93,31 @@ export default async function BillingPage() {
                 </div>
               )}
 
-              <div className={`w-10 h-10 rounded-xl ${plan.key === 'PRO' ? 'bg-orange-50' : plan.key === 'ENTERPRISE' ? 'bg-zinc-100' : 'bg-slate-100'} flex items-center justify-center mb-4`}>
+              <div className={`w-10 h-10 rounded-xl ${plan.key === 'PRO' ? 'bg-orange-500/10' : plan.key === 'ENTERPRISE' ? 'bg-zinc-800' : 'bg-zinc-800'} flex items-center justify-center mb-4`}>
                 <plan.icon className={`w-5 h-5 ${plan.color}`} />
               </div>
 
               <div className="mb-1">
-                <span className="text-lg font-bold text-slate-900">{plan.name}</span>
+                <span className="text-lg font-bold text-zinc-50">{plan.name}</span>
               </div>
               <div className="mb-4">
-                <span className="text-3xl font-black text-slate-900">
+                <span className="text-3xl font-black text-zinc-50">
                   {plan.price === 0 ? 'Free' : formatCurrency(plan.price)}
                 </span>
-                {plan.price > 0 && <span className="text-slate-400 text-sm">/mo</span>}
+                {plan.price > 0 && <span className="text-zinc-500 text-sm">/mo</span>}
               </div>
 
               <ul className="space-y-2 mb-6">
                 {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-slate-600">
-                    <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <li key={f} className="flex items-start gap-2 text-sm text-zinc-300">
+                    <Check className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
                     {f}
                   </li>
                 ))}
               </ul>
 
               {isCurrent ? (
-                <div className="btn-secondary w-full justify-center text-slate-400 cursor-default">
+                <div className="btn-secondary w-full justify-center text-zinc-500 cursor-default">
                   ✓ Current plan
                 </div>
               ) : (
@@ -138,7 +138,7 @@ export default async function BillingPage() {
 
       {/* Usage */}
       <div className="card p-5">
-        <h2 className="font-semibold text-slate-900 mb-4">Plan Limits</h2>
+        <h2 className="font-semibold text-zinc-50 mb-4">Plan Limits</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           {[
             ['Leads/day', PLAN_LIMITS[currentPlan].leadsPerDay === 9999 ? 'Unlimited' : PLAN_LIMITS[currentPlan].leadsPerDay],
@@ -146,9 +146,9 @@ export default async function BillingPage() {
             ['SP-API',    PLAN_LIMITS[currentPlan].spApi     ? '✓' : '—'],
             ['Users',     PLAN_LIMITS[currentPlan].maxUsers  === 99 ? 'Unlimited' : PLAN_LIMITS[currentPlan].maxUsers],
           ].map(([label, value]) => (
-            <div key={label as string} className="bg-slate-50 rounded-xl p-3">
-              <div className="text-xs text-slate-400 mb-1">{label as string}</div>
-              <div className="font-semibold text-slate-900">{String(value)}</div>
+            <div key={label as string} className="bg-zinc-800/40 rounded-xl p-3">
+              <div className="text-xs text-zinc-500 mb-1">{label as string}</div>
+              <div className="font-semibold text-zinc-50">{String(value)}</div>
             </div>
           ))}
         </div>

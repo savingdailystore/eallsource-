@@ -22,7 +22,7 @@ export function DeleteRuleButton({ id, asin }: { id: string; asin: string }) {
           className="text-xs text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded-lg font-medium transition-colors">
           {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Delete'}
         </button>
-        <button onClick={() => setConfirm(false)} className="text-xs text-slate-400 hover:text-slate-600 px-1">
+        <button onClick={() => setConfirm(false)} className="text-xs text-zinc-500 hover:text-zinc-300 px-1">
           Cancel
         </button>
       </span>
@@ -31,7 +31,7 @@ export function DeleteRuleButton({ id, asin }: { id: string; asin: string }) {
 
   return (
     <button onClick={() => setConfirm(true)} title={`Delete rule for ${asin}`}
-      className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all">
+      className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all">
       <Trash2 className="w-3.5 h-3.5" />
     </button>
   );

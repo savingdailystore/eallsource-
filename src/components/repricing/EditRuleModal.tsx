@@ -72,20 +72,20 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
       <button
         onClick={() => setOpen(true)}
         title="Customize rule"
-        className="p-1.5 rounded-lg text-slate-300 hover:text-orange-500 hover:bg-orange-50 transition-all"
+        className="p-1.5 rounded-lg text-zinc-600 hover:text-orange-500 hover:bg-orange-500/10 transition-all"
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="bg-zinc-900 rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
               <div>
-                <h2 className="font-semibold text-slate-900">Customize Repricing Rule</h2>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">{rule.asin}</p>
+                <h2 className="font-semibold text-zinc-50">Customize Repricing Rule</h2>
+                <p className="text-xs text-zinc-500 font-mono mt-0.5">{rule.asin}</p>
               </div>
-              <button onClick={close} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <button onClick={close} className="text-zinc-500 hover:text-zinc-300 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -98,7 +98,7 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
                 </select>
-                {activeStrategy && <p className="text-xs text-slate-400 mt-1">{activeStrategy.desc}</p>}
+                {activeStrategy && <p className="text-xs text-zinc-500 mt-1">{activeStrategy.desc}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -113,14 +113,14 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
               </div>
 
               <div>
-                <label className="label">Manual Floor Price ($) <span className="text-slate-400 font-normal">(optional)</span></label>
+                <label className="label">Manual Floor Price ($) <span className="text-zinc-500 font-normal">(optional)</span></label>
                 <input
                   value={form.floorPrice}
                   onChange={(e) => setForm((f) => ({ ...f, floorPrice: e.target.value }))}
                   type="number" step="0.01" min="0" className="input"
                   placeholder="Leave blank to use Min ROI floor"
                 />
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-zinc-500 mt-1">
                   A hard price the rule will never sell below. Effective floor = the higher of this and your Min ROI floor.
                 </p>
               </div>
@@ -130,13 +130,13 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
                   type="checkbox"
                   checked={form.isActive}
                   onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                  className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400"
+                  className="w-4 h-4 rounded border-zinc-700 text-orange-500 focus:ring-orange-400"
                 />
-                <span className="text-sm text-slate-700">Rule active</span>
-                <span className="text-xs text-slate-400">— inactive rules are skipped on Run All</span>
+                <span className="text-sm text-zinc-200">Rule active</span>
+                <span className="text-xs text-zinc-500">— inactive rules are skipped on Run All</span>
               </label>
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="text-sm text-red-400">{error}</p>}
 
               <div className="flex justify-end gap-3 pt-1">
                 <button type="button" onClick={close} className="btn-secondary">Cancel</button>

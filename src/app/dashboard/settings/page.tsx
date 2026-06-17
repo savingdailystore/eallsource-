@@ -41,8 +41,8 @@ export default async function SettingsPage() {
       {/* Organization */}
       <div className="card p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Building2 className="w-4 h-4 text-slate-500" />
-          <h2 className="font-semibold text-slate-900">Organization</h2>
+          <Building2 className="w-4 h-4 text-zinc-400" />
+          <h2 className="font-semibold text-zinc-50">Organization</h2>
         </div>
         <OrgForm
           orgName={org?.name ?? ''}
@@ -54,8 +54,8 @@ export default async function SettingsPage() {
       {/* Team */}
       <div className="card p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Users className="w-4 h-4 text-slate-500" />
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Team</span>
+          <Users className="w-4 h-4 text-zinc-400" />
+          <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Team</span>
         </div>
 
         <TeamMembers
@@ -66,7 +66,7 @@ export default async function SettingsPage() {
         />
 
         {session!.user.plan === 'STARTER' && (
-          <div className="mt-4 text-xs text-slate-400">
+          <div className="mt-4 text-xs text-zinc-500">
             Inviting team members requires Pro or Enterprise.{' '}
             <a href="/dashboard/billing" className="text-orange-600 hover:underline">Upgrade →</a>
           </div>
@@ -76,8 +76,8 @@ export default async function SettingsPage() {
       {/* Two-Factor Authentication */}
       <div className="card p-6">
         <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck className="w-4 h-4 text-slate-500" />
-          <h2 className="font-semibold text-slate-900">Two-Factor Authentication</h2>
+          <ShieldCheck className="w-4 h-4 text-zinc-400" />
+          <h2 className="font-semibold text-zinc-50">Two-Factor Authentication</h2>
         </div>
         <MfaSettings enabled={!!currentUser?.mfaEnabled} />
       </div>
@@ -85,8 +85,8 @@ export default async function SettingsPage() {
       {/* Account */}
       <div className="card p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Settings className="w-4 h-4 text-slate-500" />
-          <h2 className="font-semibold text-slate-900">Change Password</h2>
+          <Settings className="w-4 h-4 text-zinc-400" />
+          <h2 className="font-semibold text-zinc-50">Change Password</h2>
         </div>
         <PasswordForm />
       </div>

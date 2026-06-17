@@ -50,7 +50,7 @@ export function PasswordForm() {
             autoComplete="current-password"
             className="input pr-10"
           />
-          <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+          <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
             {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
@@ -68,13 +68,13 @@ export function PasswordForm() {
             className="input pr-10"
             placeholder="Min 12 chars, upper, lower, number, symbol"
           />
-          <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+          <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
             {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </button>
         </div>
       </div>
-      {error   && <p className="text-sm text-red-600">{error}</p>}
-      {success && <p className="text-sm text-green-600">Password changed successfully.</p>}
+      {error   && <p className="text-sm text-red-400">{error}</p>}
+      {success && <p className="text-sm text-green-400">Password changed successfully.</p>}
       <button type="submit" disabled={loading} className="btn-secondary text-sm">
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Change password'}
       </button>

@@ -26,8 +26,8 @@ export function ToggleRuleButton({ id, isActive }: { id: string; isActive: boole
       title={isActive ? 'Pause this rule' : 'Activate this rule'}
       className={`p-1.5 rounded-lg transition-all ${
         isActive
-          ? 'text-slate-300 hover:text-amber-500 hover:bg-amber-50'
-          : 'text-slate-300 hover:text-green-600 hover:bg-green-50'
+          ? 'text-zinc-600 hover:text-amber-500 hover:bg-amber-500/10'
+          : 'text-zinc-600 hover:text-green-400 hover:bg-green-500/10'
       }`}
     >
       {busy

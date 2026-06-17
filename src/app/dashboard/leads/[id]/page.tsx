@@ -35,15 +35,15 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     const pct = value ?? 0;
     return (
       <div className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-        <span className="text-sm text-slate-600">{label}</span>
+        <span className="text-sm text-zinc-300">{label}</span>
         <div className="flex items-center gap-2">
-          <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="w-24 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full ${pct >= 95 ? 'bg-green-500' : pct >= 70 ? 'bg-amber-400' : 'bg-red-400'}`}
               style={{ width: `${pct}%` }}
             />
           </div>
-          <span className="text-xs font-mono w-10 text-right text-slate-700">{pct.toFixed(0)}%</span>
+          <span className="text-xs font-mono w-10 text-right text-zinc-200">{pct.toFixed(0)}%</span>
           {pass != null && (pass
             ? <CheckCircle2 className="w-4 h-4 text-green-500" />
             : <XCircle className="w-4 h-4 text-red-400" />)}
@@ -55,25 +55,25 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   return (
     <div className="p-6 lg:p-8 max-w-5xl">
       {/* Back */}
-      <Link href="/dashboard/leads" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
+      <Link href="/dashboard/leads" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-zinc-200 mb-5">
         <ArrowLeft className="w-4 h-4" />Back to Lead Feed
       </Link>
 
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
         {p.imageUrl ? (
-          <img src={p.imageUrl} alt={p.title} className="w-20 h-20 object-contain rounded-xl border border-slate-100 bg-white flex-shrink-0" />
+          <img src={p.imageUrl} alt={p.title} className="w-20 h-20 object-contain rounded-xl border border-zinc-800 bg-zinc-900 flex-shrink-0" />
         ) : (
-          <div className="w-20 h-20 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-center flex-shrink-0">
-            <Package className="w-8 h-8 text-slate-300" />
+          <div className="w-20 h-20 rounded-xl border border-zinc-800 bg-zinc-800/40 flex items-center justify-center flex-shrink-0">
+            <Package className="w-8 h-8 text-zinc-600" />
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-slate-900 leading-snug">{p.title}</h1>
+          <h1 className="text-xl font-bold text-zinc-50 leading-snug">{p.title}</h1>
           <div className="flex flex-wrap items-center gap-3 mt-1">
-            <span className="font-mono text-xs text-slate-500">{p.asin}</span>
-            {p.brand && <span className="text-xs text-slate-500">{p.brand}</span>}
-            {p.category && <span className="badge bg-slate-100 text-slate-600">{p.category}</span>}
+            <span className="font-mono text-xs text-zinc-400">{p.asin}</span>
+            {p.brand && <span className="text-xs text-zinc-400">{p.brand}</span>}
+            {p.category && <span className="badge bg-zinc-800 text-zinc-300">{p.category}</span>}
           </div>
           <div className="flex items-center gap-3 mt-3">
             <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs py-1.5">
@@ -93,7 +93,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <div className="flex-shrink-0 text-center">
           <div className={`text-4xl font-black ${color}`}>{Math.round(lead.score)}</div>
           <div className={`text-sm font-bold ${color}`}>{label}</div>
-          <div className="text-xs text-slate-400 mt-1">Lead Score</div>
+          <div className="text-xs text-zinc-500 mt-1">Lead Score</div>
         </div>
       </div>
 
@@ -102,26 +102,26 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <div className="lg:col-span-2 space-y-5">
           {/* Formula */}
           <div className="card p-5">
-            <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-green-600" />Profitability Breakdown
+            <h2 className="font-semibold text-zinc-50 mb-4 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-green-400" />Profitability Breakdown
             </h2>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs text-slate-500 mb-1">Net Profit</div>
-                <div className={`text-2xl font-black ${p.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+              <div className="bg-zinc-800/40 rounded-xl p-4">
+                <div className="text-xs text-zinc-400 mb-1">Net Profit</div>
+                <div className={`text-2xl font-black ${p.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {formatCurrency(p.profit)}
                 </div>
               </div>
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs text-slate-500 mb-1">ROI</div>
-                <div className={`text-2xl font-black ${p.roi >= 30 ? 'text-green-600' : 'text-red-500'}`}>
+              <div className="bg-zinc-800/40 rounded-xl p-4">
+                <div className="text-xs text-zinc-400 mb-1">ROI</div>
+                <div className={`text-2xl font-black ${p.roi >= 30 ? 'text-green-400' : 'text-red-400'}`}>
                   {formatPercent(p.roi)}
                 </div>
               </div>
             </div>
 
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-3">
               Profitability Formula
             </div>
             <ProfitabilityCalculator
@@ -139,7 +139,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
           {/* Amazon Data */}
           <div className="card p-5">
-            <h2 className="font-semibold text-slate-900 mb-4">Amazon Market Data</h2>
+            <h2 className="font-semibold text-zinc-50 mb-4">Amazon Market Data</h2>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {[
                 ['Buy Box Price', p.buyBoxPrice != null ? formatCurrency(p.buyBoxPrice) : '—'],
@@ -152,8 +152,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 ['Price Stability', p.priceStability ?? '—'],
               ].map(([label, value]) => (
                 <div key={label as string}>
-                  <div className="text-xs text-slate-400">{label}</div>
-                  <div className="text-sm font-medium text-slate-800 mt-0.5">{value}</div>
+                  <div className="text-xs text-zinc-500">{label}</div>
+                  <div className="text-sm font-medium text-zinc-100 mt-0.5">{value}</div>
                 </div>
               ))}
             </div>
@@ -164,10 +164,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <div className="space-y-5">
           {/* Validation Scores */}
           <div className="card p-5">
-            <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+            <h2 className="font-semibold text-zinc-50 mb-3 flex items-center gap-2">
               {p.validationPassed
-                ? <CheckCircle2 className="w-4 h-4 text-green-600" />
-                : <XCircle className="w-4 h-4 text-red-500" />}
+                ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+                : <XCircle className="w-4 h-4 text-red-400" />}
               Validation
             </h2>
             <ScoreRow label="Identity"  value={p.identityScore}  pass={(p.identityScore ?? 0)  >= 95} />
@@ -175,19 +175,19 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <ScoreRow label="Price"     value={p.priceScore}      pass={(p.priceScore ?? 0)      >= 95} />
             <ScoreRow label="Inventory" value={p.inventoryScore}  pass={(p.inventoryScore ?? 0)  >= 95} />
             <ScoreRow label="Match"     value={p.matchConfidence} pass={(p.matchConfidence ?? 0) >= 70} />
-            <div className="mt-3 text-xs text-slate-400">
+            <div className="mt-3 text-xs text-zinc-500">
               All scores must be ≥ 95% to display. Match ≥ 70%.
             </div>
           </div>
 
           {/* Risk Assessment */}
           <div className="card p-5">
-            <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+            <h2 className="font-semibold text-zinc-50 mb-3 flex items-center gap-2">
               {p.gatingRisk === 'LOW'
-                ? <ShieldCheck className="w-4 h-4 text-green-600" />
+                ? <ShieldCheck className="w-4 h-4 text-green-400" />
                 : p.gatingRisk === 'MEDIUM'
                 ? <ShieldAlert className="w-4 h-4 text-amber-500" />
-                : <ShieldX className="w-4 h-4 text-red-500" />}
+                : <ShieldX className="w-4 h-4 text-red-400" />}
               Risk Assessment
             </h2>
             <div className="space-y-2">
@@ -200,8 +200,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 ['Category Gated',   p.isCategoryGated   ? 'Yes ⚠️' : 'No', !p.isCategoryGated],
               ].map(([label, value, good]) => (
                 <div key={label as string} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
-                  <span className="text-sm text-slate-500">{label as string}</span>
-                  <span className={`text-sm font-medium ${good ? 'text-green-600' : 'text-red-500'}`}>{value as string}</span>
+                  <span className="text-sm text-zinc-400">{label as string}</span>
+                  <span className={`text-sm font-medium ${good ? 'text-green-400' : 'text-red-400'}`}>{value as string}</span>
                 </div>
               ))}
             </div>

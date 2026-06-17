@@ -21,9 +21,9 @@ interface Props {
 
 const ROLE_BADGE: Record<string, string> = {
   OWNER:   'bg-zinc-800 text-white',
-  ADMIN:   'bg-orange-100 text-orange-700',
-  ANALYST: 'bg-slate-100 text-slate-600',
-  VIEWER:  'bg-slate-100 text-slate-500',
+  ADMIN:   'bg-orange-500/15 text-orange-400',
+  ANALYST: 'bg-zinc-800 text-zinc-300',
+  VIEWER:  'bg-zinc-800 text-zinc-400',
 };
 
 const ASSIGNABLE = ['ADMIN', 'ANALYST', 'VIEWER'];
@@ -74,8 +74,8 @@ export function TeamMembers({ members, currentUserId, canManage, canInvite }: Pr
     <>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-slate-900">Team Members</h2>
-          <span className="text-xs text-slate-400">({members.length})</span>
+          <h2 className="font-semibold text-zinc-50">Team Members</h2>
+          <span className="text-xs text-zinc-500">({members.length})</span>
         </div>
         {canInvite && (
           <button onClick={() => setOpen(true)} className="btn-secondary text-xs py-1.5">
@@ -84,7 +84,7 @@ export function TeamMembers({ members, currentUserId, canManage, canInvite }: Pr
         )}
       </div>
 
-      <div className="divide-y divide-slate-50">
+      <div className="divide-y divide-zinc-800">
         {members.map((u) => {
           const isOwner = u.role === 'OWNER';
           const isSelf  = u.id === currentUserId;
@@ -92,10 +92,10 @@ export function TeamMembers({ members, currentUserId, canManage, canInvite }: Pr
           return (
             <div key={u.id} className="flex items-center justify-between py-3 gap-3">
               <div className="min-w-0">
-                <div className="text-sm font-medium text-slate-900 truncate">
-                  {u.name ?? u.email}{isSelf && <span className="text-xs text-slate-400 font-normal"> (you)</span>}
+                <div className="text-sm font-medium text-zinc-50 truncate">
+                  {u.name ?? u.email}{isSelf && <span className="text-xs text-zinc-500 font-normal"> (you)</span>}
                 </div>
-                {u.name && <div className="text-xs text-slate-400 truncate">{u.email}</div>}
+                {u.name && <div className="text-xs text-zinc-500 truncate">{u.email}</div>}
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -104,12 +104,12 @@ export function TeamMembers({ members, currentUserId, canManage, canInvite }: Pr
                     value={u.role}
                     disabled={busyId === u.id}
                     onChange={(e) => changeRole(u.id, e.target.value)}
-                    className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-700 focus:outline-none focus:border-orange-400"
+                    className="text-xs border border-zinc-800 rounded-lg px-2 py-1 text-zinc-200 focus:outline-none focus:border-orange-400"
                   >
                     {ASSIGNABLE.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
                 ) : (
-                  <span className={`badge text-xs ${ROLE_BADGE[u.role] ?? 'bg-slate-100 text-slate-600'}`}>{u.role}</span>
+                  <span className={`badge text-xs ${ROLE_BADGE[u.role] ?? 'bg-zinc-800 text-zinc-300'}`}>{u.role}</span>
                 )}
 
                 {canManage && !isOwner && !isSelf && (
@@ -117,7 +117,7 @@ export function TeamMembers({ members, currentUserId, canManage, canInvite }: Pr
                     onClick={() => removeMember(u.id)}
                     disabled={busyId === u.id}
                     title="Remove member"
-                    className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                    className="p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all"
                   >
                     {busyId === u.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   </button>
@@ -162,25 +162,25 @@ function InviteModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.4)' }}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-900">Invite Team Member</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div className="bg-zinc-900 rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+          <h2 className="font-semibold text-zinc-50">Invite Team Member</h2>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {done ? (
           <div className="px-6 py-6 space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-zinc-300">
               Account created for <span className="font-medium">{form.email}</span>. Share these credentials with them —
               they can change the password after signing in.
             </p>
-            <div className="bg-slate-50 rounded-xl p-4 text-sm space-y-1">
-              <div><span className="text-slate-400">Email:</span> <span className="font-mono">{form.email}</span></div>
-              <div><span className="text-slate-400">Temp password:</span> <span className="font-mono">{form.password}</span></div>
-              <div><span className="text-slate-400">Role:</span> {form.role}</div>
+            <div className="bg-zinc-800/40 rounded-xl p-4 text-sm space-y-1">
+              <div><span className="text-zinc-500">Email:</span> <span className="font-mono">{form.email}</span></div>
+              <div><span className="text-zinc-500">Temp password:</span> <span className="font-mono">{form.password}</span></div>
+              <div><span className="text-zinc-500">Role:</span> {form.role}</div>
             </div>
             <div className="flex justify-end">
               <button onClick={onClose} className="btn-primary">Done</button>
@@ -189,7 +189,7 @@ function InviteModal({ onClose }: { onClose: () => void }) {
         ) : (
           <form onSubmit={submit} className="px-6 py-5 space-y-4">
             <div>
-              <label className="label">Email <span className="text-red-500">*</span></label>
+              <label className="label">Email <span className="text-red-400">*</span></label>
               <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} type="email" required className="input" placeholder="teammate@company.com" />
             </div>
             <div>
@@ -212,10 +212,10 @@ function InviteModal({ onClose }: { onClose: () => void }) {
                   <RefreshCw className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-xs text-slate-400 mt-1">You'll share this with the user. They can change it after signing in.</p>
+              <p className="text-xs text-zinc-500 mt-1">You'll share this with the user. They can change it after signing in.</p>
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-red-400">{error}</p>}
 
             <div className="flex justify-end gap-3 pt-1">
               <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>

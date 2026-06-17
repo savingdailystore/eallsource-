@@ -57,10 +57,10 @@ export function OrgForm({ orgName, orgSlug, canEdit }: Props) {
       <div>
         <label className="label">Slug</label>
         <input type="text" value={orgSlug} disabled className="input opacity-60 cursor-not-allowed" />
-        <p className="text-xs text-slate-400 mt-1">Slug cannot be changed after creation.</p>
+        <p className="text-xs text-zinc-500 mt-1">Slug cannot be changed after creation.</p>
       </div>
-      {error   && <p className="text-sm text-red-600">{error}</p>}
-      {success && <p className="text-sm text-green-600">Saved successfully.</p>}
+      {error   && <p className="text-sm text-red-400">{error}</p>}
+      {success && <p className="text-sm text-green-400">Saved successfully.</p>}
       {canEdit && (
         <button type="submit" disabled={loading} className="btn-primary text-sm">
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save changes'}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, ExternalLink, Package, ChevronLeft, ChevronRight, ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink, Package, ChevronLeft, ChevronRight, ShieldCheck, ShieldAlert, ShieldX, ArrowUpRight } from 'lucide-react';
 import { formatCurrency, formatPercent, cn, buildAmazonUrl } from '@/lib/utils';
 import { scoreLabel } from '@/engines/scoring';
 import type { Discount } from '@/types';
@@ -95,8 +95,11 @@ export function ProductsTable({ products, total, page, pageSize }: Props) {
                         </div>
                       </td>
                       <td className="table-td" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-1">
-                          <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                        <div className="flex gap-1 items-center">
+                          <a href={`/dashboard/products/${p.id}`} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="View detail">
+                            <ArrowUpRight className="w-3.5 h-3.5" />
+                          </a>
+                          <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="View on Amazon">
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                           <button onClick={() => setExpanded(isExp ? null : p.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all">

@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getRetailerNames } from '@/retailers';
@@ -8,7 +9,11 @@ export const metadata = { title: 'Scanner' };
 
 export default async function ScannerPage() {
   const session = await auth();
-  const orgId   = session!.user.orgId;
+
+  // Scanner is restricted to the organization Owner for now.
+  if (session!.user.role !== 'OWNER') redirect('/dashboard');
+
+  const orgId = session!.user.orgId;
 
   const jobs = await prisma.scanJob.findMany({
     where: { orgId },

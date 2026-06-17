@@ -27,6 +27,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="flex min-h-screen">
       <Sidebar
         plan={org?.plan ?? session.user.plan}
+        role={session.user.role}
         orgName={org?.name ?? 'My Organization'}
         userEmail={session.user.email}
       />

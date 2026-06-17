@@ -19,6 +19,9 @@ const startSchema = z.object({
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (session.user.role !== 'OWNER') {
+    return NextResponse.json({ error: 'Only the organization owner can run scans.' }, { status: 403 });
+  }
 
   const body   = await req.json();
   const parsed = startSchema.safeParse(body);
@@ -77,6 +80,9 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (session.user.role !== 'OWNER') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const orgId = session.user.orgId;
   const jobs  = await prisma.scanJob.findMany({

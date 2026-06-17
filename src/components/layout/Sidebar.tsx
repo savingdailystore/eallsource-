@@ -9,18 +9,19 @@ import {
   LogOut, ChevronRight, Zap, Radar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Plan } from '@/types';
+import type { Plan, Role } from '@/types';
 
 interface NavItem {
   label: string;
   href:  string;
   icon:  React.ComponentType<{ className?: string }>;
   plan?: Plan;
+  ownerOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',  href: '/dashboard',           icon: LayoutDashboard },
-  { label: 'Scanner',    href: '/dashboard/scanner',   icon: Radar },
+  { label: 'Scanner',    href: '/dashboard/scanner',   icon: Radar, ownerOnly: true },
   { label: 'Lead Feed',  href: '/dashboard/leads',     icon: TrendingUp },
   { label: 'Products',   href: '/dashboard/products',  icon: Package },
   { label: 'Inventory',  href: '/dashboard/inventory', icon: BarChart3 },
@@ -41,6 +42,7 @@ const PLAN_COLORS: Record<Plan, string> = {
 
 interface SidebarProps {
   plan:      Plan;
+  role:      Role;
   orgName:   string;
   userEmail: string;
 }
@@ -55,8 +57,9 @@ function BrandIcon() {
   );
 }
 
-export function Sidebar({ plan, orgName, userEmail }: SidebarProps) {
+export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
   const pathname = usePathname();
+  const visibleNav = NAV_ITEMS.filter((item) => !item.ownerOnly || role === 'OWNER');
 
   function NavLink({ item }: { item: NavItem }) {
     const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
@@ -102,7 +105,7 @@ export function Sidebar({ plan, orgName, userEmail }: SidebarProps) {
 
       {/* Primary nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {NAV_ITEMS.map((item) => (
+        {visibleNav.map((item) => (
           <NavLink key={item.href} item={item} />
         ))}
 

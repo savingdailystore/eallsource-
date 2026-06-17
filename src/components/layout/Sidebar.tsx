@@ -6,7 +6,7 @@ import { signOut } from 'next-auth/react';
 import {
   LayoutDashboard, TrendingUp, Package, BarChart3,
   RefreshCw, Link2, CreditCard, Settings,
-  LogOut, ChevronRight, Zap,
+  LogOut, ChevronRight, Zap, Radar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Plan } from '@/types';
@@ -20,6 +20,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',  href: '/dashboard',           icon: LayoutDashboard },
+  { label: 'Scanner',    href: '/dashboard/scanner',   icon: Radar },
   { label: 'Lead Feed',  href: '/dashboard/leads',     icon: TrendingUp },
   { label: 'Products',   href: '/dashboard/products',  icon: Package },
   { label: 'Inventory',  href: '/dashboard/inventory', icon: BarChart3 },

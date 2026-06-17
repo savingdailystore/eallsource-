@@ -2,14 +2,26 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ConnectForm } from '@/components/amazon/ConnectForm';
 import { DisconnectButton } from '@/components/amazon/DisconnectButton';
-import { CheckCircle2, XCircle, Zap, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, Zap, AlertTriangle, ShoppingBag } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Amazon SP-API' };
 
-export default async function AmazonPage() {
-  const session = await auth();
-  const plan    = session!.user.plan;
+interface Props {
+  searchParams: Promise<{ connected?: string; error?: string }>;
+}
+
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_state:        'Authorization failed: invalid state. Please try again.',
+  missing_code:         'Amazon did not return an authorization code. Please try again.',
+  token_exchange_failed:'Could not exchange the authorization code for tokens. Please try again.',
+  missing_credentials:  'Server configuration error: Amazon API credentials are not set.',
+  server_error:         'An unexpected error occurred. Please try again.',
+};
+
+export default async function AmazonPage({ searchParams: searchParamsPromise }: Props) {
+  const [session, searchParams] = await Promise.all([auth(), searchParamsPromise]);
+  const plan = session!.user.plan;
 
   if (plan === 'STARTER') {
     return (
@@ -35,6 +47,7 @@ export default async function AmazonPage() {
   });
 
   const isConnected = !!cred?.isActive;
+  const errorMsg    = searchParams.error ? (ERROR_MESSAGES[searchParams.error] ?? 'An error occurred. Please try again.') : null;
 
   return (
     <div className="p-6 lg:p-8 max-w-2xl space-y-6">
@@ -44,6 +57,22 @@ export default async function AmazonPage() {
           <p className="page-subtitle">Connect your Amazon Seller Central account</p>
         </div>
       </div>
+
+      {/* Success banner */}
+      {searchParams.connected === 'true' && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-4 py-3 flex gap-2">
+          <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-green-400">Amazon account connected successfully.</p>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {errorMsg && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 flex gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-400">{errorMsg}</p>
+        </div>
+      )}
 
       {/* Connection status */}
       <div className={`card p-5 ${isConnected ? 'border-green-500/30 bg-green-500/10' : ''}`}>
@@ -65,30 +94,43 @@ export default async function AmazonPage() {
         </div>
       </div>
 
-      {/* Connect form */}
+      {/* Connect options */}
       {!isConnected && (
-        <div className="card p-6">
-          <h2 className="font-semibold text-slate-50 mb-1">Connect Amazon Seller Account</h2>
-          <p className="text-sm text-slate-400 mb-5">
-            Enter your SP-API credentials. Tokens are encrypted with AES-256-GCM before storage.
-          </p>
-
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-5 flex gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-400">
-              You must have a registered SP-API application. See{' '}
-              <a
-                href="https://developer-docs.amazon.com/sp-api/docs/registering-your-application"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline font-medium"
-              >
-                SP-API documentation
-              </a>.
+        <div className="space-y-4">
+          {/* Primary: OAuth button */}
+          <div className="card p-6">
+            <h2 className="font-semibold text-slate-50 mb-1">Connect with Amazon</h2>
+            <p className="text-sm text-slate-400 mb-5">
+              Authorize EALLsource to access your Seller Central account. You will be redirected to
+              Amazon to approve access — no tokens to copy or paste.
             </p>
+            <a
+              href="/api/amazon/oauth/start"
+              className="btn-primary w-full justify-center text-center flex items-center gap-2"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              Connect with Amazon
+            </a>
           </div>
 
-          <ConnectForm />
+          {/* Secondary: manual / advanced */}
+          <details className="card p-6 group">
+            <summary className="cursor-pointer text-sm font-medium text-slate-400 hover:text-slate-200 select-none list-none flex items-center justify-between">
+              <span>Manual setup (advanced)</span>
+              <span className="text-slate-600 group-open:rotate-180 transition-transform">▾</span>
+            </summary>
+
+            <div className="mt-5">
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3 mb-5 flex gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-400">
+                  Manual setup requires a registered SP-API application and a self-generated refresh token.
+                  Use the button above unless you have a specific reason to enter tokens manually.
+                </p>
+              </div>
+              <ConnectForm />
+            </div>
+          </details>
         </div>
       )}
 

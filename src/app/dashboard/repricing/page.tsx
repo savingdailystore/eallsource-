@@ -6,7 +6,6 @@ import { ArrowUp, ArrowDown, Minus, Zap } from 'lucide-react';
 import { RunAllButton } from '@/components/repricing/RunAllButton';
 import { EditRuleModal } from '@/components/repricing/EditRuleModal';
 import { DeleteRuleButton } from '@/components/repricing/DeleteRuleButton';
-import { RunRuleButton } from '@/components/repricing/RunRuleButton';
 import { ToggleRuleButton } from '@/components/repricing/ToggleRuleButton';
 
 export const dynamic = 'force-dynamic';
@@ -57,7 +56,6 @@ function RulesTable({ rules }: { rules: any[] }) {
                 </td>
                 <td className="table-td">
                   <div className="flex items-center gap-0.5">
-                    <RunRuleButton id={rule.id} />
                     <ToggleRuleButton id={rule.id} isActive={rule.isActive} />
                     <EditRuleModal rule={rule} />
                     <DeleteRuleButton id={rule.id} asin={rule.asin} />

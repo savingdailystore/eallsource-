@@ -3,19 +3,12 @@ import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/utils';
 import { DollarSign, TrendingUp, ShoppingCart, Package } from 'lucide-react';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
-import { DeleteItemButton } from '@/components/inventory/DeleteItemButton';
-import { EditItemModal } from '@/components/inventory/EditItemModal';
 import { AmazonSyncButton } from '@/components/inventory/AmazonSyncButton';
 import { ImportCsvModal } from '@/components/inventory/ImportCsvModal';
+import { InventoryTable } from '@/components/inventory/InventoryTable';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inventory' };
-
-const STATUS_COLORS = {
-  IN_STOCK: 'bg-green-100 text-green-700',
-  LISTED:   'bg-blue-100 text-blue-700',
-  SOLD:     'bg-purple-100 text-purple-700',
-};
 
 export default async function InventoryPage() {
   const session = await auth();
@@ -87,50 +80,7 @@ export default async function InventoryPage() {
             <p className="text-sm text-slate-400 mt-1">Purchase a lead to start tracking inventory</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  {['Product', 'ASIN', 'Retailer', 'Cost Basis', 'Qty', 'Listed Price', 'Est. Profit', 'Purchase Date', 'Status', ''].map((h) => (
-                    <th key={h} className="table-th">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {items.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="table-td">
-                      <div className="font-medium text-slate-900 max-w-xs truncate">{item.title}</div>
-                    </td>
-                    <td className="table-td font-mono text-slate-500 text-xs">{item.asin}</td>
-                    <td className="table-td text-slate-600">{item.retailer ?? '—'}</td>
-                    <td className="table-td font-medium">{formatCurrency(item.costBasis)}</td>
-                    <td className="table-td">{item.quantity}</td>
-                    <td className="table-td">{item.listedPrice ? formatCurrency(item.listedPrice) : '—'}</td>
-                    <td className="table-td">
-                      {item.estimatedProfit != null ? (
-                        <span className={item.estimatedProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
-                          {formatCurrency(item.estimatedProfit)}
-                        </span>
-                      ) : '—'}
-                    </td>
-                    <td className="table-td text-slate-500">
-                      {new Date(item.purchaseDate).toLocaleDateString()}
-                    </td>
-                    <td className="table-td">
-                      <span className={`badge ${STATUS_COLORS[item.status]}`}>{item.status}</span>
-                    </td>
-                    <td className="table-td">
-                      <div className="flex items-center gap-0.5">
-                        <EditItemModal item={item} />
-                        <DeleteItemButton id={item.id} title={item.title} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <InventoryTable items={items} />
         )}
       </div>
     </div>

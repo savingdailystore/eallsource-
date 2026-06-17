@@ -11,7 +11,7 @@ interface Item {
   retailer:     string | null;
   costBasis:    number;
   quantity:     number;
-  purchaseDate: Date;
+  purchaseDate: Date | string;
   listedPrice:  number | null;
   status:       'IN_STOCK' | 'LISTED' | 'SOLD';
 }

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/utils';
 import { DollarSign, TrendingUp, ShoppingCart, Package } from 'lucide-react';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
+import { DeleteItemButton } from '@/components/inventory/DeleteItemButton';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inventory' };
@@ -77,7 +78,7 @@ export default async function InventoryPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  {['Product', 'ASIN', 'Retailer', 'Cost Basis', 'Qty', 'Listed Price', 'Est. Profit', 'Purchase Date', 'Status'].map((h) => (
+                  {['Product', 'ASIN', 'Retailer', 'Cost Basis', 'Qty', 'Listed Price', 'Est. Profit', 'Purchase Date', 'Status', ''].map((h) => (
                     <th key={h} className="table-th">{h}</th>
                   ))}
                 </tr>
@@ -105,6 +106,9 @@ export default async function InventoryPage() {
                     </td>
                     <td className="table-td">
                       <span className={`badge ${STATUS_COLORS[item.status]}`}>{item.status}</span>
+                    </td>
+                    <td className="table-td">
+                      <DeleteItemButton id={item.id} title={item.title} />
                     </td>
                   </tr>
                 ))}

@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ConnectForm } from '@/components/amazon/ConnectForm';
+import { DisconnectButton } from '@/components/amazon/DisconnectButton';
 import { CheckCircle2, XCircle, Zap, AlertTriangle } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -60,11 +61,7 @@ export default async function AmazonPage() {
               </div>
             )}
           </div>
-          {isConnected && (
-            <form method="POST" action="/api/amazon/disconnect" className="ml-auto">
-              <button type="submit" className="btn-danger text-xs py-1.5">Disconnect</button>
-            </form>
-          )}
+          {isConnected && <DisconnectButton />}
         </div>
       </div>
 

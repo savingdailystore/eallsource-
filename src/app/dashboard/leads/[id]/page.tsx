@@ -7,9 +7,10 @@ import {
   ArrowLeft, ExternalLink, TrendingUp, ShieldCheck, ShieldAlert, ShieldX,
   CheckCircle2, XCircle, Package, BarChart3,
 } from 'lucide-react';
+
 import Link from 'next/link';
 import type { Discount } from '@/types';
-import { discountUrl } from '@/lib/discount-urls';
+import { ProfitabilityCalculator } from '@/components/leads/ProfitabilityCalculator';
 
 export const dynamic = 'force-dynamic';
 
@@ -120,84 +121,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </div>
             </div>
 
-            {/* Source cost */}
-            <div className="space-y-1 mb-3">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Source Cost</div>
-              {p.sourcePrice != null && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Source Price ({p.sourceRetailer})</span>
-                  <span className="font-medium">{formatCurrency(p.sourcePrice)}</span>
-                </div>
-              )}
-              {discounts.map((d, i) => {
-                const url = discountUrl(d.source, p.sourceRetailer ?? '', d.url);
-                const isCashback = d.type === 'cashback' || d.type === 'rewards';
-                return (
-                  <div key={i} className="flex justify-between text-sm gap-2">
-                    <span className="text-green-600 flex items-center gap-1.5 min-w-0 flex-wrap">
-                      <span>−</span>
-                      {url ? (
-                        <a href={url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 decoration-green-400 hover:text-green-700 flex items-center gap-1">
-                          {d.source}
-                          <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                        </a>
-                      ) : (
-                        <span>{d.source}</span>
-                      )}
-                      <span className="text-green-500">{d.type}</span>
-                      {d.code && <span className="font-mono text-xs bg-green-50 border border-green-100 px-1 rounded">{d.code}</span>}
-                      {d.percentage && (
-                        <span title={isCashback ? 'Rate at scan time — verify before purchasing' : undefined}>
-                          {isCashback ? `~${d.percentage}%` : `${d.percentage}%`}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-green-600 font-medium flex-shrink-0">−{formatCurrency(d.amount)}</span>
-                  </div>
-                );
-              })}
-              {discounts.some((d) => d.type === 'cashback' || d.type === 'rewards') && (
-                <p className="text-[10px] text-amber-600 mt-1">
-                  ~ Cashback rates were captured at scan time and may have changed — click the link to verify the current rate before purchasing.
-                </p>
-              )}
-              <div className="flex justify-between text-sm font-semibold border-t border-slate-100 pt-1 mt-1">
-                <span>Final Cost</span>
-                <span>{p.finalCost != null ? formatCurrency(p.finalCost) : '—'}</span>
-              </div>
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Profitability Formula
             </div>
-
-            {/* Deductions */}
-            <div className="space-y-1">
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                Deductions from Resell Price ({formatCurrency(p.lowestFbaPrice ?? p.price)})
-              </div>
-              {p.amazonFees != null && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Amazon Fees (referral + FBA)</span>
-                  <span className="text-red-500">−{formatCurrency(p.amazonFees)}</span>
-                </div>
-              )}
-              {p.prepFee != null && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Prep Fee</span>
-                  <span className="text-red-500">−{formatCurrency(p.prepFee)}</span>
-                </div>
-              )}
-              {p.taxAmount != null && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Tax</span>
-                  <span className="text-red-500">−{formatCurrency(p.taxAmount)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm font-bold border-t border-slate-100 pt-1 mt-1">
-                <span>Net Profit</span>
-                <span className={p.profit >= 0 ? 'text-green-600' : 'text-red-500'}>{formatCurrency(p.profit)}</span>
-              </div>
-              <div className="text-xs text-slate-400 mt-1">
-                ROI = (Net Profit ÷ Final Cost) × 100 = {formatPercent(p.roi)}
-              </div>
-            </div>
+            <ProfitabilityCalculator
+              sourcePrice={p.sourcePrice ?? 0}
+              sourceRetailer={p.sourceRetailer ?? null}
+              originalDiscounts={discounts}
+              originalFinalCost={p.finalCost ?? 0}
+              originalProfit={p.profit}
+              amazonFees={p.amazonFees ?? 0}
+              prepFee={p.prepFee ?? null}
+              taxAmount={p.taxAmount ?? null}
+              resellPrice={p.lowestFbaPrice ?? p.price}
+            />
           </div>
 
           {/* Amazon Data */}

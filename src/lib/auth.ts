@@ -2,6 +2,8 @@ import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { prisma } from './prisma';
+import { decrypt } from './encryption';
+import { verifyTotp } from './mfa';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: 'jwt' },
@@ -16,6 +18,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         email:    { label: 'Email',    type: 'email' },
         password: { label: 'Password', type: 'password' },
+        totp:     { label: '2FA Code', type: 'text' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
@@ -32,6 +35,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           user.password,
         );
         if (!valid) return null;
+
+        // Enforce MFA when enabled.
+        if (user.mfaEnabled && user.mfaSecret) {
+          const code = (credentials.totp as string) ?? '';
+          if (!code) return null;
+          const ok = verifyTotp(code, decrypt(user.mfaSecret));
+          if (!ok) return null;
+        }
 
         return {
           id:      user.id,

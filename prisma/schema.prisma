@@ -74,6 +74,11 @@ model User {
   role      Role     @default(ANALYST)
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  passwordChangedAt DateTime @default(now())
+  mfaEnabled        Boolean  @default(false)
+  mfaSecret         String?  // AES-256-GCM encrypted TOTP secret
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

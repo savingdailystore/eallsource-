@@ -78,7 +78,7 @@ export default function RegisterPage() {
         <div>
           <label className="label" htmlFor="password">Password</label>
           <div className="relative">
-            <input id="password" type={showPw ? 'text' : 'password'} required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="input pr-10" placeholder="Min 8 characters" />
+            <input id="password" type={showPw ? 'text' : 'password'} required minLength={12} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="input pr-10" placeholder="Min 12 chars, upper, lower, number, symbol" />
             <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>

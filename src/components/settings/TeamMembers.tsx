@@ -29,8 +29,21 @@ const ROLE_BADGE: Record<string, string> = {
 const ASSIGNABLE = ['ADMIN', 'ANALYST', 'VIEWER'];
 
 function randomPassword() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
-  return Array.from({ length: 14 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const upper   = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower   = 'abcdefghijkmnpqrstuvwxyz';
+  const digits  = '23456789';
+  const special = '!@#$%^&*';
+  const all     = upper + lower + digits + special;
+  // Guarantee at least one of each required class, then fill to 16 chars.
+  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+  const base = [pick(upper), pick(lower), pick(digits), pick(special)];
+  while (base.length < 16) base.push(pick(all));
+  // Shuffle so the required chars aren't always in front.
+  for (let i = base.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [base[i], base[j]] = [base[j], base[i]];
+  }
+  return base.join('');
 }
 
 export function TeamMembers({ members, currentUserId, canManage, canInvite }: Props) {

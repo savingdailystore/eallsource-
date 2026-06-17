@@ -61,12 +61,12 @@ export function PasswordForm() {
           <input
             type={showNew ? 'text' : 'password'}
             required
-            minLength={8}
+            minLength={12}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             autoComplete="new-password"
             className="input pr-10"
-            placeholder="Min 8 characters, 1 uppercase, 1 number"
+            placeholder="Min 12 chars, upper, lower, number, symbol"
           />
           <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
             {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

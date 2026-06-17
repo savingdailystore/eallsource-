@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { generateOrgSlug } from '@/lib/utils';
+import { validatePassword } from '@/lib/password';
 import { z } from 'zod';
 
 const schema = z.object({
   orgName:  z.string().min(2).max(80),
   email:    z.string().email(),
-  password: z.string().min(8).max(100),
+  password: z.string().max(100),
 });
 
 export async function POST(req: NextRequest) {
@@ -23,6 +24,11 @@ export async function POST(req: NextRequest) {
     }
 
     const { orgName, email, password } = parsed.data;
+
+    const pwError = validatePassword(password);
+    if (pwError) {
+      return NextResponse.json({ error: pwError }, { status: 400 });
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {

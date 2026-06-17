@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { validatePassword } from '@/lib/password';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,7 @@ const inviteSchema = z.object({
   email:    z.string().email(),
   name:     z.string().max(80).optional(),
   role:     z.enum(['ADMIN', 'ANALYST', 'VIEWER']).default('ANALYST'),
-  password: z.string().min(8).max(100),
+  password: z.string().max(100),
 });
 
 export async function POST(req: Request) {
@@ -31,6 +32,9 @@ export async function POST(req: Request) {
   }
 
   const { email, name, role, password } = parsed.data;
+
+  const pwError = validatePassword(password);
+  if (pwError) return NextResponse.json({ error: pwError }, { status: 400 });
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {

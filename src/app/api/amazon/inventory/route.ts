@@ -40,6 +40,7 @@ export async function POST() {
       const query: Record<string, string> = {
         granularityType: 'Marketplace',
         granularityId:   client.marketplaceId,
+        marketplaceIds:  client.marketplaceId,   // required by getInventorySummaries
         details:         'true',
       };
       if (nextToken) query.nextToken = nextToken;

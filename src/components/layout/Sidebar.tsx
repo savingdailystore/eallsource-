@@ -30,7 +30,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const BOTTOM_NAV: NavItem[] = [
   { label: 'Amazon SP-API', href: '/dashboard/amazon',   icon: Link2,     plan: 'PRO' },
-  { label: 'Billing',       href: '/dashboard/billing',  icon: CreditCard },
+  { label: 'Billing',       href: '/dashboard/billing',  icon: CreditCard, ownerOnly: true },
   { label: 'Settings',      href: '/dashboard/settings', icon: Settings },
 ];
 
@@ -59,7 +59,8 @@ function BrandIcon() {
 
 export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
   const pathname = usePathname();
-  const visibleNav = NAV_ITEMS.filter((item) => !item.ownerOnly || role === 'OWNER');
+  const visibleNav    = NAV_ITEMS.filter((item) => !item.ownerOnly || role === 'OWNER');
+  const visibleBottom = BOTTOM_NAV.filter((item) => !item.ownerOnly || role === 'OWNER');
 
   function NavLink({ item }: { item: NavItem }) {
     const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
@@ -111,7 +112,7 @@ export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
 
         <div className="my-3 border-t border-slate-100" />
 
-        {BOTTOM_NAV.map((item) => (
+        {visibleBottom.map((item) => (
           <NavLink key={item.href} item={item} />
         ))}
       </nav>

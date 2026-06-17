@@ -8,6 +8,9 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (session.user.role !== 'OWNER') {
+    return NextResponse.json({ error: 'Only the organization owner can manage billing.' }, { status: 403 });
+  }
 
   const sub = await prisma.subscription.findUnique({
     where: { orgId: session.user.orgId },

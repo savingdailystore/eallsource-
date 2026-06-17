@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/utils';
@@ -26,6 +27,10 @@ const PLANS: { key: Plan; name: string; price: number; icon: any; color: string;
 
 export default async function BillingPage() {
   const session = await auth();
+
+  // Billing is restricted to the organization Owner for now.
+  if (session!.user.role !== 'OWNER') redirect('/dashboard');
+
   const orgId   = session!.user.orgId;
   const currentPlan = session!.user.plan;
 

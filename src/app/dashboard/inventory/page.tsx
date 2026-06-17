@@ -4,6 +4,7 @@ import { formatCurrency } from '@/lib/utils';
 import { DollarSign, TrendingUp, ShoppingCart, Package } from 'lucide-react';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
 import { DeleteItemButton } from '@/components/inventory/DeleteItemButton';
+import { EditItemModal } from '@/components/inventory/EditItemModal';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inventory' };
@@ -108,7 +109,10 @@ export default async function InventoryPage() {
                       <span className={`badge ${STATUS_COLORS[item.status]}`}>{item.status}</span>
                     </td>
                     <td className="table-td">
-                      <DeleteItemButton id={item.id} title={item.title} />
+                      <div className="flex items-center gap-0.5">
+                        <EditItemModal item={item} />
+                        <DeleteItemButton id={item.id} title={item.title} />
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -5,6 +5,7 @@ import { DollarSign, TrendingUp, ShoppingCart, Package } from 'lucide-react';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
 import { DeleteItemButton } from '@/components/inventory/DeleteItemButton';
 import { EditItemModal } from '@/components/inventory/EditItemModal';
+import { AmazonSyncButton } from '@/components/inventory/AmazonSyncButton';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inventory' };
@@ -19,7 +20,7 @@ export default async function InventoryPage() {
   const session = await auth();
   const orgId   = session!.user.orgId;
 
-  const [items, stats] = await Promise.all([
+  const [items, stats, amazonCred] = await Promise.all([
     prisma.inventoryItem.findMany({
       where: { orgId },
       orderBy: { purchaseDate: 'desc' },
@@ -30,7 +31,13 @@ export default async function InventoryPage() {
       _count: { id: true },
       _sum: { costBasis: true, estimatedProfit: true },
     }),
+    prisma.amazonCredential.findUnique({
+      where: { orgId },
+      select: { isActive: true },
+    }),
   ]);
+
+  const amazonConnected = !!amazonCred?.isActive;
 
   const totalValue  = stats.reduce((s, g) => s + (g._sum.costBasis ?? 0), 0);
   const totalProfit = stats.reduce((s, g) => s + (g._sum.estimatedProfit ?? 0), 0);
@@ -45,7 +52,10 @@ export default async function InventoryPage() {
           <h1 className="page-title">Inventory</h1>
           <p className="page-subtitle">Track what you've purchased and listed</p>
         </div>
-        <AddItemModal />
+        <div className="flex items-center gap-3">
+          <AmazonSyncButton connected={amazonConnected} />
+          <AddItemModal />
+        </div>
       </div>
 
       {/* Stats */}

@@ -6,6 +6,7 @@ import { AddItemModal } from '@/components/inventory/AddItemModal';
 import { DeleteItemButton } from '@/components/inventory/DeleteItemButton';
 import { EditItemModal } from '@/components/inventory/EditItemModal';
 import { AmazonSyncButton } from '@/components/inventory/AmazonSyncButton';
+import { ImportCsvModal } from '@/components/inventory/ImportCsvModal';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inventory' };
@@ -54,6 +55,7 @@ export default async function InventoryPage() {
         </div>
         <div className="flex items-center gap-3">
           <AmazonSyncButton connected={amazonConnected} />
+          <ImportCsvModal />
           <AddItemModal />
         </div>
       </div>

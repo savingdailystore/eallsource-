@@ -4,6 +4,7 @@ import { TrendingUp, ShoppingCart, Package, Boxes } from 'lucide-react';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
 import { ImportCsvModal } from '@/components/inventory/ImportCsvModal';
 import { InventoryTable } from '@/components/inventory/InventoryTable';
+import { AmazonSyncButton } from '@/components/inventory/AmazonSyncButton';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inventory' };
@@ -12,7 +13,7 @@ export default async function InventoryPage() {
   const session = await auth();
   const orgId   = session!.user.orgId;
 
-  const [items, stats] = await Promise.all([
+  const [items, stats, amazonCred] = await Promise.all([
     prisma.inventoryItem.findMany({
       where: { orgId },
       orderBy: { totalQuantity: 'desc' },
@@ -21,8 +22,13 @@ export default async function InventoryPage() {
       where: { orgId },
       _sum: { availableQuantity: true, reservedQuantity: true, inboundQuantity: true, totalQuantity: true },
     }),
+    prisma.amazonCredential.findUnique({
+      where: { orgId },
+      select: { isActive: true },
+    }),
   ]);
 
+  const amazonConnected = !!amazonCred?.isActive;
   const available = stats._sum.availableQuantity ?? 0;
   const reserved  = stats._sum.reservedQuantity ?? 0;
   const inbound   = stats._sum.inboundQuantity ?? 0;
@@ -36,6 +42,7 @@ export default async function InventoryPage() {
           <p className="page-subtitle">Track what you've purchased and listed</p>
         </div>
         <div className="flex items-center gap-3">
+          <AmazonSyncButton connected={amazonConnected} />
           <ImportCsvModal />
           <AddItemModal />
         </div>

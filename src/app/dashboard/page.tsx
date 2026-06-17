@@ -14,6 +14,7 @@ export const metadata = { title: 'Dashboard' };
 export default async function DashboardPage() {
   const session = await auth();
   const orgId   = session!.user.orgId;
+  const isOwner = session!.user.role === 'OWNER';
 
   const [leadStats, topLeads, recentJobs, inventoryStats] = await Promise.all([
     prisma.$queryRaw<{ total: bigint; avg_roi: number; avg_score: number; new_today: bigint }[]>`
@@ -34,11 +35,10 @@ export default async function DashboardPage() {
       take: 5,
       include: { product: { select: { title: true, asin: true, roi: true, profit: true, score: true, sourceRetailer: true, finalCost: true, lowestFbaPrice: true, ipRiskScore: true } } },
     }),
-    prisma.scanJob.findMany({
-      where: { orgId },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    }),
+    // Scan jobs are Owner-only — skip the query entirely for other roles.
+    isOwner
+      ? prisma.scanJob.findMany({ where: { orgId }, orderBy: { createdAt: 'desc' }, take: 5 })
+      : Promise.resolve([] as Awaited<ReturnType<typeof prisma.scanJob.findMany>>),
     prisma.inventoryItem.aggregate({
       where: { orgId },
       _count: { id: true },
@@ -100,7 +100,7 @@ export default async function DashboardPage() {
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Top Leads */}
-        <div className="lg:col-span-2 card overflow-hidden">
+        <div className={`${isOwner ? 'lg:col-span-2' : 'lg:col-span-3'} card overflow-hidden`}>
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <Flame className="w-4 h-4 text-blue-500" />
@@ -154,42 +154,44 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Recent Jobs */}
-        <div className="card overflow-hidden">
-          <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100">
-            <Clock className="w-4 h-4 text-slate-400" />
-            <h2 className="font-semibold text-slate-900">Recent jobs</h2>
-          </div>
-
-          {recentJobs.length === 0 ? (
-            <div className="py-12 text-center text-sm text-slate-500">No jobs run yet.</div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {recentJobs.map((job) => (
-                <div key={job.id} className="px-5 py-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-800 capitalize">
-                      {job.type.toLowerCase()}
-                    </span>
-                    <span className={`badge text-xs ${
-                      job.status === 'DONE'    ? 'bg-green-100 text-green-700' :
-                      job.status === 'FAILED'  ? 'bg-red-100 text-red-600'    :
-                      job.status === 'RUNNING' ? 'bg-blue-100 text-blue-700'  :
-                      'bg-slate-100 text-slate-500'
-                    }`}>
-                      {job.status === 'DONE' && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                      {job.status}
-                    </span>
-                  </div>
-                  {job.retailer && (
-                    <div className="text-xs mt-0.5 text-slate-500">{job.retailer}</div>
-                  )}
-                  <div className="text-xs mt-1 text-slate-400">{relativeTime(job.createdAt)}</div>
-                </div>
-              ))}
+        {/* Recent Jobs — Owner only */}
+        {isOwner && (
+          <div className="card overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100">
+              <Clock className="w-4 h-4 text-slate-400" />
+              <h2 className="font-semibold text-slate-900">Recent jobs</h2>
             </div>
-          )}
-        </div>
+
+            {recentJobs.length === 0 ? (
+              <div className="py-12 text-center text-sm text-slate-500">No jobs run yet.</div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {recentJobs.map((job) => (
+                  <div key={job.id} className="px-5 py-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-slate-800 capitalize">
+                        {job.type.toLowerCase()}
+                      </span>
+                      <span className={`badge text-xs ${
+                        job.status === 'DONE'    ? 'bg-green-100 text-green-700' :
+                        job.status === 'FAILED'  ? 'bg-red-100 text-red-600'    :
+                        job.status === 'RUNNING' ? 'bg-blue-100 text-blue-700'  :
+                        'bg-slate-100 text-slate-500'
+                      }`}>
+                        {job.status === 'DONE' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                        {job.status}
+                      </span>
+                    </div>
+                    {job.retailer && (
+                      <div className="text-xs mt-0.5 text-slate-500">{job.retailer}</div>
+                    )}
+                    <div className="text-xs mt-1 text-slate-400">{relativeTime(job.createdAt)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

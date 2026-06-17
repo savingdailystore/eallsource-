@@ -6,6 +6,7 @@ import { ArrowUp, ArrowDown, Minus, Zap } from 'lucide-react';
 import { RunAllButton } from '@/components/repricing/RunAllButton';
 import { EditRuleModal } from '@/components/repricing/EditRuleModal';
 import { DeleteRuleButton } from '@/components/repricing/DeleteRuleButton';
+import { RunRuleButton } from '@/components/repricing/RunRuleButton';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Repricing' };
@@ -112,6 +113,7 @@ export default async function RepricingPage() {
                       </td>
                       <td className="table-td">
                         <div className="flex items-center gap-0.5">
+                          <RunRuleButton id={rule.id} />
                           <EditRuleModal rule={rule} />
                           <DeleteRuleButton id={rule.id} asin={rule.asin} />
                         </div>

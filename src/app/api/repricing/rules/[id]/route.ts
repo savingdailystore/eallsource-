@@ -90,19 +90,30 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const rule = await getRule(id, session.user.orgId);
   if (!rule) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const product = await prisma.product.findFirst({
-    where: { orgId: session.user.orgId, asin: rule.asin },
-  });
-  if (!product) {
-    return NextResponse.json({ error: 'No product data found for this ASIN' }, { status: 404 });
+  // Prefer scanned Amazon market data; fall back to manually-entered inventory.
+  const [product, inv] = await Promise.all([
+    prisma.product.findFirst({ where: { orgId: session.user.orgId, asin: rule.asin } }),
+    prisma.inventoryItem.findFirst({ where: { orgId: session.user.orgId, asin: rule.asin } }),
+  ]);
+
+  const costBasis    = product?.totalLandedCost ?? product?.sourcePrice ?? inv?.costBasis ?? 0;
+  const currentPrice = rule.lastRecommendedPrice ?? product?.estimatedResellPrice ?? inv?.listedPrice ?? 0;
+  const buyBoxPrice  = product?.buyBoxPrice ?? 0;
+  const fbaSellers   = product?.fbaSellers ?? 0;
+
+  if (costBasis <= 0 || currentPrice <= 0) {
+    return NextResponse.json(
+      { error: 'No price data for this ASIN — add a cost basis and listed price to the inventory item.' },
+      { status: 400 },
+    );
   }
 
   const result = calculateReprice({
     asin:         rule.asin,
-    costBasis:    product.totalLandedCost ?? product.sourcePrice ?? 0,
-    currentPrice: rule.lastRecommendedPrice ?? product.estimatedResellPrice ?? 0,
-    buyBoxPrice:  product.buyBoxPrice ?? 0,
-    fbaSellers:   product.fbaSellers ?? 0,
+    costBasis,
+    currentPrice,
+    buyBoxPrice,
+    fbaSellers,
     minRoi:       rule.minRoi,
     minProfit:    rule.minProfit,
     strategy:     rule.strategy as 'COMPETITIVE' | 'FLOOR' | 'CEILING',
@@ -120,7 +131,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     prisma.repricingHistory.create({
       data: {
         ruleId:           id,
-        buyBoxPrice:      product.buyBoxPrice,
+        buyBoxPrice:      buyBoxPrice || null,
         recommendedPrice: result.recommendedPrice,
         direction:        result.direction,
         riskScore:        result.riskScore,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import ExcelJS from 'exceljs';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +76,39 @@ export async function GET(req: NextRequest) {
       headers: {
         'Content-Type': 'text/csv',
         'Content-Disposition': `attachment; filename="${type}-${new Date().toISOString().slice(0, 10)}.csv"`,
+      },
+    });
+  }
+
+  if (format === 'excel' || format === 'xlsx') {
+    const workbook  = new ExcelJS.Workbook();
+    const sheet     = workbook.addWorksheet(type === 'leads' ? 'Leads' : 'Products');
+    const headers   = rows.length ? Object.keys(rows[0]) : [];
+
+    if (headers.length) {
+      sheet.columns = headers.map((h) => ({
+        header: h,
+        key:    h,
+        width:  Math.min(Math.max(h.length + 2, 12), 50),
+      }));
+      sheet.getRow(1).font = { bold: true };
+      sheet.getRow(1).fill = {
+        type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' },
+      };
+      rows.forEach((r) => sheet.addRow(r));
+      sheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to:   { row: 1, column: headers.length },
+      };
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    return new NextResponse(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${type}-${new Date().toISOString().slice(0, 10)}.xlsx"`,
       },
     });
   }

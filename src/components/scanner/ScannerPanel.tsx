@@ -16,7 +16,7 @@ interface Job {
 
 const STATUS_STYLE: Record<string, { cls: string; icon: React.ComponentType<{ className?: string }> }> = {
   PENDING: { cls: 'bg-amber-100 text-amber-700',  icon: Clock },
-  RUNNING: { cls: 'bg-blue-100 text-blue-700',    icon: Loader2 },
+  RUNNING: { cls: 'bg-orange-100 text-orange-700',    icon: Loader2 },
   DONE:    { cls: 'bg-green-100 text-green-700',   icon: CheckCircle2 },
   FAILED:  { cls: 'bg-red-100 text-red-600',       icon: XCircle },
 };
@@ -75,7 +75,7 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
       {/* Start scan form */}
       <div className="card p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Radar className="w-4 h-4 text-blue-500" />
+          <Radar className="w-4 h-4 text-orange-500" />
           <h2 className="font-semibold text-slate-900">Start a scan</h2>
         </div>
 
@@ -127,7 +127,7 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
       <div className="card overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 className="font-semibold text-slate-900">Recent scans</h2>
-          {hasActive && <span className="text-xs text-blue-600 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Live</span>}
+          {hasActive && <span className="text-xs text-orange-600 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" />Live</span>}
         </div>
 
         {jobs.length === 0 ? (

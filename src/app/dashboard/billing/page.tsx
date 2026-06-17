@@ -16,11 +16,11 @@ const PLANS: { key: Plan; name: string; price: number; icon: any; color: string;
     features: ['20 leads/day', 'ROI calculator', 'Validation engine', 'Export to CSV', '1 user'],
   },
   {
-    key: 'PRO', name: 'Pro', price: 97, icon: Crown, color: 'text-green-600',
+    key: 'PRO', name: 'Pro', price: 97, icon: Crown, color: 'text-orange-600',
     features: ['500 leads/day', 'Everything in Starter', 'Inventory management', 'Repricing engine', 'Amazon SP-API', '5 users'],
   },
   {
-    key: 'ENTERPRISE', name: 'Enterprise', price: 297, icon: Building2, color: 'text-purple-600',
+    key: 'ENTERPRISE', name: 'Enterprise', price: 297, icon: Building2, color: 'text-zinc-800',
     features: ['Unlimited leads', 'Everything in Pro', 'API access', 'Unlimited users', 'Priority support', 'Custom integrations'],
   },
 ];
@@ -93,7 +93,7 @@ export default async function BillingPage() {
                 </div>
               )}
 
-              <div className={`w-10 h-10 rounded-xl ${plan.key === 'PRO' ? 'bg-green-50' : plan.key === 'ENTERPRISE' ? 'bg-purple-50' : 'bg-slate-100'} flex items-center justify-center mb-4`}>
+              <div className={`w-10 h-10 rounded-xl ${plan.key === 'PRO' ? 'bg-orange-50' : plan.key === 'ENTERPRISE' ? 'bg-zinc-100' : 'bg-slate-100'} flex items-center justify-center mb-4`}>
                 <plan.icon className={`w-5 h-5 ${plan.color}`} />
               </div>
 

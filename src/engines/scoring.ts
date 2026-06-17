@@ -37,7 +37,7 @@ export function calculateScore(input: ScoringInput): number {
 
 export function scoreLabel(score: number): { label: string; color: string } {
   if (score >= 80) return { label: 'HOT',  color: 'text-green-600' };
-  if (score >= 60) return { label: 'GOOD', color: 'text-blue-600' };
+  if (score >= 60) return { label: 'GOOD', color: 'text-orange-600' };
   if (score >= 40) return { label: 'MAR',  color: 'text-amber-600' };
   return              { label: 'SKIP', color: 'text-gray-400' };
 }

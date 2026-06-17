@@ -82,7 +82,7 @@ export function ProductsTable({ products, total, page, pageSize }: Props) {
                         <span className={`text-sm font-bold ${p.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>{formatCurrency(p.profit)}</span>
                       </td>
                       <td className="table-td text-right">
-                        <span className={cn('badge text-xs font-bold', p.roi >= 60 ? 'bg-green-100 text-green-700' : p.roi >= 30 ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700')}>
+                        <span className={cn('badge text-xs font-bold', p.roi >= 60 ? 'bg-green-100 text-green-700' : p.roi >= 30 ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700')}>
                           {formatPercent(p.roi)}
                         </span>
                       </td>
@@ -96,10 +96,10 @@ export function ProductsTable({ products, total, page, pageSize }: Props) {
                       </td>
                       <td className="table-td" onClick={(e) => e.stopPropagation()}>
                         <div className="flex gap-1 items-center">
-                          <a href={`/dashboard/products/${p.id}`} className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="View detail">
+                          <a href={`/dashboard/products/${p.id}`} className="p-1.5 rounded-lg text-slate-400 hover:text-orange-600 hover:bg-orange-50 transition-all" title="View detail">
                             <ArrowUpRight className="w-3.5 h-3.5" />
                           </a>
-                          <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all" title="View on Amazon">
+                          <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg text-slate-400 hover:text-orange-600 hover:bg-orange-50 transition-all" title="View on Amazon">
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                           <button onClick={() => setExpanded(isExp ? null : p.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all">
@@ -119,7 +119,7 @@ export function ProductsTable({ products, total, page, pageSize }: Props) {
                                 {discounts.map((d, i) => (
                                   <div key={i} className="text-green-600">− {d.source}: −{formatCurrency(d.amount)}{d.percentage ? ` (${d.percentage}%)` : ''}</div>
                                 ))}
-                                {p.sourceUrl && <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />{p.sourceRetailer ?? 'Source'}</a>}
+                                {p.sourceUrl && <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-orange-600 hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />{p.sourceRetailer ?? 'Source'}</a>}
                               </div>
                             </div>
                             <div>

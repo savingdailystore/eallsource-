@@ -72,7 +72,7 @@ export function EditItemModal({ item }: { item: Item }) {
 
   return (
     <>
-      <button onClick={() => setOpen(true)} title="Edit item" className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
+      <button onClick={() => setOpen(true)} title="Edit item" className="p-1.5 rounded-lg text-slate-300 hover:text-orange-500 hover:bg-orange-50 transition-all">
         <Pencil className="w-3.5 h-3.5" />
       </button>
 

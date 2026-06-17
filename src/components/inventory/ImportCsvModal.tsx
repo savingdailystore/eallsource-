@@ -86,19 +86,19 @@ export function ImportCsvModal() {
                 Rows with an existing ASIN are updated.
               </p>
 
-              <button onClick={downloadTemplate} className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium">
+              <button onClick={downloadTemplate} className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-700 font-medium">
                 <Download className="w-3.5 h-3.5" />Download template
               </button>
 
               {/* File picker */}
               <div
                 onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-slate-200 rounded-xl px-4 py-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
+                className="border-2 border-dashed border-slate-200 rounded-xl px-4 py-8 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-50/40 transition-colors"
               >
                 <input ref={fileRef} type="file" accept=".csv,.txt,text/csv,text/plain,text/tab-separated-values" onChange={onPick} className="hidden" />
                 {fileName ? (
                   <div className="flex items-center justify-center gap-2 text-sm text-slate-700">
-                    <FileText className="w-4 h-4 text-blue-500" />{fileName}
+                    <FileText className="w-4 h-4 text-orange-500" />{fileName}
                   </div>
                 ) : (
                   <div className="text-sm text-slate-400">

@@ -20,8 +20,8 @@ interface Props {
 }
 
 const ROLE_BADGE: Record<string, string> = {
-  OWNER:   'bg-purple-100 text-purple-700',
-  ADMIN:   'bg-blue-100 text-blue-700',
+  OWNER:   'bg-zinc-800 text-white',
+  ADMIN:   'bg-orange-100 text-orange-700',
   ANALYST: 'bg-slate-100 text-slate-600',
   VIEWER:  'bg-slate-100 text-slate-500',
 };
@@ -104,7 +104,7 @@ export function TeamMembers({ members, currentUserId, canManage, canInvite }: Pr
                     value={u.role}
                     disabled={busyId === u.id}
                     onChange={(e) => changeRole(u.id, e.target.value)}
-                    className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-700 focus:outline-none focus:border-blue-400"
+                    className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-700 focus:outline-none focus:border-orange-400"
                   >
                     {ASSIGNABLE.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>

@@ -46,8 +46,8 @@ export default async function InventoryPage() {
         {[
           { label: 'Available', value: available, icon: Package, color: 'text-green-600', bg: 'bg-green-50' },
           { label: 'Reserved', value: reserved, icon: ShoppingCart, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Inbound', value: inbound, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Total Units', value: total, icon: Boxes, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Inbound', value: inbound, icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Total Units', value: total, icon: Boxes, color: 'text-zinc-700', bg: 'bg-zinc-100' },
         ].map((s) => (
           <div key={s.label} className="card p-5">
             <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>

@@ -297,7 +297,7 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
 
                       {/* Profit */}
                       <td className="table-td text-right">
-                        <div className={`text-sm font-bold ${p.profit >= 10 ? 'text-green-600' : p.profit >= 0 ? 'text-blue-600' : 'text-red-500'}`}>
+                        <div className={`text-sm font-bold ${p.profit >= 10 ? 'text-green-600' : p.profit >= 0 ? 'text-orange-600' : 'text-red-500'}`}>
                           {formatCurrency(p.profit)}
                         </div>
                       </td>
@@ -307,7 +307,7 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                         <span className={cn(
                           'badge text-xs font-bold',
                           p.roi >= 60 ? 'bg-green-100 text-green-700' :
-                          p.roi >= 30 ? 'bg-blue-100 text-blue-700' :
+                          p.roi >= 30 ? 'bg-orange-100 text-orange-700' :
                           'bg-red-100 text-red-700',
                         )}>
                           {formatPercent(p.roi)}

@@ -11,19 +11,19 @@
 
   body {
     @apply antialiased;
-    background: #f1f5f9;
-    color: #0f172a;
+    background: #f5f5f4;
+    color: #1c1917;
     font-family: 'Inter', system-ui, sans-serif;
   }
 
   * {
-    border-color: #e2e8f0;
+    border-color: #e7e5e4;
   }
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
 }
 
 @layer components {
@@ -33,29 +33,29 @@
 
   .page-title {
     @apply text-2xl font-semibold;
-    color: #0f172a;
+    color: #1c1917;
   }
 
   .page-subtitle {
     @apply text-sm mt-0.5;
-    color: #64748b;
+    color: #78716c;
   }
 
   .card {
     @apply rounded-2xl;
     background: #ffffff;
-    border: 0.5px solid #e2e8f0;
+    border: 0.5px solid #e7e5e4;
   }
 
   .table-th {
     @apply text-left px-4 py-3 text-xs font-medium whitespace-nowrap uppercase;
-    color: #64748b;
+    color: #78716c;
     letter-spacing: 0.05em;
   }
 
   .table-td {
     @apply px-4 py-3 text-sm;
-    color: #0f172a;
+    color: #1c1917;
   }
 
   .badge {
@@ -67,24 +67,24 @@
   }
 
   .btn-primary {
-    @apply btn focus:ring-blue-500;
-    background: #3b82f6;
+    @apply btn focus:ring-orange-500;
+    background: #ea580c;
     color: #ffffff;
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: #2563eb;
+    background: #c2410c;
   }
 
   .btn-secondary {
-    @apply btn focus:ring-blue-400;
+    @apply btn focus:ring-orange-400;
     background: #ffffff;
-    color: #334155;
-    border: 0.5px solid #cbd5e1;
+    color: #292524;
+    border: 0.5px solid #d6d3d1;
   }
 
   .btn-secondary:hover:not(:disabled) {
-    background: #f8fafc;
+    background: #fafaf9;
   }
 
   .btn-danger {
@@ -92,18 +92,18 @@
   }
 
   .input {
-    @apply w-full px-3 py-2 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent;
+    @apply w-full px-3 py-2 text-sm rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent;
     background: #ffffff;
-    color: #0f172a;
-    border: 0.5px solid #cbd5e1;
+    color: #1c1917;
+    border: 0.5px solid #d6d3d1;
   }
 
   .input::placeholder {
-    color: #94a3b8;
+    color: #a8a29e;
   }
 
   .label {
     @apply block text-sm font-medium mb-1;
-    color: #334155;
+    color: #292524;
   }
 }

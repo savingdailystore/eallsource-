@@ -101,7 +101,7 @@ function LoginForm() {
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="label mb-0" htmlFor="password">Password</label>
-            <Link href="/forgot-password" className="text-xs text-blue-600 hover:text-blue-700 transition-colors">
+            <Link href="/forgot-password" className="text-xs text-orange-600 hover:text-orange-700 transition-colors">
               Forgot password?
             </Link>
           </div>
@@ -164,7 +164,7 @@ function LoginForm() {
 
       <p className="text-center text-sm text-slate-500 mt-6">
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="text-blue-600 font-medium hover:text-blue-700 transition-colors">
+        <Link href="/register" className="text-orange-600 font-medium hover:text-orange-700 transition-colors">
           Start free trial
         </Link>
       </p>

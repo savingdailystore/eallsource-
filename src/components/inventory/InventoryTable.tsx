@@ -60,7 +60,7 @@ export function InventoryTable({ items }: { items: InventoryRow[] }) {
     <div>
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 px-5 py-2.5 bg-blue-50 border-b border-blue-100">
+        <div className="flex items-center gap-3 px-5 py-2.5 bg-orange-50 border-b border-orange-100">
           <span className="text-sm font-medium text-slate-700">{selected.size} selected</span>
           <button
             onClick={deleteSelected}
@@ -86,7 +86,7 @@ export function InventoryTable({ items }: { items: InventoryRow[] }) {
                   type="checkbox"
                   checked={allSelected}
                   onChange={toggleAll}
-                  className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-400 cursor-pointer"
+                  className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400 cursor-pointer"
                 />
               </th>
               {['SKU', 'FNSKU', 'ASIN', 'Product Name', 'Available', 'Reserved', 'Inbound', 'Total', ''].map((h) => (
@@ -98,13 +98,13 @@ export function InventoryTable({ items }: { items: InventoryRow[] }) {
             {items.map((item) => {
               const isSel = selected.has(item.id);
               return (
-                <tr key={item.id} className={`transition-colors ${isSel ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
+                <tr key={item.id} className={`transition-colors ${isSel ? 'bg-orange-50/50' : 'hover:bg-slate-50'}`}>
                   <td className="table-td">
                     <input
                       type="checkbox"
                       checked={isSel}
                       onChange={() => toggleOne(item.id)}
-                      className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-400 cursor-pointer"
+                      className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400 cursor-pointer"
                     />
                   </td>
                   <td className="table-td font-mono text-slate-600 text-xs">{item.sku ?? '—'}</td>

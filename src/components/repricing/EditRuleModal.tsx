@@ -72,7 +72,7 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
       <button
         onClick={() => setOpen(true)}
         title="Customize rule"
-        className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50 transition-all"
+        className="p-1.5 rounded-lg text-slate-300 hover:text-orange-500 hover:bg-orange-50 transition-all"
       >
         <SlidersHorizontal className="w-3.5 h-3.5" />
       </button>
@@ -130,7 +130,7 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
                   type="checkbox"
                   checked={form.isActive}
                   onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                  className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-400"
+                  className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400"
                 />
                 <span className="text-sm text-slate-700">Rule active</span>
                 <span className="text-xs text-slate-400">— inactive rules are skipped on Run All</span>

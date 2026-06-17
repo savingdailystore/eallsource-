@@ -101,7 +101,7 @@ export function ProfitabilityCalculator({
                 value={d.source}
                 onChange={(e) => updateField(d._id, 'source', e.target.value)}
                 placeholder="Source name"
-                className="text-xs border border-slate-200 rounded px-1.5 py-0.5 w-28 text-slate-700 focus:outline-none focus:border-blue-400"
+                className="text-xs border border-slate-200 rounded px-1.5 py-0.5 w-28 text-slate-700 focus:outline-none focus:border-orange-400"
               />
             ) : (
               <span className="text-green-600 flex items-center gap-1 min-w-0">
@@ -118,7 +118,7 @@ export function ProfitabilityCalculator({
               <select
                 value={d.type}
                 onChange={(e) => updateField(d._id, 'type', e.target.value)}
-                className="text-[11px] border border-slate-200 rounded px-1 py-0.5 text-slate-500 focus:outline-none focus:border-blue-400"
+                className="text-[11px] border border-slate-200 rounded px-1 py-0.5 text-slate-500 focus:outline-none focus:border-orange-400"
               >
                 <option value="coupon">coupon</option>
                 <option value="cashback">cashback</option>
@@ -147,7 +147,7 @@ export function ProfitabilityCalculator({
                 step="0.01"
                 value={d.amount === 0 && d._custom ? '' : d.amount}
                 onChange={(e) => updateAmount(d._id, e.target.value)}
-                className="w-20 text-right text-sm font-medium text-green-600 border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-400"
+                className="w-20 text-right text-sm font-medium text-green-600 border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-orange-400"
               />
               <button
                 onClick={() => removeDiscount(d._id)}
@@ -170,7 +170,7 @@ export function ProfitabilityCalculator({
       {/* Add / Reset controls */}
       <div className="flex items-center gap-2 pt-1">
         <button onClick={addDiscount}
-          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium">
+          className="flex items-center gap-1 text-xs text-orange-600 hover:text-orange-700 font-medium">
           <Plus className="w-3.5 h-3.5" />Add discount
         </button>
         {!isReset && (

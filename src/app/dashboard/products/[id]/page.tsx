@@ -46,7 +46,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         {lead && (
           <>
             <span className="text-slate-300">·</span>
-            <Link href={`/dashboard/leads/${lead.id}`} className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
+            <Link href={`/dashboard/leads/${lead.id}`} className="inline-flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700">
               View Lead <ExternalLink className="w-3.5 h-3.5" />
             </Link>
           </>

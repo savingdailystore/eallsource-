@@ -68,7 +68,7 @@ export default async function SettingsPage() {
         {session!.user.plan === 'STARTER' && (
           <div className="mt-4 text-xs text-slate-400">
             Inviting team members requires Pro or Enterprise.{' '}
-            <a href="/dashboard/billing" className="text-blue-600 hover:underline">Upgrade →</a>
+            <a href="/dashboard/billing" className="text-orange-600 hover:underline">Upgrade →</a>
           </div>
         )}
       </div>

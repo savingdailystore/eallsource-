@@ -51,9 +51,9 @@ export default async function DashboardPage() {
   const availableUnits = inventoryStats._sum.availableQuantity ?? 0;
 
   const STAT_CARDS = [
-    { label: 'Active Leads',     value: Number(stats.total).toLocaleString(), sub: `+${Number(stats.new_today)} today`,   icon: TrendingUp, color: 'text-blue-600',    bg: 'bg-blue-50',    href: '/dashboard/leads'     },
-    { label: 'Avg ROI',          value: formatPercent(stats.avg_roi ?? 0),    sub: 'Across active leads',                 icon: BarChart3,  color: 'text-indigo-600',  bg: 'bg-indigo-50',  href: null                   },
-    { label: 'Inventory SKUs',   value: inventoryStats._count.id.toLocaleString(), sub: `${availableUnits.toLocaleString()} available`, icon: Package, color: 'text-purple-600', bg: 'bg-purple-50', href: '/dashboard/inventory' },
+    { label: 'Active Leads',     value: Number(stats.total).toLocaleString(), sub: `+${Number(stats.new_today)} today`,   icon: TrendingUp, color: 'text-orange-600',    bg: 'bg-orange-50',    href: '/dashboard/leads'     },
+    { label: 'Avg ROI',          value: formatPercent(stats.avg_roi ?? 0),    sub: 'Across active leads',                 icon: BarChart3,  color: 'text-green-600',   bg: 'bg-green-50',   href: null                   },
+    { label: 'Inventory SKUs',   value: inventoryStats._count.id.toLocaleString(), sub: `${availableUnits.toLocaleString()} available`, icon: Package, color: 'text-zinc-700', bg: 'bg-zinc-100', href: '/dashboard/inventory' },
     { label: 'Total Units',      value: totalUnits.toLocaleString(),          sub: 'Across all FBA inventory',            icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', href: '/dashboard/inventory' },
   ];
 
@@ -103,10 +103,10 @@ export default async function DashboardPage() {
         <div className={`${isOwner ? 'lg:col-span-2' : 'lg:col-span-3'} card overflow-hidden`}>
           <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <Flame className="w-4 h-4 text-blue-500" />
+              <Flame className="w-4 h-4 text-orange-500" />
               <h2 className="font-semibold text-slate-900">Top leads</h2>
             </div>
-            <Link href="/dashboard/leads" className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+            <Link href="/dashboard/leads" className="text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors">
               View all →
             </Link>
           </div>
@@ -175,7 +175,7 @@ export default async function DashboardPage() {
                       <span className={`badge text-xs ${
                         job.status === 'DONE'    ? 'bg-green-100 text-green-700' :
                         job.status === 'FAILED'  ? 'bg-red-100 text-red-600'    :
-                        job.status === 'RUNNING' ? 'bg-blue-100 text-blue-700'  :
+                        job.status === 'RUNNING' ? 'bg-orange-100 text-orange-700'  :
                         'bg-slate-100 text-slate-500'
                       }`}>
                         {job.status === 'DONE' && <CheckCircle2 className="w-3 h-3 mr-1" />}

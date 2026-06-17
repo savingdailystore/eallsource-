@@ -54,7 +54,7 @@ export default function RegisterPage() {
       <ul className="space-y-1 mb-6">
         {FEATURES.map((f) => (
           <li key={f} className="flex items-center gap-2 text-xs text-slate-600">
-            <Check className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+            <Check className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
             {f}
           </li>
         ))}
@@ -97,7 +97,7 @@ export default function RegisterPage() {
       </p>
       <p className="text-center text-sm text-slate-500 mt-4">
         Already have an account?{' '}
-        <Link href="/login" className="text-blue-600 font-medium hover:text-blue-700">Sign in</Link>
+        <Link href="/login" className="text-orange-600 font-medium hover:text-orange-700">Sign in</Link>
       </p>
     </>
   );

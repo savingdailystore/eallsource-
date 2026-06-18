@@ -23,15 +23,18 @@ export default async function AdminPage() {
       receiveBroadcast: true,
       createdAt: true,
       _count: { select: { users: true, leads: true } },
+      subscription: {
+        select: { status: true, trialEndsAt: true, currentPeriodEnd: true },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl">
+    <div className="p-6 lg:p-8 max-w-7xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-50">Admin — Organizations</h1>
-        <p className="text-slate-400 text-sm mt-1">Enable or disable scan access per org.</p>
+        <p className="text-slate-400 text-sm mt-1">Manage plans, trial dates, and scan access per org.</p>
       </div>
       <AdminOrgsTable orgs={orgs} />
     </div>

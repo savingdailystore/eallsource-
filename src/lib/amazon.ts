@@ -24,8 +24,8 @@ export async function getValidAccessToken(orgId: string): Promise<string | null>
     body: new URLSearchParams({
       grant_type:    'refresh_token',
       refresh_token: refreshToken,
-      client_id:     process.env.AMAZON_CLIENT_ID     ?? '',
-      client_secret: process.env.AMAZON_CLIENT_SECRET ?? '',
+      client_id:     process.env.LWA_CLIENT_ID     ?? '',
+      client_secret: process.env.LWA_CLIENT_SECRET ?? '',
     }),
   });
 

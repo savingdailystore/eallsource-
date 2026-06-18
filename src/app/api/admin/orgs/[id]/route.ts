@@ -10,6 +10,7 @@ const ADMIN_EMAILS = ['savingdailystore@gmail.com'];
 const patchSchema = z.object({
   scanEnabled:      z.boolean().optional(),
   receiveBroadcast: z.boolean().optional(),
+  plan:             z.enum(['STARTER', 'PRO', 'ENTERPRISE']).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,8 +29,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const org = await prisma.organization.update({
     where:  { id },
     data:   parsed.data,
-    select: { id: true, name: true, scanEnabled: true, receiveBroadcast: true },
+    select: { id: true, name: true, scanEnabled: true, receiveBroadcast: true, plan: true },
   });
+
+  // Keep the subscription's plan in sync so the billing page matches (if one exists)
+  if (parsed.data.plan) {
+    await prisma.subscription.updateMany({
+      where: { orgId: id },
+      data:  { plan: parsed.data.plan },
+    }).catch(() => {});
+  }
 
   return NextResponse.json({ ok: true, org });
 }

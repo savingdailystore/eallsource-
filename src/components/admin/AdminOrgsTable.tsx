@@ -20,7 +20,7 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
 
-  async function patch(orgId: string, data: Record<string, boolean>) {
+  async function patch(orgId: string, data: Record<string, boolean | string>) {
     setLoading(orgId);
     await fetch(`/api/admin/orgs/${orgId}`, {
       method:  'PATCH',
@@ -51,7 +51,18 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                 </div>
                 <div className="text-xs text-slate-500">{org.slug}</div>
               </td>
-              <td className="table-td text-slate-300">{org.plan}</td>
+              <td className="table-td">
+                <select
+                  value={org.plan}
+                  disabled={loading === org.id}
+                  onChange={(e) => patch(org.id, { plan: e.target.value })}
+                  className="bg-slate-800 border border-slate-700 rounded-md text-xs text-slate-200 px-2 py-1 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="STARTER">STARTER</option>
+                  <option value="PRO">PRO</option>
+                  <option value="ENTERPRISE">ENTERPRISE</option>
+                </select>
+              </td>
               <td className="table-td text-slate-300">{org._count.users}</td>
               <td className="table-td text-slate-300">{org._count.leads}</td>
 

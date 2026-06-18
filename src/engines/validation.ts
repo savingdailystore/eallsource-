@@ -19,8 +19,11 @@ interface ValidationInput {
 }
 
 // Minimum match confidence to accept a title-based ASIN match as a lead.
-// Exact identifier (UPC/EAN/model) matches score far higher and always pass.
-const IDENTITY_MIN = 65;
+// Set high (precision over recall): wrong fuzzy matches tend to score 60-70,
+// correct matches ~90, so a high bar filters dangerous false-positive leads
+// (e.g. a single item mismatched to a multipack). UPC/EAN/model matches score
+// 97-100 and always clear it. Lower this only if pairing with UPC matching.
+const IDENTITY_MIN = 80;
 
 export function validateProduct(input: ValidationInput): ValidationResult {
   const reasons: string[] = [];

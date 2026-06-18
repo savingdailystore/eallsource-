@@ -264,7 +264,10 @@ export interface InspectResult {
   fbaFee?:         number;
   profit?:         number;
   roi?:            number;
-  qualifies?:      boolean;
+  qualifies?:      boolean;   // profitability only
+  identityScore?:  number;
+  passedValidation?: boolean;
+  wouldBeLead?:    boolean;   // qualifies AND passes validation
 }
 
 export async function inspectRetailerProduct(product: RetailerProduct, orgId: string): Promise<InspectResult> {
@@ -302,20 +305,33 @@ export async function inspectRetailerProduct(product: RetailerProduct, orgId: st
     fbaFee,
   });
 
+  const validation = validateProduct({
+    source: { title: product.title, upc: product.upc, ean: product.ean, brand: product.brand, model: product.model },
+    amazon: { title: sp?.title ?? keepa?.title ?? product.title, upc: product.upc, ean: product.ean, brand: sp?.brand ?? keepa?.brand, model: product.model },
+    sourcePrice:     product.price,
+    amazonPrice:     buyBoxPrice ?? resellPrice,
+    sourceInStock:   product.inStock,
+    sourceUrl:       product.url,
+    matchConfidence: match.matchConfidence,
+  });
+
   return {
     ...base,
-    matched:         true,
-    matchMethod:     match.matchMethod,
-    matchConfidence: match.matchConfidence,
+    matched:          true,
+    matchMethod:      match.matchMethod,
+    matchConfidence:  match.matchConfidence,
     asin,
-    amazonTitle:     sp?.title ?? keepa?.title,
+    amazonTitle:      sp?.title ?? keepa?.title,
     resellPrice,
     buyBoxPrice,
-    referralFee:     profit.referralFee,
-    fbaFee:          profit.fbaFee,
-    profit:          profit.profit,
-    roi:             profit.roi,
-    qualifies:       profit.qualifies,
+    referralFee:      profit.referralFee,
+    fbaFee:           profit.fbaFee,
+    profit:           profit.profit,
+    roi:              profit.roi,
+    qualifies:        profit.qualifies,
+    identityScore:    validation.identityScore,
+    passedValidation: validation.passed,
+    wouldBeLead:      profit.qualifies && validation.passed,
   };
 }
 

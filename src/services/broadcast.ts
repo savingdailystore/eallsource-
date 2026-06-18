@@ -5,6 +5,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function broadcastLeads(sourceOrgId: string, leadIds: string[]): Promise<number> {
   if (leadIds.length === 0) return 0;
@@ -46,8 +47,8 @@ export async function broadcastLeads(sourceOrgId: string, leadIds: string[]): Pr
         onSale:            p.onSale,
         sourceTax:         p.sourceTax,
         sourceShipping:    p.sourceShipping,
-        availableDiscounts: p.availableDiscounts,
-        discountSources:   p.discountSources,
+        availableDiscounts: p.availableDiscounts ?? Prisma.JsonNull,
+        discountSources:   p.discountSources ?? Prisma.JsonNull,
         finalCost:         p.finalCost,
         amazonUrl:         p.amazonUrl,
         buyBoxPrice:       p.buyBoxPrice,

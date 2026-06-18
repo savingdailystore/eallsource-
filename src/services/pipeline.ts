@@ -247,6 +247,78 @@ export async function processRetailerProduct(
   }
 }
 
+// ─── Dry-run inspection (diagnostic — no filtering, no persistence) ──────────
+// Returns the computed match + market data + economics for a single product so
+// we can see WHY products are rejected (wrong match? genuinely no margin?).
+export interface InspectResult {
+  sourceTitle:     string;
+  sourcePrice:     number;
+  matched:         boolean;
+  matchMethod?:    string;
+  matchConfidence?: number;
+  asin?:           string;
+  amazonTitle?:    string;
+  resellPrice?:    number;
+  buyBoxPrice?:    number;
+  referralFee?:    number;
+  fbaFee?:         number;
+  profit?:         number;
+  roi?:            number;
+  qualifies?:      boolean;
+}
+
+export async function inspectRetailerProduct(product: RetailerProduct, orgId: string): Promise<InspectResult> {
+  const base: InspectResult = { sourceTitle: product.title, sourcePrice: product.price, matched: false };
+
+  const match = await findMatch(product, orgId);
+  if (!match) return base;
+
+  const { asin } = match;
+  const [spData, keepaData] = await Promise.allSettled([
+    getProductData(orgId, asin).catch(() => null),
+    getKeepaData(asin),
+  ]);
+  const sp    = spData.status    === 'fulfilled' ? spData.value    : null;
+  const keepa = keepaData.status === 'fulfilled' ? keepaData.value : null;
+
+  const buyBoxPrice    = sp?.buyBoxPrice    ?? keepa?.buyBoxPrice;
+  const lowestFbaPrice = sp?.lowestFbaPrice ?? keepa?.lowestNewPrice;
+  const resellPrice    = lowestFbaPrice ?? buyBoxPrice ?? product.price;
+  const category       = sp?.category ?? keepa?.category ?? product.category ?? 'Other';
+
+  let referralFee: number | undefined;
+  let fbaFee: number | undefined;
+  if (resellPrice > 0) {
+    const feeData = await getFeeEstimate(orgId, asin, resellPrice).catch(() => null);
+    if (feeData) { referralFee = feeData.referralFee; fbaFee = feeData.fbaFee; }
+  }
+
+  const profit = calculateProfitability({
+    sourcePrice: product.price,
+    discounts:   [],
+    resellPrice,
+    category,
+    referralFeeRate: referralFee != null ? referralFee / resellPrice : undefined,
+    fbaFee,
+  });
+
+  return {
+    ...base,
+    matched:         true,
+    matchMethod:     match.matchMethod,
+    matchConfidence: match.matchConfidence,
+    asin,
+    amazonTitle:     sp?.title ?? keepa?.title,
+    resellPrice,
+    buyBoxPrice,
+    referralFee:     profit.referralFee,
+    fbaFee:          profit.fbaFee,
+    profit:          profit.profit,
+    roi:             profit.roi,
+    qualifies:       profit.qualifies,
+  };
+}
+
 // ─── ASIN matching with priority fallback ────────────────────────────────────
 
 async function findMatch(product: RetailerProduct, orgId: string): Promise<AmazonMatch | null> {

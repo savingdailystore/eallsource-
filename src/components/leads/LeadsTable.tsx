@@ -26,6 +26,8 @@ export interface LeadRow {
     imageUrl?: string | null;
     sourceRetailer?: string | null;
     sourcePrice?: number | null;
+    sourceListPrice?: number | null;
+    onSale?: boolean | null;
     finalCost?: number | null;
     lowestFbaPrice?: number | null;
     buyBoxPrice?: number | null;
@@ -274,6 +276,11 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 mt-0.5" title="Title-based match — verify the product, variant, and quantity before buying">
                                 <ShieldAlert className="w-3 h-3" />Verify match
+                              </span>
+                            )}
+                            {p.onSale && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-400 mt-0.5 ml-2" title="Retailer has this on sale / rollback / clearance">
+                                🏷 SALE{p.sourceListPrice != null ? ` · was ${formatCurrency(p.sourceListPrice)}` : ''}
                               </span>
                             )}
                           </div>

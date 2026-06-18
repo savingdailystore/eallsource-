@@ -74,6 +74,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <span className="font-mono text-xs text-slate-400">{p.asin}</span>
             {p.brand && <span className="text-xs text-slate-400">{p.brand}</span>}
             {p.category && <span className="badge bg-slate-800 text-slate-300">{p.category}</span>}
+            {p.onSale && (
+              <span className="badge bg-orange-500/15 text-orange-400 font-semibold">
+                🏷 SALE{p.sourceListPrice != null ? ` · was ${formatCurrency(p.sourceListPrice)}` : ''}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 mt-3">
             <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs py-1.5">

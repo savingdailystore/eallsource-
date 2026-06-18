@@ -27,12 +27,14 @@ export abstract class BaseRetailer implements RetailerPlugin {
       upc:      raw.upc,
       ean:      raw.ean,
       model:    raw.model,
-      category: raw.category,
-      price:    raw.price    ?? 0,
-      inStock:  raw.inStock  ?? false,
-      url:      raw.url      ?? '',
-      retailer: this.name,
-      imageUrl: raw.imageUrl,
+      category:  raw.category,
+      price:     raw.price    ?? 0,
+      listPrice: raw.listPrice,
+      onSale:    raw.onSale,
+      inStock:   raw.inStock  ?? false,
+      url:       raw.url      ?? '',
+      retailer:  this.name,
+      imageUrl:  raw.imageUrl,
     };
   }
 }

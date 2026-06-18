@@ -46,6 +46,8 @@ export interface RetailerProduct {
   model?: string;
   category?: string;
   price: number;
+  listPrice?: number;   // original / "was" price before markdown
+  onSale?: boolean;     // retailer flagged as on sale / rollback / clearance
   inStock: boolean;
   url: string;
   retailer: string;

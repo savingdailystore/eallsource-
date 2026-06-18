@@ -139,11 +139,13 @@ model Product {
   imageUrl String?
 
   // Source data
-  sourceUrl      String?
-  sourceRetailer String?
-  sourcePrice    Float?
-  sourceTax      Float?
-  sourceShipping Float?
+  sourceUrl       String?
+  sourceRetailer  String?
+  sourcePrice     Float?
+  sourceListPrice Float?   // original "was" price before markdown
+  onSale          Boolean? // retailer flagged on sale / rollback / clearance
+  sourceTax       Float?
+  sourceShipping  Float?
 
   // Discounts applied
   availableDiscounts Json? // { source, type, amount, percentage?, code? }[]

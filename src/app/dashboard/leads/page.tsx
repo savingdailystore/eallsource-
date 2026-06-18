@@ -40,6 +40,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
           select: {
             id: true, asin: true, title: true, brand: true, category: true,
             imageUrl: true, sourceRetailer: true, sourcePrice: true,
+            sourceListPrice: true, onSale: true,
             finalCost: true, lowestFbaPrice: true, buyBoxPrice: true,
             amazonFees: true, prepFee: true, taxAmount: true,
             profit: true, roi: true, margin: true,

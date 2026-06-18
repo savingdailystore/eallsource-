@@ -165,6 +165,8 @@ export async function processRetailerProduct(
       sourceUrl:        product.url,
       sourceRetailer:   product.retailer,
       sourcePrice:      product.price,
+      sourceListPrice:  product.listPrice ?? null,
+      onSale:           product.onSale ?? null,
 
       amazonUrl,
       buyBoxPrice,
@@ -253,6 +255,8 @@ export async function processRetailerProduct(
 export interface InspectResult {
   sourceTitle:     string;
   sourcePrice:     number;
+  listPrice?:      number;
+  onSale?:         boolean;
   matched:         boolean;
   matchMethod?:    string;
   matchConfidence?: number;
@@ -271,7 +275,10 @@ export interface InspectResult {
 }
 
 export async function inspectRetailerProduct(product: RetailerProduct, orgId: string): Promise<InspectResult> {
-  const base: InspectResult = { sourceTitle: product.title, sourcePrice: product.price, matched: false };
+  const base: InspectResult = {
+    sourceTitle: product.title, sourcePrice: product.price,
+    listPrice: product.listPrice, onSale: product.onSale, matched: false,
+  };
 
   const match = await findMatch(product, orgId);
   if (!match) return base;

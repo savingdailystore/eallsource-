@@ -59,6 +59,7 @@ model Organization {
   inventory      InventoryItem[]
   repricingRules RepricingRule[]
   scanJobs       ScanJob[]
+  savedSearches  SavedSearch[]
   amazonCred     AmazonCredential?
   auditLogs      AuditLog[]
 
@@ -355,6 +356,28 @@ model ScanJob {
   @@index([status])
   @@index([orgId, type])
   @@map("scan_jobs")
+}
+
+// ─── Saved Search (scheduled weekly scans) ──────────────────────────────────
+
+model SavedSearch {
+  id    String @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  retailer String
+  query    String
+  enabled  Boolean @default(true)
+
+  lastRunAt   DateTime?
+  lastResult  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([enabled])
+  @@map("saved_searches")
 }
 
 // ─── Audit Log ─────────────────────────────────────────────────────────────

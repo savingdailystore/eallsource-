@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getRetailerNames } from '@/retailers';
 import { ScannerPanel } from '@/components/scanner/ScannerPanel';
+import { ScheduledSearches } from '@/components/scanner/ScheduledSearches';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Scanner' };
@@ -15,12 +16,18 @@ export default async function ScannerPage() {
 
   const orgId = session!.user.orgId;
 
-  const jobs = await prisma.scanJob.findMany({
-    where: { orgId },
-    orderBy: { createdAt: 'desc' },
-    take: 20,
-    select: { id: true, type: true, retailer: true, query: true, status: true, error: true, createdAt: true },
-  });
+  const [jobs, savedSearches] = await Promise.all([
+    prisma.scanJob.findMany({
+      where: { orgId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { id: true, type: true, retailer: true, query: true, status: true, error: true, createdAt: true },
+    }),
+    prisma.savedSearch.findMany({
+      where: { orgId },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ]);
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl space-y-6">
@@ -32,6 +39,14 @@ export default async function ScannerPage() {
       </div>
 
       <ScannerPanel retailers={getRetailerNames()} jobs={jobs} />
+
+      <ScheduledSearches
+        initialSearches={savedSearches.map((s) => ({
+          ...s,
+          lastRunAt: s.lastRunAt ? s.lastRunAt.toISOString() : null,
+        }))}
+        retailers={getRetailerNames()}
+      />
     </div>
   );
 }

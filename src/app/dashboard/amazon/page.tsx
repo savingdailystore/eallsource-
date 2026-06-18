@@ -47,6 +47,7 @@ export default async function AmazonPage({ searchParams: searchParamsPromise }: 
   });
 
   const isConnected = !!cred?.isActive;
+  const isOwner     = session!.user.role === 'OWNER';
   const errorMsg    = searchParams.error ? (ERROR_MESSAGES[searchParams.error] ?? 'An error occurred. Please try again.') : null;
 
   return (
@@ -97,21 +98,23 @@ export default async function AmazonPage({ searchParams: searchParamsPromise }: 
       {/* Connect options */}
       {!isConnected && (
         <div className="space-y-4">
-          {/* Primary: OAuth button */}
-          <div className="card p-6">
-            <h2 className="font-semibold text-slate-50 mb-1">Connect with Amazon</h2>
-            <p className="text-sm text-slate-400 mb-5">
-              Authorize EALLsource to access your Seller Central account. You will be redirected to
-              Amazon to approve access — no tokens to copy or paste.
-            </p>
-            <a
-              href="/api/amazon/oauth/start"
-              className="btn-primary w-full justify-center text-center flex items-center gap-2"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              Connect with Amazon
-            </a>
-          </div>
+          {/* Primary: OAuth button — owner only until app is published */}
+          {isOwner && (
+            <div className="card p-6">
+              <h2 className="font-semibold text-slate-50 mb-1">Connect with Amazon</h2>
+              <p className="text-sm text-slate-400 mb-5">
+                Authorize EALLsource to access your Seller Central account. You will be redirected to
+                Amazon to approve access — no tokens to copy or paste.
+              </p>
+              <a
+                href="/api/amazon/oauth/start"
+                className="btn-primary w-full justify-center text-center flex items-center gap-2"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                Connect with Amazon
+              </a>
+            </div>
+          )}
 
           {/* Secondary: manual / advanced */}
           <details className="card p-6 group">

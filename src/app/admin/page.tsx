@@ -19,6 +19,8 @@ export default async function AdminPage() {
       slug: true,
       plan: true,
       scanEnabled: true,
+      isBroadcastSource: true,
+      receiveBroadcast: true,
       createdAt: true,
       _count: { select: { users: true, leads: true } },
     },

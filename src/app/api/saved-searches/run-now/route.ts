@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { runScanJob } from '@/services/run-scan';
+import { broadcastLeads } from '@/services/broadcast';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -17,7 +18,10 @@ export async function POST() {
 
   const orgId = session.user.orgId;
 
-  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { scanEnabled: true } });
+  const org = await prisma.organization.findUnique({
+    where:  { id: orgId },
+    select: { scanEnabled: true, isBroadcastSource: true },
+  });
   if (!org?.scanEnabled) {
     return NextResponse.json({ error: 'Scan access is not enabled for your account.' }, { status: 403 });
   }
@@ -33,9 +37,12 @@ export async function POST() {
   }
 
   const summary = {
-    ran: 0, skippedForTime: 0, productsFound: 0, leadsCreated: 0, leadsUpdated: 0, failures: 0,
+    ran: 0, skippedForTime: 0, productsFound: 0, leadsCreated: 0, leadsUpdated: 0,
+    failures: 0, broadcast: 0,
     filtered: { noMatch: 0, notProfitable: 0, demandTooLow: 0, validationFailed: 0 },
   };
+
+  const allLeadIds: string[] = [];
 
   for (const search of searches) {
     if (Date.now() - start > TIME_BUDGET_MS) { summary.skippedForTime++; continue; }
@@ -54,11 +61,20 @@ export async function POST() {
       summary.filtered.notProfitable    += result.notProfitable;
       summary.filtered.demandTooLow     += result.demandTooLow;
       summary.filtered.validationFailed += result.validationFailed;
+      allLeadIds.push(...result.leadIds);
       await prisma.savedSearch.update({ where: { id: search.id }, data: { lastRunAt: new Date(), lastResult: result as object } });
     } catch (err) {
       summary.failures++;
       await prisma.savedSearch.update({ where: { id: search.id }, data: { lastRunAt: new Date(), lastResult: { error: String(err) } } }).catch(() => {});
     }
+  }
+
+  // Broadcast qualifying leads to subscriber orgs if this is the source org
+  if (org.isBroadcastSource && allLeadIds.length > 0) {
+    summary.broadcast = await broadcastLeads(orgId, allLeadIds).catch((err) => {
+      console.error('[run-now] broadcast failed:', err);
+      return 0;
+    });
   }
 
   return NextResponse.json({ ok: true, elapsedMs: Date.now() - start, ...summary });

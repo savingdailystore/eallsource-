@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
 const ADMIN_EMAILS = ['savingdailystore@gmail.com'];
 
 const patchSchema = z.object({
-  scanEnabled: z.boolean(),
+  scanEnabled:      z.boolean().optional(),
+  receiveBroadcast: z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -26,8 +27,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const org = await prisma.organization.update({
     where:  { id },
-    data:   { scanEnabled: parsed.data.scanEnabled },
-    select: { id: true, name: true, scanEnabled: true },
+    data:   parsed.data,
+    select: { id: true, name: true, scanEnabled: true, receiveBroadcast: true },
   });
 
   return NextResponse.json({ ok: true, org });

@@ -16,6 +16,7 @@ export interface ScanRunResult {
   skipped: number;
   errors:  number;
   found:   number;
+  leadIds: string[];  // IDs of leads created or updated (used for broadcast)
   // Breakdown of why products were filtered out (sums into `skipped`)
   noMatch:          number;
   notProfitable:    number;
@@ -50,7 +51,7 @@ export async function runScanJob(args: {
   }
 
   const result: ScanRunResult = {
-    created: 0, updated: 0, skipped: 0, errors: 0, found: 0,
+    created: 0, updated: 0, skipped: 0, errors: 0, found: 0, leadIds: [],
     noMatch: 0, notProfitable: 0, demandTooLow: 0, validationFailed: 0,
   };
 
@@ -61,8 +62,8 @@ export async function runScanJob(args: {
     for (const product of products) {
       const outcome = await processRetailerProduct(product, orgId);
       switch (outcome.outcome) {
-        case 'lead_created':      result.created++; break;
-        case 'lead_updated':      result.updated++; break;
+        case 'lead_created':      result.created++; result.leadIds.push(outcome.leadId); break;
+        case 'lead_updated':      result.updated++; result.leadIds.push(outcome.leadId); break;
         case 'error':             result.errors++;  break;
         case 'no_match':          result.skipped++; result.noMatch++;          break;
         case 'not_profitable':    result.skipped++; result.notProfitable++;    break;

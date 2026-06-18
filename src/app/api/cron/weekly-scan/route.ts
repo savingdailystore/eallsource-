@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { runScanJob } from '@/services/run-scan';
+import { broadcastLeads } from '@/services/broadcast';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // Vercel Pro: up to 300s per invocation
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
     orderBy: [{ lastRunAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'asc' }],
   });
 
+  // Track lead IDs per source org so we can broadcast after all searches finish
+  const broadcastQueue = new Map<string, string[]>();
+
   const summary = {
     totalEnabled: searches.length,
     ran:          0,
@@ -36,6 +40,7 @@ export async function GET(req: NextRequest) {
     leadsCreated: 0,
     leadsUpdated: 0,
     failures:     0,
+    broadcast:    0,
     details:      [] as Array<{ id: string; retailer: string; query: string; status: string; result?: unknown; error?: string }>,
   };
 
@@ -62,6 +67,12 @@ export async function GET(req: NextRequest) {
       summary.leadsUpdated += result.updated;
       summary.details.push({ id: search.id, retailer: search.retailer, query: search.query, status: 'done', result });
 
+      // Accumulate lead IDs per org for broadcast step
+      if (result.leadIds.length > 0) {
+        const existing = broadcastQueue.get(search.orgId) ?? [];
+        broadcastQueue.set(search.orgId, [...existing, ...result.leadIds]);
+      }
+
       await prisma.savedSearch.update({
         where: { id: search.id },
         data:  { lastRunAt: new Date(), lastResult: result as object },
@@ -74,6 +85,24 @@ export async function GET(req: NextRequest) {
         where: { id: search.id },
         data:  { lastRunAt: new Date(), lastResult: { error: String(err) } },
       }).catch(() => {});
+    }
+  }
+
+  // Broadcast leads from any source orgs that produced results
+  if (broadcastQueue.size > 0) {
+    const sourceOrgs = await prisma.organization.findMany({
+      where:  { isBroadcastSource: true, id: { in: [...broadcastQueue.keys()] } },
+      select: { id: true },
+    });
+
+    for (const { id: sourceOrgId } of sourceOrgs) {
+      const leadIds = broadcastQueue.get(sourceOrgId) ?? [];
+      if (leadIds.length > 0) {
+        summary.broadcast += await broadcastLeads(sourceOrgId, leadIds).catch((err) => {
+          console.error('[cron] broadcast failed:', err);
+          return 0;
+        });
+      }
     }
   }
 

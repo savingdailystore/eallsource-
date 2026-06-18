@@ -44,6 +44,22 @@ export function validateProduct(input: ValidationInput): ValidationResult {
     identityScore = 97;
   } else {
     identityScore = input.matchConfidence;
+
+    // Brand-mismatch guard: spec-heavy titles (air conditioners, furniture)
+    // can score high containment across DIFFERENT brands. If both brands are
+    // known and clearly differ (no substring overlap), it's almost certainly
+    // the wrong product — cap identity below the pass bar. When the source
+    // brand field is empty, fall back to the first title token (these listings
+    // typically lead with the brand, e.g. "KISSAIR Portable Air Conditioner").
+    const norm = (s?: string) => (s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const firstToken = (input.source.title ?? '').trim().split(/\s+/)[0] ?? '';
+    const sb = norm(input.source.brand) || norm(firstToken);
+    const ab = norm(input.amazon.brand);
+    const sourceBrandShown = input.source.brand || firstToken;
+    if (sb.length > 2 && ab.length > 2 && !sb.includes(ab) && !ab.includes(sb)) {
+      identityScore = Math.min(identityScore, 40);
+      reasons.push(`Brand mismatch: source "${sourceBrandShown}" vs Amazon "${input.amazon.brand}"`);
+    }
   }
   if (identityScore < IDENTITY_MIN) {
     reasons.push(`Match confidence ${identityScore}% (need ≥ ${IDENTITY_MIN}%)`);

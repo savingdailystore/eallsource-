@@ -160,39 +160,50 @@ export async function searchCatalogByKeywords(orgId: string, keywords: string, m
 
 export async function getProductData(orgId: string, asin: string, marketplaceId = 'ATVPDKIKX0DER'): Promise<Partial<AmazonProductData>> {
   try {
-    const [catalogData, pricingData] = await Promise.allSettled([
+    // competitivePricing returns 403 for this app's roles; getItemOffers
+    // (also under the Pricing role) returns a usable buy-box / lowest-price
+    // summary, so use that for resale pricing.
+    const [catalogData, offersData] = await Promise.allSettled([
       spApi(orgId, `/catalog/2022-04-01/items/${asin}`, {
         marketplaceIds: marketplaceId,
         includedData:   'summaries,salesRanks,attributes',
       }),
-      spApi(orgId, `/products/pricing/v0/competitivePricing`, {
-        Asins:         asin,
+      spApi(orgId, `/products/pricing/v0/items/${asin}/offers`, {
         MarketplaceId: marketplaceId,
-        ItemType:      'Asin',
+        ItemCondition: 'New',
       }),
     ]);
 
     const catalog = catalogData.status === 'fulfilled' ? catalogData.value as any : null;
-    const pricing = pricingData.status === 'fulfilled' ? pricingData.value as any : null;
+    const offers  = offersData.status  === 'fulfilled' ? offersData.value  as any : null;
 
-    const summary    = catalog?.summaries?.[0];
-    const salesRank  = catalog?.salesRanks?.[0]?.ranks?.[0];
-    const price      = pricing?.payload?.[0];
-    const competitive = price?.Product?.CompetitivePricing;
+    const summary   = catalog?.summaries?.[0];
+    const salesRank = catalog?.salesRanks?.[0]?.ranks?.[0];
 
-    const buyBoxPrice     = competitive?.CompetitivePrices?.find((p: any) => p.condition === 'New')?.Price?.LandedPrice?.Amount;
-    const lowestFbaPrice  = competitive?.CompetitivePrices?.find((p: any) => p.belongsToBuyingBox === true)?.Price?.LandedPrice?.Amount;
+    const sum = offers?.payload?.Summary;
+    const buyBox =
+      sum?.BuyBoxPrices?.find((p: any) => p.condition?.toLowerCase() === 'new') ?? sum?.BuyBoxPrices?.[0];
+    const buyBoxPrice = buyBox?.LandedPrice?.Amount;
+
+    const lowestFba =
+      sum?.LowestPrices?.find((p: any) => p.fulfillmentChannel === 'Amazon') ?? sum?.LowestPrices?.[0];
+    const lowestFbaPrice = lowestFba?.LandedPrice?.Amount;
+
+    const offerCounts  = (sum?.NumberOfOffers ?? []) as Array<{ fulfillmentChannel?: string; OfferCount?: number }>;
+    const totalSellers = sum?.TotalOfferCount ?? offerCounts.reduce((a, o) => a + (o.OfferCount ?? 0), 0);
+    const fbaSellers   = offerCounts.filter((o) => o.fulfillmentChannel === 'Amazon').reduce((a, o) => a + (o.OfferCount ?? 0), 0);
 
     return {
       asin,
-      title:           summary?.itemName,
-      brand:           summary?.brand,
-      category:        summary?.productType,
-      imageUrl:        summary?.mainImage?.link,
-      bsr:             salesRank?.rank,
-      buyBoxPrice:     buyBoxPrice,
-      lowestFbaPrice:  lowestFbaPrice,
-      amazonIsSeller:  competitive?.NumberOfOfferListings?.some((o: any) => o.condition === 'new' && o.Count > 0),
+      title:          summary?.itemName,
+      brand:          summary?.brand,
+      category:       summary?.productType,
+      imageUrl:       summary?.mainImage?.link,
+      bsr:            salesRank?.rank,
+      buyBoxPrice,
+      lowestFbaPrice,
+      fbaSellers,
+      totalSellers,
     };
   } catch (err) {
     console.error('[amazon] getProductData error:', err);

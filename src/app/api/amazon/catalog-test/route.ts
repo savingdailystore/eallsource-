@@ -24,6 +24,9 @@ export async function GET(req: NextRequest) {
   out.env = {
     LWA_CLIENT_ID_set:     !!process.env.LWA_CLIENT_ID,
     LWA_CLIENT_SECRET_set: !!process.env.LWA_CLIENT_SECRET,
+    // First chars only — compare to your app's "LWA credentials → View" Client ID
+    LWA_CLIENT_ID_prefix:  process.env.LWA_CLIENT_ID ? `${process.env.LWA_CLIENT_ID.slice(0, 30)}…` : null,
+    LWA_CLIENT_SECRET_len: (process.env.LWA_CLIENT_SECRET ?? '').length,
   };
 
   const cred = await prisma.amazonCredential.findUnique({ where: { orgId: session.user.orgId } });
@@ -60,7 +63,9 @@ export async function GET(req: NextRequest) {
     });
     const body = await res.text();
     if (!res.ok) {
-      out.lwaRefresh = { ok: false, status: res.status, body: body.slice(0, 300) };
+      let errorCode: string | undefined;
+      try { errorCode = JSON.parse(body).error; } catch { /* ignore */ }
+      out.lwaRefresh = { ok: false, status: res.status, error: errorCode ?? '(unparsed)', body: body.slice(0, 600) };
       return NextResponse.json(out);
     }
     accessToken = JSON.parse(body).access_token;

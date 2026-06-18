@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { formatCurrency } from '@/lib/utils';
 import { PLAN_PRICES } from '@/lib/stripe';
 import { PLAN_LIMITS } from '@/types';
-import { Check, Zap, Crown, Building2 } from 'lucide-react';
+import { Check, Zap, Crown } from 'lucide-react';
 import type { Plan } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -13,15 +13,11 @@ export const metadata = { title: 'Billing' };
 const PLANS: { key: Plan; name: string; price: number; icon: any; color: string; features: string[] }[] = [
   {
     key: 'STARTER', name: 'Starter', price: 0, icon: Zap, color: 'text-slate-300',
-    features: ['20 leads/day', 'ROI calculator', 'Validation engine', 'Export to CSV', '1 user'],
+    features: ['3 leads/week', 'ROI calculator', 'Validation engine', 'Export to CSV', '1 user'],
   },
   {
     key: 'PRO', name: 'Pro', price: 97, icon: Crown, color: 'text-blue-600',
-    features: ['500 leads/day', 'Everything in Starter', 'Inventory management', 'Repricing engine', 'Amazon SP-API', '5 users'],
-  },
-  {
-    key: 'ENTERPRISE', name: 'Enterprise', price: 297, icon: Building2, color: 'text-slate-200',
-    features: ['Unlimited leads', 'Everything in Pro', 'API access', 'Unlimited users', 'Priority support', 'Custom integrations'],
+    features: ['20 leads/week', 'Everything in Starter', 'Inventory management', 'Repricing engine', 'Amazon SP-API', '2 users'],
   },
 ];
 
@@ -79,7 +75,7 @@ export default async function BillingPage() {
       )}
 
       {/* Plan cards */}
-      <div className="grid md:grid-cols-3 gap-5">
+      <div className="grid md:grid-cols-2 gap-5 max-w-2xl">
         {PLANS.map((plan) => {
           const isCurrent = plan.key === currentPlan;
           return (
@@ -93,7 +89,7 @@ export default async function BillingPage() {
                 </div>
               )}
 
-              <div className={`w-10 h-10 rounded-xl ${plan.key === 'PRO' ? 'bg-blue-500/10' : plan.key === 'ENTERPRISE' ? 'bg-slate-800' : 'bg-slate-800'} flex items-center justify-center mb-4`}>
+              <div className={`w-10 h-10 rounded-xl ${plan.key === 'PRO' ? 'bg-blue-500/10' : 'bg-slate-800'} flex items-center justify-center mb-4`}>
                 <plan.icon className={`w-5 h-5 ${plan.color}`} />
               </div>
 
@@ -141,7 +137,7 @@ export default async function BillingPage() {
         <h2 className="font-semibold text-slate-50 mb-4">Plan Limits</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           {[
-            ['Leads/day', PLAN_LIMITS[currentPlan].leadsPerDay === 9999 ? 'Unlimited' : PLAN_LIMITS[currentPlan].leadsPerDay],
+            ['Leads/week', PLAN_LIMITS[currentPlan].leadsPerWeek === 9999 ? 'Unlimited' : PLAN_LIMITS[currentPlan].leadsPerWeek],
             ['Repricing', PLAN_LIMITS[currentPlan].repricing ? '✓' : '—'],
             ['SP-API',    PLAN_LIMITS[currentPlan].spApi     ? '✓' : '—'],
             ['Users',     PLAN_LIMITS[currentPlan].maxUsers  === 99 ? 'Unlimited' : PLAN_LIMITS[currentPlan].maxUsers],

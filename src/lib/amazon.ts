@@ -135,11 +135,16 @@ export async function searchCatalogByKeywords(orgId: string, keywords: string, m
     if (items.length === 0) return null;
 
     // Score the top candidates and keep the best — Amazon's keyword ranking
-    // is good but the #1 result isn't always the closest title match.
+    // is good but the #1 result isn't always the closest title match. Reject
+    // candidates whose pack size conflicts with the source (e.g. a single item
+    // matched to a 12-pack), which otherwise produces fake "profitable" leads.
+    const srcQty = extractPackCount(keywords);
     let best: { asin: string; confidence: number } | null = null;
     for (const it of items.slice(0, 5)) {
-      const name = it.summaries?.[0]?.itemName ?? '';
-      const c    = estimateTitleConfidence(keywords, name);
+      const name  = it.summaries?.[0]?.itemName ?? '';
+      const itQty = extractPackCount(name);
+      if (srcQty != null && itQty != null && srcQty !== itQty) continue; // pack-size mismatch
+      const c = estimateTitleConfidence(keywords, name);
       if (!best || c > best.confidence) best = { asin: it.asin, confidence: c };
     }
     if (!best || best.confidence < 55) return null;
@@ -259,6 +264,17 @@ const TITLE_STOPWORDS = new Set([
   'the', 'and', 'for', 'with', 'an', 'of', 'to', 'in', 'by', 'or', 'from',
   'your', 'that', 'this', 'new', 'set',
 ]);
+
+// Extract a pack/multi-count from a title, e.g. "12 Pack", "5-pk", "set of 3",
+// "single". Returns null when no count is stated (can't compare).
+function extractPackCount(title: string): number | null {
+  const t = title.toLowerCase();
+  if (/\bsingle\b/.test(t)) return 1;
+  const m =
+    t.match(/(?:set|pack)\s*of\s*(\d{1,3})/) ||
+    t.match(/(\d{1,3})\s*-?\s*(?:pack|pk|count|ct|pieces?|pcs?|pc)\b/);
+  return m ? parseInt(m[1], 10) : null;
+}
 
 function estimateTitleConfidence(sourceTitle: string, amazonTitle: string): number {
   if (!amazonTitle) return 0;

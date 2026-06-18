@@ -97,6 +97,43 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
+      {/* Match verification — title matches are fuzzy and must be confirmed */}
+      {(() => {
+        const verified = p.matchMethod === 'UPC' || p.matchMethod === 'EAN';
+        return (
+          <div className={`rounded-xl border px-4 py-3 mb-6 flex gap-3 ${verified ? 'bg-green-500/10 border-green-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
+            {verified
+              ? <ShieldCheck className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+              : <ShieldAlert className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />}
+            <div className="min-w-0">
+              {verified ? (
+                <p className="text-sm text-green-300">
+                  <span className="font-semibold">Barcode-verified match (UPC/EAN).</span> Matched to Amazon by exact identifier — high confidence.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-amber-300 font-semibold">Verify this match before buying</p>
+                  <p className="text-xs text-amber-200/90 leading-relaxed mt-0.5">
+                    Matched by title similarity ({(p.matchConfidence ?? 0).toFixed(0)}%), not a barcode. Open both listings and confirm the
+                    {' '}<strong>brand, model, and pack/quantity</strong> match — fuzzy matches can pair a single item with a multipack or a different variant.
+                  </p>
+                </>
+              )}
+              <div className="flex flex-wrap gap-2 mt-2">
+                <a href={amazonUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs py-1">
+                  <ExternalLink className="w-3 h-3" />Amazon listing
+                </a>
+                {p.sourceUrl && (
+                  <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs py-1">
+                    <ExternalLink className="w-3 h-3" />{p.sourceRetailer ?? 'Source'} listing
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Profitability */}
         <div className="lg:col-span-2 space-y-5">
@@ -170,13 +207,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 : <XCircle className="w-4 h-4 text-red-400" />}
               Validation
             </h2>
-            <ScoreRow label="Identity"  value={p.identityScore}  pass={(p.identityScore ?? 0)  >= 95} />
+            <ScoreRow label="Identity"  value={p.identityScore}  pass={(p.identityScore ?? 0)  >= 80} />
             <ScoreRow label="URL"       value={p.urlScore}        pass={(p.urlScore ?? 0)        >= 95} />
-            <ScoreRow label="Price"     value={p.priceScore}      pass={(p.priceScore ?? 0)      >= 95} />
+            <ScoreRow label="Price"     value={p.priceScore}      pass={(p.priceScore ?? 0)      >= 70} />
             <ScoreRow label="Inventory" value={p.inventoryScore}  pass={(p.inventoryScore ?? 0)  >= 95} />
-            <ScoreRow label="Match"     value={p.matchConfidence} pass={(p.matchConfidence ?? 0) >= 70} />
+            <ScoreRow label="Match"     value={p.matchConfidence} pass={(p.matchConfidence ?? 0) >= 80} />
             <div className="mt-3 text-xs text-slate-500">
-              All scores must be ≥ 95% to display. Match ≥ 70%.
+              Identity &amp; Match ≥ 80%, Price ≥ 70%, URL &amp; Inventory ≥ 95%. Barcode (UPC/EAN) matches score 100%.
             </div>
           </div>
 

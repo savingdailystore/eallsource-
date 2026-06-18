@@ -46,7 +46,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             bsr: true, bsrPercentage: true,
             demandLevel: true, gatingRisk: true, ipRiskScore: true,
             autoUngated: true, amazonOwnsBuyBox: true, buyBoxOwner: true,
-            matchConfidence: true, availableDiscounts: true, discountSources: true,
+            matchConfidence: true, matchMethod: true, availableDiscounts: true, discountSources: true,
             keepaLink: true, amazonUrl: true, score: true,
             validationPassed: true, identityScore: true, urlScore: true,
             priceScore: true, inventoryScore: true,

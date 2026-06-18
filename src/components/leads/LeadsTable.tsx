@@ -44,6 +44,7 @@ export interface LeadRow {
     amazonOwnsBuyBox?: boolean | null;
     buyBoxOwner?: string | null;
     matchConfidence?: number | null;
+    matchMethod?: string | null;
     availableDiscounts?: any;
     discountSources?: any;
     keepaLink?: string | null;
@@ -268,7 +269,13 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                           <div className="min-w-0">
                             <div className="font-medium text-slate-50 text-sm leading-tight line-clamp-1">{p.title}</div>
                             <div className="text-xs text-slate-500 font-mono mt-0.5">{p.asin}</div>
-                            {p.category && <div className="text-xs text-slate-500">{p.category}</div>}
+                            {(p.matchMethod === 'UPC' || p.matchMethod === 'EAN') ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-green-400 mt-0.5"><ShieldCheck className="w-3 h-3" />Barcode match</span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 mt-0.5" title="Title-based match — verify the product, variant, and quantity before buying">
+                                <ShieldAlert className="w-3 h-3" />Verify match
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>

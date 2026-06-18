@@ -6,6 +6,14 @@ import type { RetailerProduct } from '@/types';
 // https://apify.com/automation-lab/walmart-scraper
 const ACTOR_ID = 'automation-lab/walmart-scraper';
 
+// UPC enrichment: the search actor returns no UPC (it's only on detail pages),
+// so we enrich the top products via a per-URL detail scraper (pay-per-event).
+// Exact UPC matching is far more reliable than fuzzy title matching.
+// https://apify.com/pratikdani/walmart-product-scraper
+const UPC_ACTOR        = 'pratikdani/walmart-product-scraper';
+const UPC_ENRICH_LIMIT = 15;     // cap products enriched per search (bounds time + cost)
+const UPC_CONCURRENCY  = 5;      // parallel detail fetches
+
 interface ApifyWalmartItem {
   name?: string;
   brand?: string;
@@ -15,6 +23,32 @@ interface ApifyWalmartItem {
   url?: string;
   thumbnail?: string;
   seller?: string;
+}
+
+interface PratikItem {
+  upc?: string | number;
+  model?: string | number;
+  product_identifiers?: { upc?: string | number; model?: string | number };
+}
+
+// Best-effort UPC/model enrichment for the top N products, in parallel batches.
+// Failures are swallowed so the product simply falls back to title matching.
+async function enrichUpc(products: RetailerProduct[], limit: number): Promise<void> {
+  const targets = products.slice(0, limit).filter((p) => p.url);
+  for (let i = 0; i < targets.length; i += UPC_CONCURRENCY) {
+    const batch = targets.slice(i, i + UPC_CONCURRENCY);
+    await Promise.all(batch.map(async (p) => {
+      try {
+        const url   = p.url.split('?')[0]; // pratikdani fails on URL query params
+        const items = await runApifyActor<PratikItem>(UPC_ACTOR, { url }, 60_000);
+        const it    = items[0];
+        const upc   = it?.upc   ?? it?.product_identifiers?.upc;
+        const model = it?.model ?? it?.product_identifiers?.model;
+        if (upc)            p.upc   = String(upc);
+        if (model && !p.model) p.model = String(model);
+      } catch { /* best effort — fall back to title matching */ }
+    }));
+  }
 }
 
 export class WalmartRetailer extends BaseRetailer {
@@ -49,6 +83,9 @@ export class WalmartRetailer extends BaseRetailer {
 
       // Prioritise on-sale items — that's where arbitrage margin lives.
       products.sort((a, b) => Number(b.onSale ?? false) - Number(a.onSale ?? false));
+
+      // Enrich the top products with UPC so matching can use exact barcodes.
+      await enrichUpc(products, UPC_ENRICH_LIMIT);
       return products;
     } catch (err) {
       console.error('[walmart] search error:', err);

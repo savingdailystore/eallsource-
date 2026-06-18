@@ -2,7 +2,7 @@
 // reading back their dataset items in one call — used by retailer plugins
 // instead of maintaining our own scraping/proxy/anti-bot stack per site.
 
-export async function runApifyActor<T = unknown>(actorId: string, input: object): Promise<T[]> {
+export async function runApifyActor<T = unknown>(actorId: string, input: object, timeoutMs = 120000): Promise<T[]> {
   const token = process.env.APIFY_TOKEN;
   if (!token) throw new Error('APIFY_TOKEN is not set');
 
@@ -12,7 +12,7 @@ export async function runApifyActor<T = unknown>(actorId: string, input: object)
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
-    signal: AbortSignal.timeout(120000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (!res.ok) {

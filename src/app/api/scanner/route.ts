@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { enqueueScrape } from '@/lib/queue';
+import { runScanJob } from '@/services/run-scan';
 import { getRetailerNames } from '@/retailers';
 import { runDemoScan } from '@/lib/demo-scan';
 import { z } from 'zod';
@@ -61,9 +61,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Real mode: enqueue for the background worker.
-  await enqueueScrape({ retailer, orgId, scanJobId: job.id, query: query ?? '' });
-
   await prisma.auditLog.create({
     data: {
       orgId,
@@ -74,7 +71,14 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ success: true, data: job });
+  // Run synchronously — this deployment has no always-on worker. runScanJob
+  // does scrape → match → price → lead and records the result on the ScanJob.
+  try {
+    const result = await runScanJob({ retailer, query: query ?? '', orgId, scanJobId: job.id });
+    return NextResponse.json({ success: true, data: job, result });
+  } catch (err) {
+    return NextResponse.json({ error: 'Scan failed', message: String(err) }, { status: 502 });
+  }
 }
 
 export async function GET(req: NextRequest) {

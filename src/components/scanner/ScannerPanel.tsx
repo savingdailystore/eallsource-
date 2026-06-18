@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Radar, Loader2, CheckCircle2, XCircle, Clock, Play, FlaskConical } from 'lucide-react';
+import { Radar, Loader2, CheckCircle2, XCircle, Clock, Play } from 'lucide-react';
 
 interface Job {
   id:          string;
@@ -38,36 +38,33 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
     return () => clearInterval(t);
   }, [hasActive, router]);
 
-  async function runScan(demo: boolean) {
+  async function startScan(e: React.FormEvent) {
+    e.preventDefault();
     setLoading(true);
     setResult(null);
 
     const res  = await fetch('/api/scanner', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ retailer, query: query.trim() || undefined, category: category.trim() || undefined, demo }),
+      body:    JSON.stringify({ retailer, query: query.trim() || undefined, category: category.trim() || undefined }),
     });
     const data = await res.json().catch(() => ({}));
     setLoading(false);
 
     if (res.ok) {
+      const r = data.result;
       setResult({
         ok: true,
-        message: demo
-          ? `Demo scan complete — ${data.count ?? 0} sample products added. Check Lead Feed.`
-          : `Scan queued for ${retailer}.`,
+        message: r
+          ? `Scan complete — ${r.created ?? 0} new lead${(r.created ?? 0) === 1 ? '' : 's'} from ${r.found ?? 0} products. Check Lead Feed.`
+          : `Scan complete for ${retailer}.`,
       });
       setQuery('');
       setCategory('');
       router.refresh();
     } else {
-      setResult({ ok: false, message: data.error ?? 'Failed to start scan.' });
+      setResult({ ok: false, message: data.error ?? data.message ?? 'Scan failed.' });
     }
-  }
-
-  function startScan(e: React.FormEvent) {
-    e.preventDefault();
-    runScan(false);
   }
 
   return (
@@ -106,20 +103,18 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
 
           <div className="flex items-center gap-3">
             <button type="submit" disabled={loading || !retailer} className="btn-primary">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Play className="w-4 h-4" />Start scan</>}
-            </button>
-            <button type="button" onClick={() => runScan(true)} disabled={loading || !retailer} className="btn-secondary">
-              <FlaskConical className="w-4 h-4" />Run demo scan
+              {loading ? <><Loader2 className="w-4 h-4 animate-spin" />Scanning…</> : <><Play className="w-4 h-4" />Start scan</>}
             </button>
           </div>
         </form>
 
+        {loading && (
+          <p className="text-xs text-slate-500 mt-3">Scraping and analysing against Amazon — this can take a minute or two. Keep this tab open.</p>
+        )}
         <p className="text-xs text-slate-500 mt-4 leading-relaxed">
-          <span className="font-medium text-slate-400">Start scan</span> runs on a background worker via Apify — a job stays
-          <span className="font-medium text-amber-400"> Pending</span> until the worker, Redis queue, and
-          <span className="font-mono"> APIFY_TOKEN</span> are configured.{' '}
-          <span className="font-medium text-slate-400">Run demo scan</span> generates realistic sample products instantly (no Apify
-          needed) so you can test the flow — results appear in your Lead Feed and Products.
+          Scans run live via Apify and are matched + priced against Amazon. Qualified opportunities appear in your{' '}
+          <span className="font-medium text-slate-400">Lead Feed</span>. For recurring searches, use{' '}
+          <span className="font-medium text-slate-400">Scheduled searches</span> below.
         </p>
       </div>
 

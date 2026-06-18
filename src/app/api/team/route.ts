@@ -21,9 +21,6 @@ export async function POST(req: Request) {
   if (!['OWNER', 'ADMIN'].includes(session.user.role)) {
     return NextResponse.json({ error: 'Only owners and admins can invite users.' }, { status: 403 });
   }
-  if (session.user.plan === 'STARTER') {
-    return NextResponse.json({ error: 'Team members require a Pro or Enterprise plan.' }, { status: 403 });
-  }
 
   const body   = await req.json();
   const parsed = inviteSchema.safeParse(body);

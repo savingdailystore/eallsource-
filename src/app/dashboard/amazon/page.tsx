@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ConnectForm } from '@/components/amazon/ConnectForm';
 import { DisconnectButton } from '@/components/amazon/DisconnectButton';
-import { CheckCircle2, XCircle, Zap, AlertTriangle, ShoppingBag } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, ShoppingBag } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Amazon SP-API' };
@@ -21,24 +21,6 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 export default async function AmazonPage({ searchParams: searchParamsPromise }: Props) {
   const [session, searchParams] = await Promise.all([auth(), searchParamsPromise]);
-  const plan = session!.user.plan;
-
-  if (plan === 'STARTER') {
-    return (
-      <div className="p-6 lg:p-8 max-w-xl">
-        <div className="card p-10 text-center">
-          <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Zap className="w-7 h-7 text-amber-500" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-50 mb-2">Amazon SP-API requires Pro</h2>
-          <p className="text-slate-400 text-sm mb-5">
-            Connect your Amazon Seller Central account to sync inventory, update listings, and automate repricing.
-          </p>
-          <a href="/dashboard/billing" className="btn-primary">Upgrade to Pro →</a>
-        </div>
-      </div>
-    );
-  }
 
   const orgId = session!.user.orgId;
   const cred  = await prisma.amazonCredential.findUnique({

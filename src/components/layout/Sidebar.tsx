@@ -29,7 +29,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const BOTTOM_NAV: NavItem[] = [
-  { label: 'Amazon SP-API', href: '/dashboard/amazon',   icon: Link2,     plan: 'PRO' },
+  { label: 'Amazon SP-API', href: '/dashboard/amazon',   icon: Link2 },
   { label: 'Billing',       href: '/dashboard/billing',  icon: CreditCard, ownerOnly: true },
   { label: 'Settings',      href: '/dashboard/settings', icon: Settings },
 ];

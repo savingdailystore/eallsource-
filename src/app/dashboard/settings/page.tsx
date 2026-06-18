@@ -62,15 +62,8 @@ export default async function SettingsPage() {
           members={users}
           currentUserId={session!.user.id}
           canManage={canManageUsers}
-          canInvite={canManageUsers && session!.user.plan !== 'STARTER'}
+          canInvite={canManageUsers}
         />
-
-        {session!.user.plan === 'STARTER' && (
-          <div className="mt-4 text-xs text-slate-500">
-            Inviting team members requires Pro or Enterprise.{' '}
-            <a href="/dashboard/billing" className="text-blue-600 hover:underline">Upgrade →</a>
-          </div>
-        )}
       </div>
 
       {/* Two-Factor Authentication */}

@@ -16,6 +16,11 @@ export async function POST() {
   if (session.user.role !== 'OWNER') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const orgId = session.user.orgId;
+
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { scanEnabled: true } });
+  if (!org?.scanEnabled) {
+    return NextResponse.json({ error: 'Scan access is not enabled for your account.' }, { status: 403 });
+  }
   const start = Date.now();
 
   const searches = await prisma.savedSearch.findMany({

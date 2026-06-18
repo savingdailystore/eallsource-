@@ -33,6 +33,14 @@ export async function POST(req: NextRequest) {
   const { retailer, query, category, demo } = parsed.data;
   const orgId = session.user.orgId;
 
+  // Check scan access
+  if (!demo) {
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { scanEnabled: true } });
+    if (!org?.scanEnabled) {
+      return NextResponse.json({ error: 'Scan access is not enabled for your account. Contact the platform admin.' }, { status: 403 });
+    }
+  }
+
   // Validate retailer
   if (!getRetailerNames().includes(retailer)) {
     return NextResponse.json({ error: `Unknown retailer: ${retailer}` }, { status: 400 });

@@ -18,10 +18,6 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  if (session.user.plan === 'STARTER') {
-    return NextResponse.json({ error: 'Amazon SP-API requires a PRO or ENTERPRISE plan' }, { status: 403 });
-  }
-
   if (!isEncryptionConfigured()) {
     return NextResponse.json(
       { error: 'Server encryption key (ENCRYPTION_KEY) is not configured. Contact your administrator.' },

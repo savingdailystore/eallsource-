@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   // Least-recently-run first so every search eventually runs even if we run
   // out of time budget on a given tick.
   const searches = await prisma.savedSearch.findMany({
-    where:   { enabled: true },
+    where:   { enabled: true, org: { scanEnabled: true } },
     orderBy: [{ lastRunAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'asc' }],
   });
 

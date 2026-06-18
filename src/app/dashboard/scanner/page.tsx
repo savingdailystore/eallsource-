@@ -23,9 +23,14 @@ export default async function ScannerPage() {
       take: 20,
       select: { id: true, type: true, retailer: true, query: true, status: true, error: true, createdAt: true },
     }),
+    // Degrade gracefully if the saved_searches table isn't present yet
+    // (e.g. migration not applied) rather than crashing the whole page.
     prisma.savedSearch.findMany({
       where: { orgId },
       orderBy: { createdAt: 'asc' },
+    }).catch((err) => {
+      console.error('[scanner] savedSearch query failed:', err?.code ?? err);
+      return [];
     }),
   ]);
 

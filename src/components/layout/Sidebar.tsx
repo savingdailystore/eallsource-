@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOut } from 'next-auth/react';
+import { signOutAction } from '@/lib/actions/auth';
 import {
   LayoutDashboard, TrendingUp, Package, BarChart3,
   RefreshCw, Link2, CreditCard, Settings,
@@ -125,13 +125,15 @@ export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
           </div>
           <span className="text-xs text-slate-400 truncate flex-1">{userEmail}</span>
         </div>
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          Sign out
-        </button>
+        <form action={signOutAction}>
+          <button
+            type="submit"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign out
+          </button>
+        </form>
       </div>
     </aside>
   );

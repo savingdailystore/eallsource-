@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CalendarClock, Plus, Trash2, Loader2 } from 'lucide-react';
+import { CalendarClock, Plus, Trash2, Loader2, Play } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface SavedSearch {
@@ -25,6 +25,8 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
   const [query, setQuery]       = useState('');
   const [adding, setAdding]     = useState(false);
   const [busyId, setBusyId]     = useState<string | null>(null);
+  const [running, setRunning]   = useState(false);
+  const [runMsg, setRunMsg]     = useState<string | null>(null);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -61,6 +63,31 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
     if (res.ok) setSearches((s) => s.filter((x) => x.id !== id));
   }
 
+  async function runNow() {
+    setRunning(true);
+    setRunMsg(null);
+    try {
+      const res  = await fetch('/api/saved-searches/run-now', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setRunMsg(data.error ?? 'Run failed.');
+      } else if (data.ran === 0) {
+        setRunMsg(data.message ?? 'No enabled searches to run.');
+      } else {
+        const parts = [`Ran ${data.ran} search${data.ran === 1 ? '' : 'es'}`];
+        if (data.leadsCreated) parts.push(`${data.leadsCreated} new lead${data.leadsCreated === 1 ? '' : 's'}`);
+        if (data.leadsUpdated) parts.push(`${data.leadsUpdated} updated`);
+        if (data.failures)     parts.push(`${data.failures} failed`);
+        setRunMsg(parts.join(' · '));
+        router.refresh();
+      }
+    } catch {
+      setRunMsg('Run failed.');
+    } finally {
+      setRunning(false);
+    }
+  }
+
   const enabledCount = searches.filter((s) => s.enabled).length;
 
   return (
@@ -70,11 +97,25 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
           <CalendarClock className="w-5 h-5 text-blue-400" />
           <h2 className="font-semibold text-slate-50">Scheduled searches</h2>
         </div>
-        <span className="text-xs text-slate-500">Runs every Monday 9am UTC</span>
+        <button
+          onClick={runNow}
+          disabled={running || enabledCount === 0}
+          className="btn-secondary text-xs py-1.5"
+          title={enabledCount === 0 ? 'Enable at least one search first' : 'Run all enabled searches now'}
+        >
+          {running ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Running…</> : <><Play className="w-3.5 h-3.5" />Run now</>}
+        </button>
       </div>
-      <p className="text-sm text-slate-400 mb-5">
-        These searches run automatically every week. {enabledCount} of {searches.length} active.
+      <p className="text-sm text-slate-400 mb-1">
+        These searches run automatically every Monday 9am UTC. {enabledCount} of {searches.length} active.
       </p>
+      {running && (
+        <p className="text-xs text-slate-500 mb-4">Scraping can take a minute or two per search — keep this tab open.</p>
+      )}
+      {runMsg && !running && (
+        <p className="text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 mb-4">{runMsg}</p>
+      )}
+      <div className="mb-4" />
 
       {/* Add form */}
       <form onSubmit={add} className="flex flex-col sm:flex-row gap-2 mb-5">

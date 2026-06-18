@@ -1,0 +1,52 @@
+import { NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { runScanJob } from '@/services/run-scan';
+
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
+
+const TIME_BUDGET_MS = 270_000;
+
+// Owner-triggered on-demand run of this org's enabled saved searches. Mirrors
+// the weekly cron but is auth-gated (not CRON_SECRET) and scoped to one org.
+export async function POST() {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (session.user.role !== 'OWNER') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const orgId = session.user.orgId;
+  const start = Date.now();
+
+  const searches = await prisma.savedSearch.findMany({
+    where:   { orgId, enabled: true },
+    orderBy: [{ lastRunAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'asc' }],
+  });
+
+  if (searches.length === 0) {
+    return NextResponse.json({ ok: true, ran: 0, message: 'No enabled searches to run.' });
+  }
+
+  const summary = { ran: 0, skippedForTime: 0, leadsCreated: 0, leadsUpdated: 0, failures: 0 };
+
+  for (const search of searches) {
+    if (Date.now() - start > TIME_BUDGET_MS) { summary.skippedForTime++; continue; }
+
+    const job = await prisma.scanJob.create({
+      data: { orgId, type: 'MANUAL_SCHEDULED_RUN', retailer: search.retailer, query: search.query, status: 'PENDING' },
+    });
+
+    try {
+      const result = await runScanJob({ retailer: search.retailer, query: search.query, orgId, scanJobId: job.id });
+      summary.ran++;
+      summary.leadsCreated += result.created;
+      summary.leadsUpdated += result.updated;
+      await prisma.savedSearch.update({ where: { id: search.id }, data: { lastRunAt: new Date(), lastResult: result as object } });
+    } catch (err) {
+      summary.failures++;
+      await prisma.savedSearch.update({ where: { id: search.id }, data: { lastRunAt: new Date(), lastResult: { error: String(err) } } }).catch(() => {});
+    }
+  }
+
+  return NextResponse.json({ ok: true, elapsedMs: Date.now() - start, ...summary });
+}

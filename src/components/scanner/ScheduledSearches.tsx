@@ -74,11 +74,21 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
       } else if (data.ran === 0) {
         setRunMsg(data.message ?? 'No enabled searches to run.');
       } else {
-        const parts = [`Ran ${data.ran} search${data.ran === 1 ? '' : 'es'}`];
+        const parts = [`Scanned ${data.productsFound} product${data.productsFound === 1 ? '' : 's'} across ${data.ran} search${data.ran === 1 ? '' : 'es'}`];
         if (data.leadsCreated) parts.push(`${data.leadsCreated} new lead${data.leadsCreated === 1 ? '' : 's'}`);
         if (data.leadsUpdated) parts.push(`${data.leadsUpdated} updated`);
-        if (data.failures)     parts.push(`${data.failures} failed`);
-        setRunMsg(parts.join(' · '));
+        if (!data.leadsCreated && !data.leadsUpdated) parts.push('0 qualified');
+
+        // Why products were filtered out
+        const f = data.filtered ?? {};
+        const reasons: string[] = [];
+        if (f.noMatch)          reasons.push(`${f.noMatch} no Amazon match`);
+        if (f.notProfitable)    reasons.push(`${f.notProfitable} not profitable`);
+        if (f.demandTooLow)     reasons.push(`${f.demandTooLow} low demand`);
+        if (f.validationFailed) reasons.push(`${f.validationFailed} failed validation`);
+        if (data.failures)      reasons.push(`${data.failures} errored`);
+
+        setRunMsg(parts.join(' · ') + (reasons.length ? ` — filtered: ${reasons.join(', ')}` : ''));
         router.refresh();
       }
     } catch {

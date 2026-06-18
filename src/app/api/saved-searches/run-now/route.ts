@@ -27,7 +27,10 @@ export async function POST() {
     return NextResponse.json({ ok: true, ran: 0, message: 'No enabled searches to run.' });
   }
 
-  const summary = { ran: 0, skippedForTime: 0, leadsCreated: 0, leadsUpdated: 0, failures: 0 };
+  const summary = {
+    ran: 0, skippedForTime: 0, productsFound: 0, leadsCreated: 0, leadsUpdated: 0, failures: 0,
+    filtered: { noMatch: 0, notProfitable: 0, demandTooLow: 0, validationFailed: 0 },
+  };
 
   for (const search of searches) {
     if (Date.now() - start > TIME_BUDGET_MS) { summary.skippedForTime++; continue; }
@@ -39,8 +42,13 @@ export async function POST() {
     try {
       const result = await runScanJob({ retailer: search.retailer, query: search.query, orgId, scanJobId: job.id });
       summary.ran++;
-      summary.leadsCreated += result.created;
-      summary.leadsUpdated += result.updated;
+      summary.productsFound += result.found;
+      summary.leadsCreated  += result.created;
+      summary.leadsUpdated  += result.updated;
+      summary.filtered.noMatch          += result.noMatch;
+      summary.filtered.notProfitable    += result.notProfitable;
+      summary.filtered.demandTooLow     += result.demandTooLow;
+      summary.filtered.validationFailed += result.validationFailed;
       await prisma.savedSearch.update({ where: { id: search.id }, data: { lastRunAt: new Date(), lastResult: result as object } });
     } catch (err) {
       summary.failures++;

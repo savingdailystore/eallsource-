@@ -16,6 +16,11 @@ export interface ScanRunResult {
   skipped: number;
   errors:  number;
   found:   number;
+  // Breakdown of why products were filtered out (sums into `skipped`)
+  noMatch:          number;
+  notProfitable:    number;
+  demandTooLow:     number;
+  validationFailed: number;
 }
 
 export async function runScanJob(args: {
@@ -44,7 +49,10 @@ export async function runScanJob(args: {
     throw new Error(`Unknown retailer: ${retailer}`);
   }
 
-  const result: ScanRunResult = { created: 0, updated: 0, skipped: 0, errors: 0, found: 0 };
+  const result: ScanRunResult = {
+    created: 0, updated: 0, skipped: 0, errors: 0, found: 0,
+    noMatch: 0, notProfitable: 0, demandTooLow: 0, validationFailed: 0,
+  };
 
   try {
     const products = (await plugin.search(query)) as RetailerProduct[];
@@ -52,10 +60,16 @@ export async function runScanJob(args: {
 
     for (const product of products) {
       const outcome = await processRetailerProduct(product, orgId);
-      if      (outcome.outcome === 'lead_created') result.created++;
-      else if (outcome.outcome === 'lead_updated') result.updated++;
-      else if (outcome.outcome === 'error')        result.errors++;
-      else                                          result.skipped++;
+      switch (outcome.outcome) {
+        case 'lead_created':      result.created++; break;
+        case 'lead_updated':      result.updated++; break;
+        case 'error':             result.errors++;  break;
+        case 'no_match':          result.skipped++; result.noMatch++;          break;
+        case 'not_profitable':    result.skipped++; result.notProfitable++;    break;
+        case 'demand_too_low':    result.skipped++; result.demandTooLow++;     break;
+        case 'validation_failed': result.skipped++; result.validationFailed++; break;
+        default:                  result.skipped++; break;
+      }
     }
 
     if (scanJobId) {

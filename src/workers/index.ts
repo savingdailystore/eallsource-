@@ -69,6 +69,7 @@ export function startWorkers(redisUrl: string) {
       sourceInStock: true,
       sourceUrl: product.sourceUrl ?? '',
       matchConfidence: product.matchConfidence ?? 0,
+      matchMethod: product.matchMethod ?? undefined,
     });
 
     await prisma.product.update({

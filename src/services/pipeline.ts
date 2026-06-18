@@ -132,6 +132,7 @@ export async function processRetailerProduct(
       sourceInStock:   product.inStock,
       sourceUrl:       product.url,
       matchConfidence,
+      matchMethod,
     });
 
     if (!validationResult.passed) {
@@ -320,6 +321,7 @@ export async function inspectRetailerProduct(product: RetailerProduct, orgId: st
     sourceInStock:   product.inStock,
     sourceUrl:       product.url,
     matchConfidence: match.matchConfidence,
+    matchMethod:     match.matchMethod,
   });
 
   return {

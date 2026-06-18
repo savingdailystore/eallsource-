@@ -16,6 +16,7 @@ interface ValidationInput {
   sourceInStock: boolean;
   sourceUrl: string;
   matchConfidence: number;
+  matchMethod?: string;   // how the ASIN was matched (UPC/EAN/BRAND_MODEL/TITLE_SIMILARITY)
 }
 
 // Minimum match confidence to accept a title-based ASIN match as a lead.
@@ -31,17 +32,15 @@ export function validateProduct(input: ValidationInput): ValidationResult {
   // ── Identity confidence ───────────────────────────────────────────────────
   // Exact identifiers are fully trusted; otherwise use the matching engine's
   // confidence (title containment) — the same signal used to pick the ASIN.
+  // Identity is driven by HOW the ASIN was matched. A UPC/EAN match means the
+  // ASIN was found *by* the barcode lookup, so it's exact and fully trusted.
+  // We can't compare source.upc to a real Amazon UPC here (the pipeline never
+  // fetches it — amazon.upc is just a copy of source.upc), so identity must key
+  // off matchMethod, NOT identifier equality. Everything else (title /
+  // brand-model) uses the match confidence and the brand-mismatch guard.
   let identityScore = 0;
-  if (input.source.upc && input.amazon.upc && input.source.upc === input.amazon.upc) {
+  if (input.matchMethod === 'UPC' || input.matchMethod === 'EAN') {
     identityScore = 100;
-  } else if (input.source.ean && input.amazon.ean && input.source.ean === input.amazon.ean) {
-    identityScore = 100;
-  } else if (
-    input.source.model && input.amazon.model &&
-    input.source.model.toLowerCase() === input.amazon.model.toLowerCase() &&
-    input.source.brand?.toLowerCase() === input.amazon.brand?.toLowerCase()
-  ) {
-    identityScore = 97;
   } else {
     identityScore = input.matchConfidence;
 

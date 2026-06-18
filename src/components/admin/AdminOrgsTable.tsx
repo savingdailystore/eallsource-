@@ -47,8 +47,14 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
     };
   }
 
-  function setEdit(orgId: string, field: string, value: string) {
-    setEdits((prev) => ({ ...prev, [orgId]: { ...getEdit({ id: orgId } as Org), ...prev[orgId], [field]: value } }));
+  function setEdit(org: Org, field: string, value: string) {
+    setEdits((prev) => {
+      const current = prev[org.id] ?? {
+        plan:        org.plan,
+        trialEndsAt: toInputDate(org.subscription?.trialEndsAt),
+      };
+      return { ...prev, [org.id]: { ...current, [field]: value } };
+    });
   }
 
   async function patch(orgId: string, data: Record<string, boolean | string | null>) {
@@ -179,7 +185,7 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                           <label className="block text-xs text-slate-400 mb-1">Plan</label>
                           <select
                             value={edit.plan}
-                            onChange={(e) => setEdit(org.id, 'plan', e.target.value)}
+                            onChange={(e) => setEdit(org, 'plan', e.target.value)}
                             className="bg-slate-700 border border-slate-600 rounded-md text-sm text-slate-200 px-3 py-1.5 focus:outline-none focus:border-blue-500"
                           >
                             <option value="STARTER">STARTER</option>
@@ -193,7 +199,7 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                           <input
                             type="date"
                             value={edit.trialEndsAt}
-                            onChange={(e) => setEdit(org.id, 'trialEndsAt', e.target.value)}
+                            onChange={(e) => setEdit(org, 'trialEndsAt', e.target.value)}
                             className="bg-slate-700 border border-slate-600 rounded-md text-sm text-slate-200 px-3 py-1.5 focus:outline-none focus:border-blue-500"
                           />
                         </div>

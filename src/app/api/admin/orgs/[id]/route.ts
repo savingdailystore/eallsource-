@@ -27,17 +27,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
+  // Split fields — trialEndsAt belongs to Subscription, not Organization
+  const { trialEndsAt, ...orgFields } = parsed.data;
+
   const org = await prisma.organization.update({
     where:  { id },
-    data:   parsed.data,
+    data:   orgFields,
     select: { id: true, name: true, scanEnabled: true, receiveBroadcast: true, plan: true },
   });
 
   // Keep subscription in sync for plan + trial date changes
   const subUpdate: Record<string, unknown> = {};
-  if (parsed.data.plan) subUpdate.plan = parsed.data.plan;
-  if (parsed.data.trialEndsAt !== undefined) {
-    subUpdate.trialEndsAt = parsed.data.trialEndsAt ? new Date(parsed.data.trialEndsAt) : null;
+  if (orgFields.plan) subUpdate.plan = orgFields.plan;
+  if (trialEndsAt !== undefined) {
+    subUpdate.trialEndsAt = trialEndsAt ? new Date(trialEndsAt) : null;
   }
   if (Object.keys(subUpdate).length > 0) {
     await prisma.subscription.updateMany({ where: { orgId: id }, data: subUpdate }).catch(() => {});

@@ -108,6 +108,14 @@ export function ConnectForm() {
 
       <div className="border-t border-slate-800" />
 
+      <a
+        href="/dashboard/amazon/guide"
+        className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2.5"
+      >
+        <span className="text-base">📖</span>
+        <span>Don't have SP-API access yet? Follow our step-by-step setup guide →</span>
+      </a>
+
       {/* Form fields */}
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Seller ID */}

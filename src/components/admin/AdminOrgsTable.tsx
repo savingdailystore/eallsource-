@@ -46,7 +46,7 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
             <tr key={org.id} className="hover:bg-slate-800/40">
               <td className="table-td font-medium text-slate-100">
                 <div className="flex items-center gap-1.5">
-                  {org.isBroadcastSource && <Radio className="w-3 h-3 text-blue-400 flex-shrink-0" title="Broadcast source" />}
+                  {org.isBroadcastSource && <Radio className="w-3 h-3 text-blue-400 flex-shrink-0" aria-label="Broadcast source" />}
                   {org.name}
                 </div>
                 <div className="text-xs text-slate-500">{org.slug}</div>

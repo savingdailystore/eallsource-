@@ -131,19 +131,24 @@ export async function searchCatalogByKeywords(orgId: string, keywords: string, m
       includedData:   'identifiers,summaries',
     }) as { items?: Array<{ asin: string; summaries?: Array<{ itemName?: string }> }> };
 
-    const item = data.items?.[0];
-    if (!item) return null;
+    const items = data.items ?? [];
+    if (items.length === 0) return null;
 
-    // Estimate confidence by computing title similarity
-    const amazonTitle = item.summaries?.[0]?.itemName ?? '';
-    const confidence  = estimateTitleConfidence(keywords, amazonTitle);
-    if (confidence < 70) return null;
+    // Score the top candidates and keep the best — Amazon's keyword ranking
+    // is good but the #1 result isn't always the closest title match.
+    let best: { asin: string; confidence: number } | null = null;
+    for (const it of items.slice(0, 5)) {
+      const name = it.summaries?.[0]?.itemName ?? '';
+      const c    = estimateTitleConfidence(keywords, name);
+      if (!best || c > best.confidence) best = { asin: it.asin, confidence: c };
+    }
+    if (!best || best.confidence < 55) return null;
 
     return {
-      asin:            item.asin,
-      amazonUrl:       `https://www.amazon.com/dp/${item.asin}`,
+      asin:            best.asin,
+      amazonUrl:       `https://www.amazon.com/dp/${best.asin}`,
       matchMethod:     'TITLE_SIMILARITY',
-      matchConfidence: confidence,
+      matchConfidence: best.confidence,
     };
   } catch (err) {
     console.error('[amazon] searchCatalogByKeywords error:', err);
@@ -235,12 +240,26 @@ export async function getFeeEstimate(orgId: string, asin: string, price: number,
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+// Containment-based title confidence: what fraction of the *shorter* title's
+// significant words appear in the other. More robust than Jaccard for matching
+// a retailer title to an Amazon title (they differ in length/phrasing), while a
+// minimum-shared-words floor guards against trivial/generic matches.
+const TITLE_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'an', 'of', 'to', 'in', 'by', 'or', 'from',
+  'your', 'that', 'this', 'new', 'set',
+]);
+
 function estimateTitleConfidence(sourceTitle: string, amazonTitle: string): number {
   if (!amazonTitle) return 0;
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(Boolean);
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 1 && !TITLE_STOPWORDS.has(w));
   const a = new Set(norm(sourceTitle));
   const b = new Set(norm(amazonTitle));
+  if (a.size === 0 || b.size === 0) return 0;
+
   const intersection = [...a].filter((w) => b.has(w)).length;
-  const union = new Set([...a, ...b]).size;
-  return union > 0 ? Math.round((intersection / union) * 100) : 0;
+  if (intersection < 3) return 0; // require at least 3 shared significant words
+
+  const containment = intersection / Math.min(a.size, b.size);
+  return Math.round(containment * 100);
 }

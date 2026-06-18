@@ -18,20 +18,16 @@ interface ValidationInput {
   matchConfidence: number;
 }
 
-function titleSimilarity(a: string, b: string): number {
-  const normalize = (s: string) =>
-    s.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/);
-  const wordsA = new Set(normalize(a));
-  const wordsB = new Set(normalize(b));
-  const intersection = [...wordsA].filter((w) => wordsB.has(w)).length;
-  const union = new Set([...wordsA, ...wordsB]).size;
-  return union > 0 ? (intersection / union) * 100 : 0;
-}
+// Minimum match confidence to accept a title-based ASIN match as a lead.
+// Exact identifier (UPC/EAN/model) matches score far higher and always pass.
+const IDENTITY_MIN = 65;
 
 export function validateProduct(input: ValidationInput): ValidationResult {
   const reasons: string[] = [];
 
   // ── Identity confidence ───────────────────────────────────────────────────
+  // Exact identifiers are fully trusted; otherwise use the matching engine's
+  // confidence (title containment) — the same signal used to pick the ASIN.
   let identityScore = 0;
   if (input.source.upc && input.amazon.upc && input.source.upc === input.amazon.upc) {
     identityScore = 100;
@@ -44,30 +40,30 @@ export function validateProduct(input: ValidationInput): ValidationResult {
   ) {
     identityScore = 97;
   } else {
-    const similarity = titleSimilarity(input.source.title, input.amazon.title);
-    identityScore = Math.min(95, similarity);
-    if (similarity < 95) {
-      reasons.push(`Title similarity only ${similarity.toFixed(1)}% (need ≥ 95%)`);
-    }
+    identityScore = input.matchConfidence;
   }
-
-  // Match confidence from the matching engine
-  if (input.matchConfidence < 70) {
-    identityScore = Math.min(identityScore, input.matchConfidence);
-    reasons.push(`Low match confidence: ${input.matchConfidence}%`);
+  if (identityScore < IDENTITY_MIN) {
+    reasons.push(`Match confidence ${identityScore}% (need ≥ ${IDENTITY_MIN}%)`);
   }
 
   // ── URL confidence (stub — would check HTTP 200 in real impl) ─────────────
   const urlScore = input.sourceUrl.startsWith('https://') ? 98 : 50;
   if (urlScore < 95) reasons.push('Source URL does not use HTTPS');
 
-  // ── Price confidence ──────────────────────────────────────────────────────
-  const priceVariance = input.amazonPrice > 0
-    ? Math.abs(input.sourcePrice - input.amazonPrice) / input.amazonPrice * 100
-    : 100;
-  const priceScore = priceVariance <= 2 ? 100 : Math.max(0, 100 - priceVariance * 5);
-  if (priceVariance > 2) {
-    reasons.push(`Price variance ${priceVariance.toFixed(1)}% exceeds 2% threshold`);
+  // ── Price sanity (wrong-match guard, NOT a same-price requirement) ────────
+  // Arbitrage REQUIRES Amazon price > source price, so a price gap is expected
+  // and must not be penalised. We only flag ratios extreme enough to suggest a
+  // mismatched product (e.g. a $30 item matched to a $500 listing).
+  let priceScore = 100;
+  if (input.amazonPrice <= 0) {
+    priceScore = 0;
+    reasons.push('No Amazon price available');
+  } else if (input.sourcePrice > 0) {
+    const ratio = input.amazonPrice / input.sourcePrice;
+    if (ratio < 0.5 || ratio > 8) {
+      priceScore = 50;
+      reasons.push(`Amazon/source price ratio ${ratio.toFixed(1)}x looks implausible — possible wrong match`);
+    }
   }
 
   // ── Inventory confidence ──────────────────────────────────────────────────
@@ -76,13 +72,13 @@ export function validateProduct(input: ValidationInput): ValidationResult {
 
   // ── Final gate ────────────────────────────────────────────────────────────
   const passed =
-    identityScore >= 95 &&
-    urlScore      >= 95 &&
-    priceScore    >= 95 &&
+    identityScore  >= IDENTITY_MIN &&
+    urlScore       >= 95 &&
+    priceScore     >= 70 &&
     inventoryScore >= 95;
 
   if (!passed && reasons.length === 0) {
-    reasons.push('One or more confidence scores below 95%');
+    reasons.push('One or more confidence checks failed');
   }
 
   return { identityScore, urlScore, priceScore, inventoryScore, passed, reasons };

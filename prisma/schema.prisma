@@ -373,6 +373,7 @@ model SavedSearch {
   retailer String
   query    String
   enabled  Boolean @default(true)
+  position Int     @default(0)
 
   lastRunAt   DateTime?
   lastResult  Json?

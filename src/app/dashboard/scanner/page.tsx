@@ -37,7 +37,7 @@ export default async function ScannerPage() {
     // (e.g. migration not applied) rather than crashing the whole page.
     prisma.savedSearch.findMany({
       where: { orgId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
     }).catch((err) => {
       console.error('[scanner] savedSearch query failed:', err?.code ?? err);
       return [];

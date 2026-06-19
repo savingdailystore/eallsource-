@@ -18,7 +18,7 @@ export async function GET() {
 
   const searches = await prisma.savedSearch.findMany({
     where:   { orgId: session.user.orgId },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
   });
 
   return NextResponse.json({ searches, retailers: getRetailerNames() });

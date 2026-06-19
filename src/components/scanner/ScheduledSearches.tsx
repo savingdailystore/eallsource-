@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CalendarClock, Plus, Trash2, Loader2, Play } from 'lucide-react';
+import { CalendarClock, Plus, Trash2, Loader2, Play, ArrowUp, ArrowDown, Square, CheckSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface SavedSearch {
@@ -27,6 +27,49 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
   const [busyId, setBusyId]     = useState<string | null>(null);
   const [running, setRunning]   = useState(false);
   const [runMsg, setRunMsg]     = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelected((prev) => (prev.size === searches.length ? new Set() : new Set(searches.map((s) => s.id))));
+  }
+
+  async function bulkDelete() {
+    if (selected.size === 0) return;
+    const ids = [...selected];
+    setBulkBusy(true);
+    const res = await fetch('/api/saved-searches/bulk-delete', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ids }),
+    });
+    setBulkBusy(false);
+    if (res.ok) {
+      setSearches((s) => s.filter((x) => !selected.has(x.id)));
+      setSelected(new Set());
+    }
+  }
+
+  async function move(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= searches.length) return;
+    const next = [...searches];
+    [next[index], next[target]] = [next[target], next[index]];
+    setSearches(next); // optimistic
+    await fetch('/api/saved-searches/reorder', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ids: next.map((s) => s.id) }),
+    });
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -154,6 +197,31 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
         </button>
       </form>
 
+      {/* Bulk action bar */}
+      {searches.length > 0 && (
+        <div className="flex items-center justify-between mb-2">
+          <button
+            onClick={toggleSelectAll}
+            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            {selected.size === searches.length && searches.length > 0
+              ? <CheckSquare className="w-4 h-4 text-blue-400" />
+              : <Square className="w-4 h-4" />}
+            {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
+          </button>
+          {selected.size > 0 && (
+            <button
+              onClick={bulkDelete}
+              disabled={bulkBusy}
+              className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors"
+            >
+              {bulkBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+              Delete selected
+            </button>
+          )}
+        </div>
+      )}
+
       {/* List */}
       {searches.length === 0 ? (
         <div className="text-center py-8 text-sm text-slate-500">
@@ -161,8 +229,37 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
         </div>
       ) : (
         <div className="space-y-2">
-          {searches.map((s) => (
+          {searches.map((s, index) => (
             <div key={s.id} className="flex items-center gap-3 bg-slate-800/50 border border-slate-800 rounded-xl px-4 py-3">
+              {/* Select checkbox */}
+              <button
+                onClick={() => toggleSelect(s.id)}
+                className="text-slate-500 hover:text-blue-400 transition-colors flex-shrink-0"
+                aria-label={selected.has(s.id) ? 'Deselect' : 'Select'}
+              >
+                {selected.has(s.id) ? <CheckSquare className="w-4 h-4 text-blue-400" /> : <Square className="w-4 h-4" />}
+              </button>
+
+              {/* Reorder arrows */}
+              <div className="flex flex-col flex-shrink-0">
+                <button
+                  onClick={() => move(index, -1)}
+                  disabled={index === 0}
+                  className="text-slate-500 hover:text-slate-200 disabled:opacity-25 disabled:hover:text-slate-500 transition-colors"
+                  aria-label="Move up"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => move(index, 1)}
+                  disabled={index === searches.length - 1}
+                  className="text-slate-500 hover:text-slate-200 disabled:opacity-25 disabled:hover:text-slate-500 transition-colors"
+                  aria-label="Move down"
+                >
+                  <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
               {/* Toggle */}
               <button
                 onClick={() => toggle(s.id, !s.enabled)}

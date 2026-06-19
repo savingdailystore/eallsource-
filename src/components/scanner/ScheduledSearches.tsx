@@ -124,7 +124,7 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
         </button>
       </div>
       <p className="text-sm text-slate-400 mb-1">
-        These searches run automatically every Monday 9am UTC. {enabledCount} of {searches.length} active.
+        These searches run automatically on a rolling schedule — each runs about once a week. {enabledCount} of {searches.length} active.
       </p>
       {running && (
         <p className="text-xs text-slate-500 mb-4">Scraping can take a minute or two per search — keep this tab open.</p>

@@ -23,10 +23,10 @@ export async function GET(req: NextRequest) {
 
   const start = Date.now();
 
-  // Cron fires daily but each search should only run about once a week. Pick up
-  // searches never run, or not run in the last 6 days, least-recently-run first.
-  // This spreads the weekly workload across days so each tick stays in budget
-  // while keeping Apify spend at roughly one run per search per week.
+  // Cron fires every few hours but each search should only run about once a week.
+  // Pick up searches never run, or not run in the last 6 days, least-recently-run
+  // first. Frequent ticks each drain 1-2 stale searches, so many searches all get
+  // covered weekly while the 6-day filter keeps Apify spend at ~1 run/search/week.
   const staleBefore = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
   const searches = await prisma.savedSearch.findMany({
     where: {

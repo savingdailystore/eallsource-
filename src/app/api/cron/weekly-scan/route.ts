@@ -6,10 +6,10 @@ import { broadcastLeads } from '@/services/broadcast';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // Vercel Pro: up to 300s per invocation
 
-// Stop launching new searches after this much wall-clock time so an in-flight
-// scrape can finish before the function is killed. Remaining searches run on
-// the next cron tick (we order by lastRunAt so they get priority).
-const TIME_BUDGET_MS = 270_000;
+// Stop launching new searches with headroom for the in-flight search + broadcast
+// to finish within the 300s function limit. Remaining searches run on the next
+// cron tick (ordered by lastRunAt so they get priority and every search is covered).
+const TIME_BUDGET_MS = 150_000;
 
 export async function GET(req: NextRequest) {
   // ── Auth: Vercel Cron sends "Authorization: Bearer <CRON_SECRET>" ──────────
@@ -23,10 +23,17 @@ export async function GET(req: NextRequest) {
 
   const start = Date.now();
 
-  // Least-recently-run first so every search eventually runs even if we run
-  // out of time budget on a given tick.
+  // Cron fires daily but each search should only run about once a week. Pick up
+  // searches never run, or not run in the last 6 days, least-recently-run first.
+  // This spreads the weekly workload across days so each tick stays in budget
+  // while keeping Apify spend at roughly one run per search per week.
+  const staleBefore = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
   const searches = await prisma.savedSearch.findMany({
-    where:   { enabled: true, org: { scanEnabled: true } },
+    where: {
+      enabled: true,
+      org: { scanEnabled: true },
+      OR: [{ lastRunAt: null }, { lastRunAt: { lt: staleBefore } }],
+    },
     orderBy: [{ lastRunAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'asc' }],
   });
 

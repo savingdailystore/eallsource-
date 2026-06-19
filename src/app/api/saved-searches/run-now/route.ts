@@ -7,7 +7,9 @@ import { broadcastLeads } from '@/services/broadcast';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const TIME_BUDGET_MS = 270_000;
+// Stop launching new searches with enough headroom for the in-flight search to
+// finish AND the broadcast step to run, all within the 300s function limit.
+const TIME_BUDGET_MS = 150_000;
 
 // Owner-triggered on-demand run of this org's enabled saved searches. Mirrors
 // the weekly cron but is auth-gated (not CRON_SECRET) and scoped to one org.

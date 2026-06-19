@@ -11,8 +11,13 @@ const ACTOR_ID = 'automation-lab/walmart-scraper';
 // Exact UPC matching is far more reliable than fuzzy title matching.
 // https://apify.com/pratikdani/walmart-product-scraper
 const UPC_ACTOR        = 'pratikdani/walmart-product-scraper';
-const UPC_ENRICH_LIMIT = 15;     // cap products enriched per search (bounds time + cost)
+const UPC_ENRICH_LIMIT = 12;     // cap products enriched per search (bounds time + cost)
 const UPC_CONCURRENCY  = 5;      // parallel detail fetches
+const UPC_TIMEOUT_MS   = 25_000; // per-detail-fetch cap so one stuck call can't blow the budget
+
+// Hard cap on products handed to the pipeline per search. Each product costs
+// several Amazon SP-API calls, so this bounds total run time on serverless.
+const MAX_PRODUCTS = 18;
 
 interface ApifyWalmartItem {
   name?: string;
@@ -40,7 +45,7 @@ async function enrichUpc(products: RetailerProduct[], limit: number): Promise<vo
     await Promise.all(batch.map(async (p) => {
       try {
         const url   = p.url.split('?')[0]; // pratikdani fails on URL query params
-        const items = await runApifyActor<PratikItem>(UPC_ACTOR, { url }, 60_000);
+        const items = await runApifyActor<PratikItem>(UPC_ACTOR, { url }, UPC_TIMEOUT_MS);
         const it    = items[0];
         const upc   = it?.upc   ?? it?.product_identifiers?.upc;
         const model = it?.model ?? it?.product_identifiers?.model;
@@ -84,9 +89,13 @@ export class WalmartRetailer extends BaseRetailer {
       // Prioritise on-sale items — that's where arbitrage margin lives.
       products.sort((a, b) => Number(b.onSale ?? false) - Number(a.onSale ?? false));
 
-      // Enrich the top products with UPC so matching can use exact barcodes.
-      await enrichUpc(products, UPC_ENRICH_LIMIT);
-      return products;
+      // Cap to the best candidates so the downstream Amazon pipeline (several
+      // SP-API calls per product) stays within the serverless time limit.
+      const top = products.slice(0, MAX_PRODUCTS);
+
+      // Enrich with UPC so matching can use exact barcodes.
+      await enrichUpc(top, UPC_ENRICH_LIMIT);
+      return top;
     } catch (err) {
       console.error('[walmart] search error:', err);
       return [];

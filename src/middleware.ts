@@ -5,8 +5,17 @@ const PUBLIC_PATHS = ['/login', '/register', '/api/auth'];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const isAuthed = !!req.auth;
+
+  // API routes must never be redirected. They guard themselves (returning
+  // 401 JSON when needed) and are called via fetch(), which silently follows
+  // a 307 and returns HTML — that broke the login mfa-check, surfacing as a
+  // bogus "Invalid email or password." Let every /api request through.
+  if (pathname.startsWith('/api')) {
+    return NextResponse.next();
+  }
+
+  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   if (isPublic && isAuthed) {
     return NextResponse.redirect(new URL('/dashboard', req.nextUrl));

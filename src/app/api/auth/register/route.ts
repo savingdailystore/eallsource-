@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { generateOrgSlug } from '@/lib/utils';
 import { validatePassword } from '@/lib/password';
+import { backfillOrgFromSource } from '@/services/broadcast';
 import { z } from 'zod';
 
 const schema = z.object({
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 14);
 
-    await prisma.$transaction(async (tx) => {
+    const newOrgId = await prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
         data: { name: orgName, slug, plan: 'STARTER' },
       });
@@ -67,7 +68,17 @@ export async function POST(req: NextRequest) {
           metadata: { email },
         },
       });
+
+      return org.id;
     });
+
+    // Seed the new org with the current broadcast lead set so the feed isn't
+    // empty on first login. Best-effort — never block registration on this.
+    try {
+      await backfillOrgFromSource(newOrgId);
+    } catch (err) {
+      console.error('[register] backfill failed:', err);
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

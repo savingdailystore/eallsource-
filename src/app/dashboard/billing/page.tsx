@@ -34,6 +34,9 @@ export default async function BillingPage() {
     where: { orgId },
   });
 
+  // Self-serve Stripe checkout only when billing is actually wired up.
+  const stripeEnabled = !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_PRO_PRICE_ID;
+
   return (
     <div className="p-6 lg:p-8 max-w-4xl space-y-6">
       <div className="page-header">
@@ -116,7 +119,7 @@ export default async function BillingPage() {
                 <div className="btn-secondary w-full justify-center text-slate-500 cursor-default">
                   ✓ Current plan
                 </div>
-              ) : (
+              ) : stripeEnabled ? (
                 <form action="/api/billing/checkout" method="POST">
                   <input type="hidden" name="plan" value={plan.key} />
                   <button
@@ -126,6 +129,13 @@ export default async function BillingPage() {
                     {currentPlan === 'STARTER' ? 'Upgrade' : plan.key === 'STARTER' ? 'Downgrade' : 'Switch'} to {plan.name}
                   </button>
                 </form>
+              ) : (
+                <a
+                  href="mailto:savingdailystore@gmail.com?subject=EALLsource plan change"
+                  className={`w-full justify-center flex items-center ${plan.key === 'PRO' ? 'btn-primary' : 'btn-secondary'}`}
+                >
+                  Contact us to {currentPlan === 'STARTER' ? 'upgrade' : 'change plan'}
+                </a>
               )}
             </div>
           );

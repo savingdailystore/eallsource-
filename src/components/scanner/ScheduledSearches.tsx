@@ -74,6 +74,9 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
       } else if (data.ran === 0) {
         setRunMsg(data.message ?? 'No enabled searches to run.');
       } else {
+        const ran     = (data.ranSearches ?? []) as string[];
+        const skipped = (data.skippedSearches ?? []) as string[];
+
         const parts = [`Scanned ${data.productsFound} product${data.productsFound === 1 ? '' : 's'} across ${data.ran} search${data.ran === 1 ? '' : 'es'}`];
         if (data.leadsCreated) parts.push(`${data.leadsCreated} new lead${data.leadsCreated === 1 ? '' : 's'}`);
         if (data.leadsUpdated) parts.push(`${data.leadsUpdated} updated`);
@@ -88,7 +91,11 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
         if (f.validationFailed) reasons.push(`${f.validationFailed} failed validation`);
         if (data.failures)      reasons.push(`${data.failures} errored`);
 
-        setRunMsg(parts.join(' · ') + (reasons.length ? ` — filtered: ${reasons.join(', ')}` : ''));
+        const lines = [parts.join(' · ') + (reasons.length ? ` — filtered: ${reasons.join(', ')}` : '')];
+        if (ran.length)     lines.push(`Ran: ${ran.join(', ')}`);
+        if (skipped.length) lines.push(`Not run this time (click Run now again): ${skipped.join(', ')}`);
+
+        setRunMsg(lines.join('\n'));
         router.refresh();
       }
     } catch {
@@ -123,7 +130,7 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
         <p className="text-xs text-slate-500 mb-4">Scraping can take a minute or two per search — keep this tab open.</p>
       )}
       {runMsg && !running && (
-        <p className="text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 mb-4">{runMsg}</p>
+        <p className="text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2 mb-4 whitespace-pre-line">{runMsg}</p>
       )}
       <div className="mb-4" />
 

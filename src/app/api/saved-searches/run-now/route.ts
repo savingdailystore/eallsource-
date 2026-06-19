@@ -41,13 +41,19 @@ export async function POST() {
   const summary = {
     ran: 0, skippedForTime: 0, productsFound: 0, leadsCreated: 0, leadsUpdated: 0,
     failures: 0, broadcast: 0,
+    ranSearches:     [] as string[],
+    skippedSearches: [] as string[],
     filtered: { noMatch: 0, notProfitable: 0, demandTooLow: 0, validationFailed: 0 },
   };
 
   const allLeadIds: string[] = [];
 
   for (const search of searches) {
-    if (Date.now() - start > TIME_BUDGET_MS) { summary.skippedForTime++; continue; }
+    if (Date.now() - start > TIME_BUDGET_MS) {
+      summary.skippedForTime++;
+      summary.skippedSearches.push(search.query);
+      continue;
+    }
 
     const job = await prisma.scanJob.create({
       data: { orgId, type: 'MANUAL_SCHEDULED_RUN', retailer: search.retailer, query: search.query, status: 'PENDING' },
@@ -56,6 +62,7 @@ export async function POST() {
     try {
       const result = await runScanJob({ retailer: search.retailer, query: search.query, orgId, scanJobId: job.id });
       summary.ran++;
+      summary.ranSearches.push(search.query);
       summary.productsFound += result.found;
       summary.leadsCreated  += result.created;
       summary.leadsUpdated  += result.updated;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CalendarClock, Plus, Trash2, Loader2, Play, ArrowUp, ArrowDown, Square, CheckSquare } from 'lucide-react';
+import { CalendarClock, Plus, Trash2, Loader2, Play, GripVertical, Square, CheckSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface SavedSearch {
@@ -29,6 +29,7 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
   const [runMsg, setRunMsg]     = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -58,17 +59,30 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
     }
   }
 
-  async function move(index: number, dir: -1 | 1) {
-    const target = index + dir;
-    if (target < 0 || target >= searches.length) return;
-    const next = [...searches];
-    [next[index], next[target]] = [next[target], next[index]];
-    setSearches(next); // optimistic
+  async function persistOrder(list: SavedSearch[]) {
     await fetch('/api/saved-searches/reorder', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ids: next.map((s) => s.id) }),
+      body:    JSON.stringify({ ids: list.map((s) => s.id) }),
     });
+  }
+
+  function onDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault(); // allow drop
+    if (dragIndex === null || dragIndex === index) return;
+    // Live reorder: move the dragged row to the hovered position.
+    setSearches((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(index, 0, moved);
+      return next;
+    });
+    setDragIndex(index);
+  }
+
+  function onDragEnd() {
+    if (dragIndex !== null) persistOrder(searches);
+    setDragIndex(null);
   }
 
   async function add(e: React.FormEvent) {
@@ -230,7 +244,19 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
       ) : (
         <div className="space-y-2">
           {searches.map((s, index) => (
-            <div key={s.id} className="flex items-center gap-3 bg-slate-800/50 border border-slate-800 rounded-xl px-4 py-3">
+            <div
+              key={s.id}
+              draggable
+              onDragStart={() => setDragIndex(index)}
+              onDragOver={(e) => onDragOver(e, index)}
+              onDragEnd={onDragEnd}
+              className={`flex items-center gap-3 bg-slate-800/50 border rounded-xl px-4 py-3 transition-colors ${dragIndex === index ? 'border-blue-500 opacity-60' : 'border-slate-800'}`}
+            >
+              {/* Drag handle */}
+              <span className="text-slate-600 cursor-grab active:cursor-grabbing flex-shrink-0" aria-label="Drag to reorder">
+                <GripVertical className="w-4 h-4" />
+              </span>
+
               {/* Select checkbox */}
               <button
                 onClick={() => toggleSelect(s.id)}
@@ -239,26 +265,6 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
               >
                 {selected.has(s.id) ? <CheckSquare className="w-4 h-4 text-blue-400" /> : <Square className="w-4 h-4" />}
               </button>
-
-              {/* Reorder arrows */}
-              <div className="flex flex-col flex-shrink-0">
-                <button
-                  onClick={() => move(index, -1)}
-                  disabled={index === 0}
-                  className="text-slate-500 hover:text-slate-200 disabled:opacity-25 disabled:hover:text-slate-500 transition-colors"
-                  aria-label="Move up"
-                >
-                  <ArrowUp className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => move(index, 1)}
-                  disabled={index === searches.length - 1}
-                  className="text-slate-500 hover:text-slate-200 disabled:opacity-25 disabled:hover:text-slate-500 transition-colors"
-                  aria-label="Move down"
-                >
-                  <ArrowDown className="w-3.5 h-3.5" />
-                </button>
-              </div>
 
               {/* Toggle */}
               <button

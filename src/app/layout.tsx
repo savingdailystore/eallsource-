@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: { default: 'Arbitrage Pro AI', template: '%s · Arbitrage Pro AI' },
+  title: { default: 'EALLsource', template: '%s · EALLsource' },
   description: 'Amazon FBA arbitrage sourcing platform',
 };
 

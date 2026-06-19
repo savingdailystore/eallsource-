@@ -49,10 +49,22 @@ interface SidebarProps {
 
 function BrandIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <rect x="2"  y="18" width="7" height="12" rx="2" fill="#3b82f6" fillOpacity="0.45" />
-      <rect x="12" y="10" width="7" height="20" rx="2" fill="#3b82f6" fillOpacity="0.75" />
-      <rect x="22" y="2"  width="7" height="28" rx="2" fill="#3b82f6" />
+    <svg width="34" height="34" viewBox="0 0 42 42" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="eall-g" x1="8" y1="8" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#93c5fd" />
+          <stop offset="1" stopColor="#1d4ed8" />
+        </linearGradient>
+      </defs>
+      <rect width="42" height="42" rx="10" fill="#070d1a" />
+      {/* Vertical bar */}
+      <rect x="9"  y="9"    width="6"  height="24" rx="2" fill="url(#eall-g)" />
+      {/* Top horizontal */}
+      <rect x="9"  y="9"    width="22" height="6"  rx="2" fill="url(#eall-g)" />
+      {/* Middle horizontal */}
+      <rect x="9"  y="18"   width="16" height="5"  rx="2" fill="url(#eall-g)" />
+      {/* Bottom horizontal */}
+      <rect x="9"  y="27"   width="22" height="6"  rx="2" fill="url(#eall-g)" />
     </svg>
   );
 }
@@ -94,10 +106,18 @@ export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
       <div className="flex items-center gap-2.5 px-4 py-5" style={{ borderBottom: '1px solid #1e293b' }}>
         <BrandIcon />
         <div className="min-w-0">
-          <div className="font-semibold text-sm leading-tight truncate text-white">
-            Arbitrage Pro <span className="text-blue-500">AI</span>
+          <div className="font-black text-[16px] leading-none tracking-tight text-white truncate">
+            EALL
           </div>
-          <div className="text-[10px] text-slate-500 truncate">{orgName}</div>
+          <div className="flex items-center gap-1 mt-[3px]">
+            <span className="text-[8px] font-bold tracking-[0.22em] text-blue-400 uppercase leading-none">
+              SOURCE
+            </span>
+            <svg width="16" height="5" viewBox="0 0 16 5" fill="none" aria-hidden="true">
+              <path d="M0.5 2.5 Q7 5 14 2.5" stroke="#3b82f6" strokeWidth="1" strokeLinecap="round"/>
+              <path d="M12.5 1 L14.5 2.5 L12.5 4" stroke="#3b82f6" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
         </div>
         <span className={cn('ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0', PLAN_COLORS[plan])}>
           {plan}

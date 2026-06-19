@@ -16,6 +16,15 @@ export default async function ScannerPage() {
 
   const orgId = session!.user.orgId;
 
+  // Auto-heal orphaned jobs: a serverless function that times out dies before
+  // marking its job DONE/FAILED, leaving it stuck "RUNNING" forever. Anything
+  // still PENDING/RUNNING past the 300s function limit (+buffer) is dead.
+  const staleJobCutoff = new Date(Date.now() - 6 * 60 * 1000);
+  await prisma.scanJob.updateMany({
+    where: { orgId, status: { in: ['PENDING', 'RUNNING'] }, createdAt: { lt: staleJobCutoff } },
+    data:  { status: 'FAILED', error: 'Scan exceeded the time limit and was stopped.', completedAt: new Date() },
+  }).catch(() => {});
+
   const [org, jobs, savedSearches] = await Promise.all([
     prisma.organization.findUnique({ where: { id: orgId }, select: { scanEnabled: true } }),
     prisma.scanJob.findMany({

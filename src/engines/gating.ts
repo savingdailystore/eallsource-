@@ -106,3 +106,52 @@ export function assessGating(input: GatingInput): GatingResult {
 export function isCategoryAutoUngated(category: string): boolean {
   return AUTO_UNGATED_CATEGORIES.has(category);
 }
+
+// ─── Ungating outlook ────────────────────────────────────────────────────────
+// A human-readable read on how easy a product is to actually sell, combining
+// category openness + brand IP risk. This is more useful than the raw
+// `autoUngated` flag, which reads "No" whenever the category is unknown/"Other"
+// even for generic items that are almost certainly open.
+
+export type UngatingKey = 'OPEN' | 'LIKELY_OPEN' | 'EASY' | 'APPROVAL' | 'RESTRICTED';
+
+export interface UngatingOutlook {
+  key:   UngatingKey;
+  label: string;
+  tone:  'good' | 'ok' | 'warn' | 'bad';
+  hint:  string;
+}
+
+export function ungatingOutlook(p: {
+  ipRiskScore?:       string | null;
+  autoUngated?:       boolean | null;
+  isBrandRestricted?: boolean | null;
+  isCategoryGated?:   boolean | null;
+  hasHazmat?:         boolean | null;
+}): UngatingOutlook {
+  if (p.hasHazmat) {
+    return { key: 'RESTRICTED', label: 'Hazmat', tone: 'bad',
+      hint: 'Hazmat items need special approval and FBA handling.' };
+  }
+  if (p.isBrandRestricted || p.ipRiskScore === 'HIGH') {
+    return { key: 'RESTRICTED', label: 'Restricted brand', tone: 'bad',
+      hint: 'High-IP brand — usually brand-gated and hard to ungate.' };
+  }
+  if (p.isCategoryGated) {
+    return { key: 'APPROVAL', label: 'Approval needed', tone: 'warn',
+      hint: 'Gated category — requires Amazon approval before you can sell.' };
+  }
+  if (p.ipRiskScore === 'MEDIUM') {
+    return { key: 'EASY', label: 'Usually easy', tone: 'ok',
+      hint: 'Mid-tier brand — typically ungated quickly with a wholesale invoice.' };
+  }
+  if (p.autoUngated) {
+    return { key: 'OPEN', label: 'Open — no approval', tone: 'good',
+      hint: 'Open category and low IP risk — sellable with no approval on most accounts.' };
+  }
+  // autoUngated is false but IP risk is low and it's not a gated category — the
+  // category just couldn't be confirmed (often comes through as "Other").
+  // Generic items here are almost always open; flag to verify, not to avoid.
+  return { key: 'LIKELY_OPEN', label: 'Likely open', tone: 'good',
+    hint: 'Low IP risk and not a gated category. Category unconfirmed — quick to verify, but generic items like this are usually open.' };
+}

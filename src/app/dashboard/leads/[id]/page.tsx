@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import type { Discount } from '@/types';
 import { ProfitabilityCalculator } from '@/components/leads/ProfitabilityCalculator';
+import { ungatingOutlook } from '@/engines/gating';
 
 export const dynamic = 'force-dynamic';
 
@@ -232,6 +233,23 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 : <ShieldX className="w-4 h-4 text-red-400" />}
               Risk Assessment
             </h2>
+
+            {/* Ungating outlook — combined read of category + brand IP risk */}
+            {(() => {
+              const o = ungatingOutlook(p);
+              const tone = o.tone === 'good' ? 'bg-green-500/10 border-green-500/30 text-green-300'
+                         : o.tone === 'ok'   ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                         : o.tone === 'warn' ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                         :                     'bg-red-500/10 border-red-500/30 text-red-300';
+              return (
+                <div className={`rounded-xl border px-3 py-2.5 mb-3 ${tone}`}>
+                  <div className="text-xs font-semibold uppercase tracking-wider opacity-70">Ungating outlook</div>
+                  <div className="text-sm font-bold mt-0.5">{o.label}</div>
+                  <div className="text-xs opacity-90 mt-1 leading-relaxed">{o.hint}</div>
+                </div>
+              );
+            })()}
+
             <div className="space-y-2">
               {[
                 ['IP Risk',      p.ipRiskScore ?? 'LOW', p.ipRiskScore === 'LOW'],

@@ -7,7 +7,7 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Lead Feed' };
 
-interface SearchParams { page?: string; status?: string; minRoi?: string; sortBy?: string; }
+interface SearchParams { page?: string; status?: string; minRoi?: string; sortBy?: string; gating?: string; }
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const session = await auth();
@@ -19,12 +19,23 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const status   = sp.status;
   const minRoi   = sp.minRoi ? Number(sp.minRoi) : undefined;
   const sortBy   = sp.sortBy ?? 'score';
+  const gating   = sp.gating; // 'sellable' = hide restricted + approval-needed
+
+  // Build the product filter in one place so multiple conditions compose
+  // (previously a second `product:` key silently clobbered the minRoi filter).
+  const productWhere: any = { validationPassed: true };
+  if (minRoi != null) productWhere.roi = { gte: minRoi };
+  if (gating === 'sellable') {
+    productWhere.isBrandRestricted = false;
+    productWhere.isCategoryGated   = false;
+    productWhere.hasHazmat         = false;
+    productWhere.ipRiskScore       = { not: 'HIGH' };
+  }
 
   const where = {
     orgId,
     ...(status ? { status: status as any } : { status: { notIn: ['REJECTED', 'EXPIRED'] as any[] } }),
-    ...(minRoi != null ? { product: { roi: { gte: minRoi } } } : {}),
-    product: { validationPassed: true },
+    product: productWhere,
   };
 
   const [leads, total] = await Promise.all([
@@ -46,7 +57,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             profit: true, roi: true, margin: true,
             bsr: true, bsrPercentage: true,
             demandLevel: true, gatingRisk: true, ipRiskScore: true,
-            autoUngated: true, amazonOwnsBuyBox: true, buyBoxOwner: true,
+            autoUngated: true, isBrandRestricted: true, isCategoryGated: true, hasHazmat: true,
+            amazonOwnsBuyBox: true, buyBoxOwner: true,
             matchConfidence: true, matchMethod: true, availableDiscounts: true, discountSources: true,
             keepaLink: true, amazonUrl: true, score: true,
             validationPassed: true, identityScore: true, urlScore: true,
@@ -75,6 +87,24 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             <Download className="w-3.5 h-3.5" />Excel
           </Link>
         </div>
+      </div>
+
+      {/* Ungating filter */}
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xs text-slate-500">Show:</span>
+        <Link
+          href="/dashboard/leads"
+          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${gating !== 'sellable' ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+        >
+          All leads
+        </Link>
+        <Link
+          href="/dashboard/leads?gating=sellable"
+          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${gating === 'sellable' ? 'bg-green-600 border-green-600 text-white' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+        >
+          Sellable only
+        </Link>
+        <span className="text-xs text-slate-500 hidden sm:inline">— hides restricted brands, gated categories &amp; hazmat</span>
       </div>
 
       <LeadsTable

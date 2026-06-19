@@ -10,6 +10,7 @@ import {
 import { formatCurrency, formatPercent, cn } from '@/lib/utils';
 import { discountUrl } from '@/lib/discount-urls';
 import { scoreLabel } from '@/engines/scoring';
+import { ungatingOutlook } from '@/engines/gating';
 import type { Discount, Plan } from '@/types';
 
 export interface LeadRow {
@@ -43,6 +44,9 @@ export interface LeadRow {
     gatingRisk: string;
     ipRiskScore?: string | null;
     autoUngated?: boolean | null;
+    isBrandRestricted?: boolean | null;
+    isCategoryGated?: boolean | null;
+    hasHazmat?: boolean | null;
     amazonOwnsBuyBox?: boolean | null;
     buyBoxOwner?: string | null;
     matchConfidence?: number | null;
@@ -69,6 +73,15 @@ function IpBadge({ score }: { score?: string | null }) {
 function DemandBadge({ level }: { level: string }) {
   const cls = level === 'HIGH' ? 'bg-green-500/15 text-green-400' : level === 'MEDIUM' ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400';
   return <span className={`badge text-xs ${cls}`}>{level}</span>;
+}
+
+function UngatingBadge({ product }: { product: LeadRow['product'] }) {
+  const o = ungatingOutlook(product);
+  const cls = o.tone === 'good' ? 'bg-green-500/15 text-green-400'
+            : o.tone === 'ok'   ? 'bg-blue-500/15 text-blue-400'
+            : o.tone === 'warn' ? 'bg-amber-500/15 text-amber-400'
+            :                     'bg-red-500/15 text-red-400';
+  return <span className={`badge text-xs ${cls}`} title={o.hint}>{o.label}</span>;
 }
 
 function ScorePill({ score }: { score: number }) {
@@ -109,7 +122,7 @@ function ExpandedPanel({ lead }: { lead: LeadRow }) {
 
   return (
     <tr className="bg-slate-800/40">
-      <td colSpan={11} className="px-4 py-4">
+      <td colSpan={12} className="px-4 py-4">
         <div className="grid md:grid-cols-3 gap-4">
           {/* Profitability */}
           <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
@@ -248,7 +261,7 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
           <table className="w-full text-sm" style={{ minWidth: '960px' }}>
             <thead>
               <tr className="border-b border-slate-800 bg-slate-800/40">
-                {['Product', 'Retailer', 'Cost', 'Resell', 'Amazon Fees', 'Profit', 'ROI', 'Demand', 'IP Risk', 'Score', ''].map((h) => (
+                {['Product', 'Retailer', 'Cost', 'Resell', 'Amazon Fees', 'Profit', 'ROI', 'Demand', 'IP Risk', 'Ungating', 'Score', ''].map((h) => (
                   <th key={h} className="table-th">{h}</th>
                 ))}
               </tr>
@@ -333,6 +346,9 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
 
                       {/* IP Risk */}
                       <td className="table-td"><IpBadge score={p.ipRiskScore} /></td>
+
+                      {/* Ungating outlook */}
+                      <td className="table-td"><UngatingBadge product={p} /></td>
 
                       {/* Score */}
                       <td className="table-td"><ScorePill score={lead.score} /></td>

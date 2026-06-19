@@ -31,7 +31,7 @@ export default async function ScannerPage() {
       where: { orgId },
       orderBy: { createdAt: 'desc' },
       take: 20,
-      select: { id: true, type: true, retailer: true, query: true, status: true, error: true, createdAt: true },
+      select: { id: true, type: true, retailer: true, query: true, status: true, error: true, createdAt: true, result: true },
     }),
     // Degrade gracefully if the saved_searches table isn't present yet
     // (e.g. migration not applied) rather than crashing the whole page.
@@ -70,7 +70,7 @@ export default async function ScannerPage() {
         </div>
       ) : (
         <>
-          <ScannerPanel retailers={getRetailerNames()} jobs={jobs} />
+          <ScannerPanel retailers={getRetailerNames()} jobs={jobs as any} />
           <ScheduledSearches
             initialSearches={savedSearches.map((s) => ({
               ...s,

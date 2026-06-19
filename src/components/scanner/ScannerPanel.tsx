@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Radar, Loader2, CheckCircle2, XCircle, Clock, Play } from 'lucide-react';
 
+interface ScanResult {
+  found?:   number;
+  created?: number;
+  updated?: number;
+}
+
 interface Job {
   id:          string;
   type:        string;
@@ -12,6 +18,7 @@ interface Job {
   status:      string;
   error:       string | null;
   createdAt:   Date | string;
+  result:      ScanResult | null;
 }
 
 const STATUS_STYLE: Record<string, { cls: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -132,14 +139,17 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-800/40">
-                  {['Retailer', 'Query', 'Status', 'Started'].map((h) => (
+                  {['Retailer', 'Query', 'Status', 'Products', 'Leads', 'Started'].map((h) => (
                     <th key={h} className="table-th">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {jobs.map((job) => {
-                  const s = STATUS_STYLE[job.status] ?? STATUS_STYLE.PENDING;
+                  const s        = STATUS_STYLE[job.status] ?? STATUS_STYLE.PENDING;
+                  const found    = job.result?.found;
+                  const leads    = (job.result?.created ?? 0) + (job.result?.updated ?? 0);
+                  const hasStats = job.status === 'DONE' && job.result != null;
                   return (
                     <tr key={job.id} className="hover:bg-slate-800/40">
                       <td className="table-td font-medium text-slate-100">{job.retailer ?? '—'}</td>
@@ -152,6 +162,12 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                         {job.status === 'FAILED' && job.error && (
                           <div className="text-[10px] text-red-400 mt-1 max-w-xs truncate" title={job.error}>{job.error}</div>
                         )}
+                      </td>
+                      <td className="table-td text-slate-300 text-xs">{hasStats && found != null ? found : '—'}</td>
+                      <td className="table-td text-xs">
+                        {hasStats
+                          ? <span className={leads > 0 ? 'font-semibold text-green-400' : 'text-slate-500'}>{leads}</span>
+                          : <span className="text-slate-500">—</span>}
                       </td>
                       <td className="table-td text-slate-400 text-xs">{new Date(job.createdAt).toLocaleString()}</td>
                     </tr>

@@ -106,9 +106,18 @@ export function ManualLeadEntry({ retailers }: Props) {
           </div>
           <div className="sm:w-40">
             <label className="label" htmlFor="retailer">Retailer</label>
-            <select id="retailer" value={retailer} onChange={(e) => setRetailer(e.target.value)} className="input">
-              {retailers.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <input
+              id="retailer"
+              list="retailer-options"
+              required
+              value={retailer}
+              onChange={(e) => setRetailer(e.target.value)}
+              placeholder="e.g. Chewy"
+              className="input"
+            />
+            <datalist id="retailer-options">
+              {retailers.map((r) => <option key={r} value={r} />)}
+            </datalist>
           </div>
           <div className="sm:w-36">
             <label className="label" htmlFor="sourcePrice">Source price</label>

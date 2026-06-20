@@ -3,7 +3,6 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { processRetailerProduct } from '@/services/pipeline';
 import { broadcastLeads } from '@/services/broadcast';
-import { getRetailerNames } from '@/retailers';
 import type { RetailerProduct } from '@/types';
 import { z } from 'zod';
 
@@ -13,7 +12,7 @@ export const maxDuration = 120;
 const schema = z.object({
   amazonUrl:   z.string().url(),
   retailerUrl: z.string().url(),
-  retailer:    z.string().min(1),
+  retailer:    z.string().min(1).max(40),
   sourcePrice: z.number().positive(),
   title:       z.string().max(300).optional(),
   upc:         z.string().max(20).optional(),
@@ -52,17 +51,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Couldn't find an ASIN in that Amazon link. Use the full product URL (it contains /dp/...)." }, { status: 400 });
   }
 
-  if (!getRetailerNames().includes(retailer)) {
-    return NextResponse.json({ error: `Unknown retailer: ${retailer}` }, { status: 400 });
-  }
-
+  // Any retailer name is allowed for manual entry — it's just the source label
+  // (Chewy, CVS, GameStop, …). We don't scrape it; the Amazon side auto-fills.
   const orgId = session.user.orgId;
 
   const product: RetailerProduct = {
     title:    title?.trim() ?? '',
     price:    sourcePrice,
     url:      retailerUrl,
-    retailer,
+    retailer: retailer.trim(),
     inStock:  true,
     upc:      upc?.trim() || undefined,
   };

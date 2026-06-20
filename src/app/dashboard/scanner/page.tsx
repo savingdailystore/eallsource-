@@ -71,8 +71,8 @@ export default async function ScannerPage() {
         </div>
       ) : (
         <>
-          <ScannerPanel retailers={getRetailerNames()} jobs={jobs as any} />
           <ManualLeadEntry retailers={getRetailerNames()} />
+          <ScannerPanel retailers={getRetailerNames()} jobs={jobs as any} />
           <ScheduledSearches
             initialSearches={savedSearches.map((s) => ({
               ...s,

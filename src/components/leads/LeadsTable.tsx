@@ -2,10 +2,11 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ChevronDown, ChevronUp, ExternalLink, TrendingUp,
   ShieldCheck, ShieldAlert, ShieldX, Bookmark, BookmarkCheck,
-  Package, Check, X, Minus, ChevronLeft, ChevronRight,
+  Package, Check, X, Minus, ChevronLeft, ChevronRight, Trash2, Loader2,
 } from 'lucide-react';
 import { formatCurrency, formatPercent, cn } from '@/lib/utils';
 import { discountUrl } from '@/lib/discount-urls';
@@ -113,12 +114,17 @@ function ProductImage({ asin, imageUrl, title }: { asin: string; imageUrl?: stri
   );
 }
 
-function ExpandedPanel({ lead }: { lead: LeadRow }) {
+function ExpandedPanel({ lead, isOwner, onDelete }: {
+  lead: LeadRow;
+  isOwner: boolean;
+  onDelete: (productId: string) => Promise<boolean>;
+}) {
   const p = lead.product;
   const discounts = (p.availableDiscounts as Discount[] | null) ?? [];
   const resell    = p.lowestFbaPrice ?? 0;
   const amazonUrl = p.amazonUrl ?? `https://www.amazon.com/dp/${p.asin}`;
   const keepaUrl  = p.keepaLink ?? `https://keepa.com/#!product/1-${p.asin}`;
+  const [deleting, setDeleting] = useState(false);
 
   return (
     <tr className="bg-slate-800/40">
@@ -224,6 +230,20 @@ function ExpandedPanel({ lead }: { lead: LeadRow }) {
               <Link href={`/dashboard/leads/${lead.id}`} className="btn-primary text-xs py-1.5">
                 View Detail →
               </Link>
+              {isOwner && (
+                <button
+                  onClick={async () => {
+                    if (!confirm('Remove this product from the lead feed? This deletes the product and its lead and cannot be undone. It will disappear for all users.')) return;
+                    setDeleting(true);
+                    const ok = await onDelete(p.id);
+                    if (!ok) setDeleting(false);
+                  }}
+                  disabled={deleting}
+                  className="btn-secondary text-xs py-1.5 text-red-400 hover:text-red-300 ml-auto"
+                >
+                  {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}Delete
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -238,11 +258,19 @@ interface LeadsTableProps {
   page: number;
   pageSize: number;
   orgPlan: Plan;
+  isOwner?: boolean;
 }
 
-export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTableProps) {
+export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = false }: LeadsTableProps) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
   const totalPages = Math.ceil(total / pageSize);
+
+  async function deleteProduct(productId: string): Promise<boolean> {
+    const res = await fetch(`/api/products/${productId}`, { method: 'DELETE' });
+    if (res.ok) router.refresh();
+    return res.ok;
+  }
 
   if (!leads.length) {
     return (
@@ -364,7 +392,7 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan }: LeadsTable
                       </td>
                     </tr>
 
-                    {isExpanded && <ExpandedPanel lead={lead} />}
+                    {isExpanded && <ExpandedPanel lead={lead} isOwner={isOwner} onDelete={deleteProduct} />}
                   </React.Fragment>
                 );
               })}

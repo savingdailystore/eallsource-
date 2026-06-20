@@ -113,6 +113,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         page={page}
         pageSize={pageSize}
         orgPlan={session!.user.plan}
+        isOwner={session!.user.role === 'OWNER'}
       />
     </div>
   );

@@ -49,7 +49,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         </Link>
       </div>
 
-      <ProductsTable products={products as any} total={total} page={page} pageSize={pageSize} />
+      <ProductsTable products={products as any} total={total} page={page} pageSize={pageSize} isOwner={session!.user.role === 'OWNER'} />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, ExternalLink, Package, ChevronLeft, ChevronRight, ShieldCheck, ShieldAlert, ShieldX, ArrowUpRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ChevronDown, ChevronUp, ExternalLink, Package, ChevronLeft, ChevronRight, ShieldCheck, ShieldAlert, ShieldX, ArrowUpRight, Trash2, Loader2 } from 'lucide-react';
 import { formatCurrency, formatPercent, cn, buildAmazonUrl } from '@/lib/utils';
 import { scoreLabel } from '@/engines/scoring';
 import type { Discount } from '@/types';
@@ -25,11 +26,21 @@ function IpBadge({ score }: { score?: string | null }) {
   return <span className="flex items-center gap-1 text-xs text-green-400"><ShieldCheck className="w-3 h-3" />Low</span>;
 }
 
-interface Props { products: ProductRow[]; total: number; page: number; pageSize: number; }
+interface Props { products: ProductRow[]; total: number; page: number; pageSize: number; isOwner?: boolean; }
 
-export function ProductsTable({ products, total, page, pageSize }: Props) {
+export function ProductsTable({ products, total, page, pageSize, isOwner = false }: Props) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const totalPages = Math.ceil(total / pageSize);
+
+  async function deleteProduct(productId: string) {
+    if (!confirm('Remove this product from the feed? This deletes the product and its lead and cannot be undone. It will disappear for all users.')) return;
+    setDeletingId(productId);
+    const res = await fetch(`/api/products/${productId}`, { method: 'DELETE' });
+    if (res.ok) router.refresh();
+    else setDeletingId(null);
+  }
 
   if (!products.length) {
     return (
@@ -105,6 +116,16 @@ export function ProductsTable({ products, total, page, pageSize }: Props) {
                           <button onClick={() => setExpanded(isExp ? null : p.id)} className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-all">
                             {isExp ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           </button>
+                          {isOwner && (
+                            <button
+                              onClick={() => deleteProduct(p.id)}
+                              disabled={deletingId === p.id}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                              title="Delete from feed"
+                            >
+                              {deletingId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

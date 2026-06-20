@@ -171,7 +171,7 @@ export async function getProductData(orgId: string, asin: string, marketplaceId 
     const [catalogData, offersData] = await Promise.allSettled([
       spApi(orgId, `/catalog/2022-04-01/items/${asin}`, {
         marketplaceIds: marketplaceId,
-        includedData:   'summaries,salesRanks,attributes',
+        includedData:   'summaries,salesRanks,attributes,images',
       }),
       spApi(orgId, `/products/pricing/v0/items/${asin}/offers`, {
         MarketplaceId: marketplaceId,
@@ -184,6 +184,13 @@ export async function getProductData(orgId: string, asin: string, marketplaceId 
 
     const summary   = catalog?.summaries?.[0];
     const salesRank = catalog?.salesRanks?.[0]?.ranks?.[0];
+
+    // Images live in their own block (not summaries). Prefer the MAIN variant,
+    // then the largest available, so manual entries (no retailer thumbnail) and
+    // scans both get a real product photo.
+    const imageList = (catalog?.images?.[0]?.images ?? []) as Array<{ variant?: string; link?: string; height?: number }>;
+    const mainImage = imageList.find((i) => i.variant === 'MAIN')
+      ?? [...imageList].sort((a, b) => (b.height ?? 0) - (a.height ?? 0))[0];
 
     const sum = offers?.payload?.Summary;
     const buyBox =
@@ -203,7 +210,7 @@ export async function getProductData(orgId: string, asin: string, marketplaceId 
       title:          summary?.itemName,
       brand:          summary?.brand,
       category:       summary?.productType,
-      imageUrl:       summary?.mainImage?.link,
+      imageUrl:       mainImage?.link,
       bsr:            salesRank?.rank,
       buyBoxPrice,
       lowestFbaPrice,

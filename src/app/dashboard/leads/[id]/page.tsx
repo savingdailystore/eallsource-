@@ -12,6 +12,7 @@ import Link from 'next/link';
 import type { Discount } from '@/types';
 import { ProfitabilityCalculator } from '@/components/leads/ProfitabilityCalculator';
 import { LeadNotes } from '@/components/leads/LeadNotes';
+import { ProductHero } from '@/components/leads/ProductHero';
 import { ungatingOutlook } from '@/engines/gating';
 
 export const dynamic = 'force-dynamic';
@@ -63,13 +64,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
-        {p.imageUrl ? (
-          <img src={p.imageUrl} alt={p.title} className="w-20 h-20 object-contain rounded-xl border border-slate-800 bg-slate-900 flex-shrink-0" />
-        ) : (
-          <div className="w-20 h-20 rounded-xl border border-slate-800 bg-slate-800/40 flex items-center justify-center flex-shrink-0">
-            <Package className="w-8 h-8 text-slate-600" />
-          </div>
-        )}
+        <ProductHero asin={p.asin} imageUrl={p.imageUrl} title={p.title} />
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-slate-50 leading-snug">{p.title}</h1>
           <div className="flex flex-wrap items-center gap-3 mt-1">

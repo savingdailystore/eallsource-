@@ -41,6 +41,8 @@ export interface ProcessOptions {
   // When true, compute everything but never reject — always create the lead.
   // Used for manual owner entry where the product was deliberately chosen.
   force?: boolean;
+  // Free-text sourcing notes to attach to the product (manual entry).
+  notes?: string;
 }
 
 export async function processRetailerProduct(
@@ -236,6 +238,7 @@ export async function processRetailerProduct(
       demandLevel:      demandResult.level,
       priceStability:   priceStability,
       keepaLink,
+      notes:            opts.notes?.trim() || null,
       score,
     };
 

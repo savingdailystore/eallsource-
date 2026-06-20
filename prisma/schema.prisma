@@ -227,6 +227,10 @@ model Product {
   // External links
   keepaLink String?
 
+  // Free-text sourcing notes (promo codes, cart-quantity tricks, per-unit math).
+  // Shared with all orgs — broadcast along with the rest of the product data.
+  notes String?
+
   // Final lead score (0–100)
   score Float @default(0)
 

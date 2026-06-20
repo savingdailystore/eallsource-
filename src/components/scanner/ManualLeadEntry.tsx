@@ -20,6 +20,7 @@ export function ManualLeadEntry({ retailers }: Props) {
   const [retailer,    setRetailer]    = useState(retailers[0] ?? '');
   const [sourcePrice, setSourcePrice] = useState('');
   const [title,       setTitle]       = useState('');
+  const [notes,       setNotes]       = useState('');
   const [showMore,    setShowMore]    = useState(false);
   const [busy,        setBusy]        = useState(false);
   const [result,      setResult]      = useState<Result | null>(null);
@@ -46,6 +47,7 @@ export function ManualLeadEntry({ retailers }: Props) {
           retailer,
           sourcePrice: price,
           title:       title.trim() || undefined,
+          notes:       notes.trim() || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -54,7 +56,7 @@ export function ManualLeadEntry({ retailers }: Props) {
         setResult({ kind: 'error', message: typeof data.error === 'string' ? data.error : 'Could not add the lead.' });
       } else {
         setResult({ kind: 'success', leadId: data.leadId, outcome: data.outcome, broadcast: data.broadcast ?? 0 });
-        setAmazonUrl(''); setRetailerUrl(''); setSourcePrice(''); setTitle('');
+        setAmazonUrl(''); setRetailerUrl(''); setSourcePrice(''); setTitle(''); setNotes('');
         router.refresh();
       }
     } catch {
@@ -130,19 +132,32 @@ export function ManualLeadEntry({ retailers }: Props) {
           className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors"
         >
           <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMore ? 'rotate-180' : ''}`} />
-          Optional: custom title
+          Optional: title &amp; notes
         </button>
         {showMore && (
-          <div>
-            <label className="label" htmlFor="title">Title (leave blank to use the Amazon title)</label>
-            <input
-              id="title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Auto-filled from Amazon if blank"
-              className="input"
-            />
+          <div className="space-y-3">
+            <div>
+              <label className="label" htmlFor="title">Title (leave blank to use the Amazon title)</label>
+              <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Auto-filled from Amazon if blank"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="notes">Sourcing notes (shared with all users)</label>
+              <textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+                placeholder="e.g. Add 5 to cart · promo code NEWADOPTION20 → $10.00/unit"
+                className="input resize-y"
+              />
+            </div>
           </div>
         )}
 

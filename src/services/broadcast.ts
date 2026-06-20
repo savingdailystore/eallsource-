@@ -75,6 +75,7 @@ async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct): Promis
     demandLevel:       p.demandLevel,
     priceStability:    p.priceStability,
     keepaLink:         p.keepaLink,
+    notes:             p.notes,
     score:             p.score,
   };
 

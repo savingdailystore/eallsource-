@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import type { Discount } from '@/types';
 import { ProfitabilityCalculator } from '@/components/leads/ProfitabilityCalculator';
+import { LeadNotes } from '@/components/leads/LeadNotes';
 import { ungatingOutlook } from '@/engines/gating';
 
 export const dynamic = 'force-dynamic';
@@ -179,6 +180,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               resellPrice={p.lowestFbaPrice ?? p.price}
             />
           </div>
+
+          {/* Sourcing notes */}
+          <LeadNotes
+            productId={p.id}
+            initialNotes={p.notes}
+            canEdit={session!.user.role === 'OWNER'}
+          />
 
           {/* Amazon Data */}
           <div className="card p-5">

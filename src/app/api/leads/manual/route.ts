@@ -17,6 +17,7 @@ const schema = z.object({
   sourcePrice: z.number().positive(),
   title:       z.string().max(300).optional(),
   upc:         z.string().max(20).optional(),
+  notes:       z.string().max(1000).optional(),
 });
 
 // Pull a 10-char ASIN out of an Amazon URL: /dp/XXXX, /gp/product/XXXX, ?asin=, etc.
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 
-  const { amazonUrl, retailerUrl, retailer, sourcePrice, title, upc } = parsed.data;
+  const { amazonUrl, retailerUrl, retailer, sourcePrice, title, upc, notes } = parsed.data;
 
   const asin = extractAsin(amazonUrl);
   if (!asin) {
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
     upc:      upc?.trim() || undefined,
   };
 
-  const result = await processRetailerProduct(product, orgId, { knownAsin: asin, force: true });
+  const result = await processRetailerProduct(product, orgId, { knownAsin: asin, force: true, notes });
 
   if (result.outcome === 'no_match' || result.outcome === 'no_amazon_data') {
     return NextResponse.json({

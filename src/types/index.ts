@@ -64,7 +64,7 @@ export interface RetailerPlugin {
 
 // ─── Amazon matching ────────────────────────────────────────────────────────
 
-export type MatchMethod = 'UPC' | 'EAN' | 'BRAND_MODEL' | 'TITLE_SIMILARITY';
+export type MatchMethod = 'UPC' | 'EAN' | 'BRAND_MODEL' | 'TITLE_SIMILARITY' | 'MANUAL';
 
 export interface AmazonMatch {
   asin: string;

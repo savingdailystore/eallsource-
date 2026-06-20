@@ -17,6 +17,7 @@ const METHOD_CONFIDENCE: Record<MatchMethod, number> = {
   EAN:              99,
   BRAND_MODEL:      85,
   TITLE_SIMILARITY: 70,
+  MANUAL:           100,
 };
 
 export async function findAmazonMatch(input: MatchInput): Promise<AmazonMatch | null> {

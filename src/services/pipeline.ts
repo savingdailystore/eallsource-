@@ -33,13 +33,25 @@ export type PipelineResult =
   | { outcome: 'demand_too_low';    bsr: number }
   | { outcome: 'error';             message: string };
 
+export interface ProcessOptions {
+  // When the ASIN is already known (e.g. manual entry from an Amazon link),
+  // skip auto-matching and use it directly.
+  knownAsin?: string;
+  // When true, compute everything but never reject — always create the lead.
+  // Used for manual owner entry where the product was deliberately chosen.
+  force?: boolean;
+}
+
 export async function processRetailerProduct(
   product: RetailerProduct,
   orgId: string,
+  opts: ProcessOptions = {},
 ): Promise<PipelineResult> {
   try {
-    // ── 1. Find Amazon ASIN ───────────────────────────────────────────────────
-    const match = await findMatch(product, orgId);
+    // ── 1. Find Amazon ASIN (or use the one provided) ─────────────────────────
+    const match: AmazonMatch | null = opts.knownAsin
+      ? { asin: opts.knownAsin, amazonUrl: `https://www.amazon.com/dp/${opts.knownAsin}`, matchMethod: 'MANUAL', matchConfidence: 100 }
+      : await findMatch(product, orgId);
     if (!match) return { outcome: 'no_match' };
 
     const { asin, amazonUrl, matchMethod, matchConfidence } = match;
@@ -73,7 +85,7 @@ export async function processRetailerProduct(
 
     // ── 3. Demand gate (BSR must be top 3%) ───────────────────────────────────
     const demandResult = assessDemand({ bsr: bsr ?? 999999, category, fbaSellers, totalSellers });
-    if (demandResult.level === 'LOW' && bsr != null) {
+    if (!opts.force && demandResult.level === 'LOW' && bsr != null) {
       return { outcome: 'demand_too_low', bsr };
     }
 
@@ -107,7 +119,7 @@ export async function processRetailerProduct(
       fbaFee,
     });
 
-    if (!profitResult.qualifies) {
+    if (!opts.force && !profitResult.qualifies) {
       return { outcome: 'not_profitable', roi: profitResult.roi, profit: profitResult.profit };
     }
 
@@ -135,7 +147,7 @@ export async function processRetailerProduct(
       matchMethod,
     });
 
-    if (!validationResult.passed) {
+    if (!opts.force && !validationResult.passed) {
       return { outcome: 'validation_failed', reasons: validationResult.reasons };
     }
 
@@ -159,7 +171,7 @@ export async function processRetailerProduct(
       ean:              product.ean,
       model:            product.model,
       brand:            product.brand ?? amazonBrand,
-      title:            product.title,
+      title:            product.title?.trim() || amazonTitle,
       category,
       imageUrl,
 

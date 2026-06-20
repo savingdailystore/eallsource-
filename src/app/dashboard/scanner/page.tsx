@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getRetailerNames } from '@/retailers';
 import { ScannerPanel } from '@/components/scanner/ScannerPanel';
 import { ScheduledSearches } from '@/components/scanner/ScheduledSearches';
+import { ManualLeadEntry } from '@/components/scanner/ManualLeadEntry';
 import { Clock } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,7 @@ export default async function ScannerPage() {
       ) : (
         <>
           <ScannerPanel retailers={getRetailerNames()} jobs={jobs as any} />
+          <ManualLeadEntry retailers={getRetailerNames()} />
           <ScheduledSearches
             initialSearches={savedSearches.map((s) => ({
               ...s,

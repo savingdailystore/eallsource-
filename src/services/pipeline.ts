@@ -28,6 +28,7 @@ export type PipelineResult =
   | { outcome: 'lead_created';      leadId: string; score: number }
   | { outcome: 'lead_updated';      leadId: string; score: number }
   | { outcome: 'no_match' }
+  | { outcome: 'no_amazon_data' }
   | { outcome: 'validation_failed'; reasons: string[] }
   | { outcome: 'not_profitable';    roi: number; profit: number }
   | { outcome: 'demand_too_low';    bsr: number }
@@ -79,6 +80,14 @@ export async function processRetailerProduct(
     const amazonIsSeller = sp?.amazonIsSeller ?? keepa?.amazonIsSeller ?? false;
     const priceStability = keepa?.priceStability ?? 'UNKNOWN';
     const keepaLink      = keepa?.keepaLink;
+
+    // Manual entries must come back with real Amazon data. Without a resell price
+    // the economics are fiction and the lead would be a shell (blank title, fake
+    // ROI), so reject rather than persist garbage. Scans aren't affected — they
+    // reach here only after a successful match and tolerate sparse data.
+    if (opts.knownAsin && buyBoxPrice == null && lowestFbaPrice == null) {
+      return { outcome: 'no_amazon_data' };
+    }
 
     const resellPrice = lowestFbaPrice ?? buyBoxPrice ?? product.price;
     const category    = amazonCategory ?? product.category ?? 'Other';

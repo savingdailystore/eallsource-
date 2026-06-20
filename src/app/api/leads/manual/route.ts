@@ -68,8 +68,10 @@ export async function POST(req: NextRequest) {
 
   const result = await processRetailerProduct(product, orgId, { knownAsin: asin, force: true });
 
-  if (result.outcome === 'no_match') {
-    return NextResponse.json({ error: `No Amazon data found for ASIN ${asin}. Double-check the Amazon link.` }, { status: 422 });
+  if (result.outcome === 'no_match' || result.outcome === 'no_amazon_data') {
+    return NextResponse.json({
+      error: `Couldn't pull Amazon market data for ASIN ${asin} (no buy box / FBA price). Double-check the Amazon link, or try again in a moment.`,
+    }, { status: 422 });
   }
   if (result.outcome === 'error') {
     return NextResponse.json({ error: 'Something went wrong building the lead. Please try again.' }, { status: 500 });

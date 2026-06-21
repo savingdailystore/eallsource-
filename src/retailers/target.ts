@@ -12,13 +12,17 @@ const ACTOR_ID = 'kawsar/target-product-search-scraper';
 // title matching — this is what makes Target produce leads like Walmart does.
 // https://apify.com/elliotpadfield/target-scraper  (accepts tcins / productUrls)
 const UPC_ACTOR        = 'elliotpadfield/target-scraper';
-const UPC_ENRICH_LIMIT = 12;     // cap products enriched per search (bounds time + cost)
 const UPC_TIMEOUT_MS   = 60_000; // one batched call for all TCINs
 
 // Hard cap on products handed to the pipeline per search. Each product costs
 // several Amazon SP-API calls, so this bounds total run time on serverless.
 // Mirrors the Walmart retailer's cap.
 const MAX_PRODUCTS = 18;
+
+// Enrich every product we hand to the pipeline. Enrichment is a single batched
+// actor call (not one per product), so enriching fewer saves nothing — and an
+// un-enriched product falls back to weak title matching (the old behavior).
+const UPC_ENRICH_LIMIT = MAX_PRODUCTS;
 
 interface ApifyTargetItem {
   productTitle?: string;

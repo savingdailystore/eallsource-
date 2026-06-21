@@ -1,5 +1,8 @@
 import type { Discount, ProfitabilityInput, ProfitabilityResult } from '@/types';
 
+// Estimated average sales tax paid when purchasing from the retailer.
+const SALES_TAX_RATE = 0.0875;
+
 // Referral fee rates by category (approximate)
 const REFERRAL_RATES: Record<string, number> = {
   'Electronics':        0.08,
@@ -70,7 +73,12 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   // treating them as verified economics.
   const feeEstimateConfirmed = inputFbaFee != null;
   const fbaFee       = inputFbaFee ?? estimateFbaFee();
-  const taxAmount    = resellPrice * 0.0875; // estimated avg sales tax
+  // Sales tax is the tax YOU pay buying from the retailer (on the source cost),
+  // not a cut of the resale price. The tax a customer pays on Amazon is
+  // collected and remitted by Amazon — it is never the seller's cost. Charging
+  // it on resellPrice (the old behavior) added a large phantom cost that sank
+  // otherwise-profitable leads. Conservative: assumes no resale certificate.
+  const taxAmount    = finalCost * SALES_TAX_RATE;
   const amazonFees   = referralFee + fbaFee + storageFee;
 
   // ── Profitability ──────────────────────────────────────────────────────

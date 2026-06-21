@@ -78,13 +78,23 @@ export function calculateReprice(input: RepricingInput): RepricingResult {
   // Prevent going below floor under any strategy
   if (recommendedPrice < floorPrice) {
     recommendedPrice = floorPrice;
-    direction = 'UP';
     reason = `Price protected at ${floorLabel}`;
     riskScore = Math.max(riskScore, 30);
   }
 
+  // Derive direction from the actual move so it can never disagree with the
+  // recommended price. This matters when the current price sits BELOW the floor:
+  // the recommendation (raise to floor) must read as UP, not HOLD, or it would
+  // never surface as an actionable proposal. The per-branch direction above only
+  // shapes the reason text.
+  const finalPrice = Math.round(recommendedPrice * 100) / 100;
+  const EPS = 0.005;
+  if      (finalPrice > currentPrice + EPS) direction = 'UP';
+  else if (finalPrice < currentPrice - EPS) direction = 'DOWN';
+  else                                      direction = 'HOLD';
+
   return {
-    recommendedPrice: Math.round(recommendedPrice * 100) / 100,
+    recommendedPrice: finalPrice,
     direction,
     riskScore,
     reason,

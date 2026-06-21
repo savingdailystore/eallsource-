@@ -56,7 +56,8 @@ export async function POST() {
     }
 
     // Upsert into inventory table
-    let synced = 0;
+    let synced  = 0;
+    let skipped = 0;
     for (const item of allItems) {
       if (!item.asin) continue;
 
@@ -76,6 +77,22 @@ export async function POST() {
         totalQuantity:     total,
       };
 
+      // Amazon returns a summary for every SKU you've ever listed, including
+      // long-tail items sold off in the past that now have nothing on-hand,
+      // reserved, or inbound. Don't CREATE new rows for those — they only
+      // clutter the page. We still UPDATE any SKU we already track, so an item
+      // that sells down to zero reflects accurately instead of freezing at its
+      // last positive count.
+      if (available === 0 && reserved === 0 && inbound === 0) {
+        const res = await prisma.inventoryItem.updateMany({
+          where: { orgId, asin: item.asin },
+          data,
+        });
+        if (res.count > 0) synced++;
+        else skipped++;
+        continue;
+      }
+
       await prisma.inventoryItem.upsert({
         where:  { orgId_asin: { orgId, asin: item.asin } },
         create: { orgId, asin: item.asin, ...data },
@@ -84,7 +101,7 @@ export async function POST() {
       synced++;
     }
 
-    return NextResponse.json({ synced, total: allItems.length });
+    return NextResponse.json({ synced, skipped, total: allItems.length });
 
   } catch (err: any) {
     const msg = err?.message ?? 'Unknown error';

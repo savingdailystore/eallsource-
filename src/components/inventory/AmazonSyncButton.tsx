@@ -31,9 +31,12 @@ export function AmazonSyncButton({ connected }: Props) {
     setLoading(false);
 
     if (res.ok) {
+      const skippedNote = data.skipped > 0
+        ? ` (${data.skipped} empty SKU${data.skipped === 1 ? '' : 's'} skipped)`
+        : '';
       setResult({ ok: true, message: data.synced > 0
-        ? `Synced ${data.synced} item${data.synced === 1 ? '' : 's'} from Amazon FBA.`
-        : (data.message ?? 'No FBA inventory found.') });
+        ? `Synced ${data.synced} item${data.synced === 1 ? '' : 's'} from Amazon FBA.${skippedNote}`
+        : (data.message ?? `No active FBA inventory found.${skippedNote}`) });
       router.refresh();
     } else {
       const msg =

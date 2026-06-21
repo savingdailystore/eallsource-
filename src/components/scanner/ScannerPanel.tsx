@@ -21,6 +21,7 @@ interface ScanResult {
   priceDeclining?:   number;
   priceTooLow?:      number;
   validationFailed?: number;
+  upcCount?:         number;
   diagnostics?: Array<{
     sourceTitle:      string;
     outcome:          string;
@@ -251,8 +252,13 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
 
                             {Array.isArray(r.diagnostics) && r.diagnostics.length > 0 && (
                               <div className="mt-4 pt-3 border-t border-slate-800">
-                                <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">
-                                  Match diagnostics — compare source vs. matched Amazon listing
+                                <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2 flex items-center gap-2 flex-wrap">
+                                  <span>Match diagnostics — compare source vs. matched Amazon listing</span>
+                                  {r.upcCount != null && r.found != null && (
+                                    <span className={`badge text-[10px] ${r.upcCount > 0 ? 'bg-blue-500/15 text-blue-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                                      {r.upcCount}/{r.found} had a UPC
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="space-y-1.5">
                                   {r.diagnostics.map((d, i) => {

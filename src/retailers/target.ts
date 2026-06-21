@@ -44,39 +44,46 @@ interface TargetDetailItem {
   barcode?: string | number;
 }
 
-// Target product URLs end in `/-/A-<TCIN>`. The TCIN is Target's stable item id,
-// which the detail actor uses to look up the barcode.
-function tcinFromUrl(url: string): string | undefined {
-  return url.match(/\/A-(\d+)/)?.[1];
+// Target product URLs end in `/-/A-<TCIN>`. The TCIN is Target's stable item id.
+function tcinFromUrl(url?: string): string | undefined {
+  return url?.match(/\/A-(\d+)/)?.[1];
 }
 
-// Best-effort UPC enrichment for the top N products in a single batched call.
-// Failures are swallowed so each product simply falls back to title matching —
-// Target can never end up worse than the search-only behavior.
+const normUrl = (url: string) => url.split('?')[0].replace(/\/$/, '');
+
+// Best-effort UPC enrichment in a single batched call. We pass the raw product
+// URLs (not a parsed TCIN) so the actor does its own id extraction — more robust
+// than depending on the search actor's URL format. Results are matched back by
+// URL or TCIN. Errors are logged but never thrown: a product simply falls back
+// to title matching, so Target can't end up worse than search-only.
 async function enrichUpc(products: RetailerProduct[], limit: number): Promise<void> {
-  const byTcin = new Map<string, RetailerProduct>();
-  for (const p of products.slice(0, limit)) {
-    if (!p.url) continue;
-    const tcin = tcinFromUrl(p.url);
-    if (tcin) byTcin.set(tcin, p);
-  }
-  if (byTcin.size === 0) return;
+  const targets = products.slice(0, limit).filter((p) => p.url);
+  if (targets.length === 0) return;
+
+  const byUrl = new Map<string, RetailerProduct>();
+  for (const p of targets) byUrl.set(normUrl(p.url), p);
 
   try {
     const items = await runApifyActor<TargetDetailItem>(
       UPC_ACTOR,
-      { tcins: [...byTcin.keys()], includeProductDetails: true },
+      { productUrls: targets.map((p) => p.url), includeProductDetails: true },
       UPC_TIMEOUT_MS,
     );
+    let found = 0;
     for (const it of items) {
-      // Match the returned item back to a product by TCIN (directly or via URL).
-      const tcin = it.tcin != null ? String(it.tcin) : (it.url ? tcinFromUrl(it.url) : undefined);
-      if (!tcin) continue;
-      const p   = byTcin.get(tcin);
       const upc = it.upc ?? it.gtin ?? it.barcode;
-      if (p && upc) p.upc = String(upc);
+      if (!upc) continue;
+      // Map the returned item back to a product by URL, then by TCIN.
+      const tcin = it.tcin != null ? String(it.tcin) : undefined;
+      const p =
+        (it.url && byUrl.get(normUrl(it.url))) ||
+        (tcin ? targets.find((t) => tcinFromUrl(t.url) === tcin) : undefined);
+      if (p) { p.upc = String(upc); found++; }
     }
-  } catch { /* best effort — fall back to title matching */ }
+    console.log(`[target] UPC enrichment: ${found}/${targets.length} products matched a UPC (actor returned ${items.length} items)`);
+  } catch (err) {
+    console.error('[target] UPC enrichment failed (falling back to title matching):', err);
+  }
 }
 
 export class TargetRetailer extends BaseRetailer {

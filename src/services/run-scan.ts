@@ -31,6 +31,8 @@ export interface ScanRunResult {
   priceDeclining:   number;
   priceTooLow:      number;
   validationFailed: number;
+  // How many scraped products arrived with a UPC (barcode enrichment health).
+  upcCount?:        number;
   // Per-product match diagnostics (debugging match quality). Capped in size.
   diagnostics?:     MatchDiagnostic[];
 }
@@ -71,6 +73,7 @@ export async function runScanJob(args: {
   try {
     const products = (await plugin.search(query)) as RetailerProduct[];
     result.found = products.length;
+    result.upcCount = products.filter((p) => p.upc).length;
 
     for (const product of products) {
       const outcome = await processRetailerProduct(product, orgId, {

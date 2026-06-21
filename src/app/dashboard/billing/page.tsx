@@ -16,7 +16,7 @@ const PLANS: { key: Plan; name: string; price: number; icon: any; color: string;
     features: ['3 leads/week', 'ROI calculator', 'Validation engine', 'Export to CSV', '1 user'],
   },
   {
-    key: 'PRO', name: 'Pro', price: 97, icon: Crown, color: 'text-blue-600',
+    key: 'PRO', name: 'Pro', price: 50, icon: Crown, color: 'text-blue-600',
     features: ['20 leads/week', 'Everything in Starter', 'Inventory management', 'Repricing engine', 'Amazon SP-API', '2 users'],
   },
 ];

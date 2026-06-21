@@ -20,7 +20,7 @@ export const PRICE_IDS: Record<Plan, string | undefined> = {
 
 export const PLAN_PRICES: Record<Plan, number> = {
   STARTER:    0,
-  PRO:        97,
+  PRO:        50,
   ENTERPRISE: 297,
 };
 

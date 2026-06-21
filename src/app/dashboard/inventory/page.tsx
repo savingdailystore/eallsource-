@@ -5,6 +5,7 @@ import { AddItemModal } from '@/components/inventory/AddItemModal';
 import { ImportCsvModal } from '@/components/inventory/ImportCsvModal';
 import { InventoryTable } from '@/components/inventory/InventoryTable';
 import { AmazonSyncButton } from '@/components/inventory/AmazonSyncButton';
+import { InventoryGuide } from '@/components/inventory/InventoryGuide';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inventory' };
@@ -65,6 +66,9 @@ export default async function InventoryPage() {
           </div>
         ))}
       </div>
+
+      {/* Beginner walkthrough */}
+      <InventoryGuide />
 
       {/* Table */}
       <div className="card overflow-hidden">

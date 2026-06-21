@@ -52,6 +52,19 @@ export type PipelineResult =
   | { outcome: 'ip_complaint_history' }
   | { outcome: 'error';             message: string };
 
+// Lightweight per-product diagnostic for debugging match quality — e.g. why
+// matched products don't become leads, and whether UPC matches land on the
+// right ASIN (compare sourceTitle vs amazonTitle).
+export interface MatchDiagnostic {
+  sourceTitle:      string;
+  outcome:          string;
+  asin?:            string;
+  amazonTitle?:     string;
+  matchMethod?:     string;
+  matchConfidence?: number;
+  upc?:             string;
+}
+
 export interface ProcessOptions {
   // When the ASIN is already known (e.g. manual entry from an Amazon link),
   // skip auto-matching and use it directly.
@@ -61,6 +74,8 @@ export interface ProcessOptions {
   force?: boolean;
   // Free-text sourcing notes to attach to the product (manual entry).
   notes?: string;
+  // Optional collector for match-quality diagnostics (used by scan debugging).
+  onDiagnostic?: (d: MatchDiagnostic) => void;
 }
 
 export async function processRetailerProduct(
@@ -73,9 +88,27 @@ export async function processRetailerProduct(
     const match: AmazonMatch | null = opts.knownAsin
       ? { asin: opts.knownAsin, amazonUrl: `https://www.amazon.com/dp/${opts.knownAsin}`, matchMethod: 'MANUAL', matchConfidence: 100 }
       : await findMatch(product, orgId);
-    if (!match) return { outcome: 'no_match' };
+    if (!match) {
+      // A no-match WITH a UPC present means the barcode didn't resolve to an
+      // Amazon ASIN (wrong/obscure UPC) — distinct from having no UPC to try.
+      opts.onDiagnostic?.({ sourceTitle: product.title, outcome: 'no_match', upc: product.upc });
+      return { outcome: 'no_match' };
+    }
 
     const { asin, amazonUrl, matchMethod, matchConfidence } = match;
+
+    // Base diagnostic for a matched product — emitted with the final outcome so
+    // we can audit whether the match (esp. UPC) landed on the right listing.
+    const emitDiag = (outcome: string, amazonTitle?: string) =>
+      opts.onDiagnostic?.({
+        sourceTitle: product.title,
+        outcome,
+        asin,
+        amazonTitle,
+        matchMethod,
+        matchConfidence,
+        upc: product.upc,
+      });
 
     // Real IP-complaint history gate — checked across ALL orgs since this is a
     // confirmed fact about the ASIN itself, not org-specific. Once an owner has
@@ -132,6 +165,7 @@ export async function processRetailerProduct(
     // and burying a data gap as a bogus "not profitable" verdict. Surface it as
     // its own outcome so missing pricing is distinguishable from real thin spread.
     if (buyBoxPrice == null && lowestFbaPrice == null) {
+      emitDiag('no_pricing_data', amazonTitle);
       return { outcome: 'no_pricing_data' };
     }
 
@@ -142,6 +176,7 @@ export async function processRetailerProduct(
     // floor after fees, and the per-unit labor (prep, ship, manage) isn't worth
     // it even when they do. Hard reject.
     if (!opts.force && resellPrice < MIN_RESALE_PRICE) {
+      emitDiag('price_too_low', amazonTitle);
       return { outcome: 'price_too_low', resellPrice };
     }
 
@@ -153,12 +188,14 @@ export async function processRetailerProduct(
     // sellers rarely win it — the listed margin almost never converts to real
     // sales, so this is a hard reject rather than just a display flag.
     if (!opts.force && amazonIsSeller) {
+      emitDiag('amazon_sells_it', amazonTitle);
       return { outcome: 'amazon_sells_it' };
     }
 
     // No-buy-box gate: a suppressed buy box means no one-click "Buy Now" for
     // customers — conversion craters, so the listed economics are misleading.
     if (!opts.force && buyBoxSuppressed) {
+      emitDiag('no_buybox', amazonTitle);
       return { outcome: 'no_buybox' };
     }
 
@@ -239,6 +276,7 @@ export async function processRetailerProduct(
     });
 
     if (!opts.force && !profitResult.qualifies) {
+      emitDiag('not_profitable', amazonTitle);
       return { outcome: 'not_profitable', roi: profitResult.roi, profit: profitResult.profit };
     }
 
@@ -282,6 +320,7 @@ export async function processRetailerProduct(
     });
 
     if (!opts.force && !validationResult.passed) {
+      emitDiag('validation_failed', amazonTitle);
       return { outcome: 'validation_failed', reasons: validationResult.reasons };
     }
 
@@ -379,6 +418,8 @@ export async function processRetailerProduct(
       notes:            opts.notes?.trim() || null,
       score,
     };
+
+    emitDiag('lead', amazonTitle);
 
     // Upsert product keyed on the composite unique [orgId, asin]
     const savedProduct = await prisma.product.upsert({

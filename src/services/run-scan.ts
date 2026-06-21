@@ -8,7 +8,11 @@
 import { prisma } from '@/lib/prisma';
 import { getRetailer } from '@/retailers';
 import { processRetailerProduct } from '@/services/pipeline';
+import type { MatchDiagnostic } from '@/services/pipeline';
 import type { RetailerProduct } from '@/types';
+
+// Cap diagnostics stored per scan so the ScanJob.result JSON stays small.
+const MAX_DIAGNOSTICS = 40;
 
 export interface ScanRunResult {
   created: number;
@@ -27,6 +31,8 @@ export interface ScanRunResult {
   priceDeclining:   number;
   priceTooLow:      number;
   validationFailed: number;
+  // Per-product match diagnostics (debugging match quality). Capped in size.
+  diagnostics?:     MatchDiagnostic[];
 }
 
 export async function runScanJob(args: {
@@ -60,12 +66,16 @@ export async function runScanJob(args: {
     noMatch: 0, noPricing: 0, notProfitable: 0, demandTooLow: 0, velocityTooLow: 0, noBuyBox: 0, priceDeclining: 0, priceTooLow: 0, validationFailed: 0,
   };
 
+  const diagnostics: MatchDiagnostic[] = [];
+
   try {
     const products = (await plugin.search(query)) as RetailerProduct[];
     result.found = products.length;
 
     for (const product of products) {
-      const outcome = await processRetailerProduct(product, orgId);
+      const outcome = await processRetailerProduct(product, orgId, {
+        onDiagnostic: (d) => { if (diagnostics.length < MAX_DIAGNOSTICS) diagnostics.push(d); },
+      });
       switch (outcome.outcome) {
         case 'lead_created':      result.created++; result.leadIds.push(outcome.leadId); break;
         case 'lead_updated':      result.updated++; result.leadIds.push(outcome.leadId); break;
@@ -82,6 +92,8 @@ export async function runScanJob(args: {
         default:                  result.skipped++; break;
       }
     }
+
+    result.diagnostics = diagnostics;
 
     if (scanJobId) {
       await prisma.scanJob.update({

@@ -21,6 +21,15 @@ interface ScanResult {
   priceDeclining?:   number;
   priceTooLow?:      number;
   validationFailed?: number;
+  diagnostics?: Array<{
+    sourceTitle:      string;
+    outcome:          string;
+    asin?:            string;
+    amazonTitle?:     string;
+    matchMethod?:     string;
+    matchConfidence?: number;
+    upc?:             string;
+  }>;
 }
 
 // Human labels for each skip reason, in a sensible reading order.
@@ -181,7 +190,8 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                   const skipped  = r?.skipped ?? 0;
                   const namedSkips = SKIP_LABELS.reduce((sum, { key }) => sum + (Number(r?.[key]) || 0), 0);
                   const otherSkips = Math.max(0, skipped - namedSkips);
-                  const canExpand  = hasStats && skipped > 0;
+                  const hasDiag    = Array.isArray(r?.diagnostics) && r!.diagnostics!.length > 0;
+                  const canExpand  = hasStats && (skipped > 0 || hasDiag);
                   const isExp      = expanded === job.id;
                   return (
                     <React.Fragment key={job.id}>
@@ -210,7 +220,7 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                         <td className="table-td text-xs text-slate-500">
                           {canExpand && (isExp
                             ? <ChevronUp className="w-3.5 h-3.5" />
-                            : <span className="flex items-center gap-1">{skipped} filtered<ChevronDown className="w-3.5 h-3.5" /></span>)}
+                            : <span className="flex items-center gap-1">{skipped > 0 ? `${skipped} filtered` : 'details'}<ChevronDown className="w-3.5 h-3.5" /></span>)}
                         </td>
                       </tr>
                       {isExp && r && (
@@ -237,6 +247,49 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                               <p className="text-[10px] text-slate-500 mt-2">
                                 “Other risk gates” = Amazon-on-listing, suppressed-by-volatility, hazmat, private/generic brand, IP history, etc.
                               </p>
+                            )}
+
+                            {Array.isArray(r.diagnostics) && r.diagnostics.length > 0 && (
+                              <div className="mt-4 pt-3 border-t border-slate-800">
+                                <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">
+                                  Match diagnostics — compare source vs. matched Amazon listing
+                                </div>
+                                <div className="space-y-1.5">
+                                  {r.diagnostics.map((d, i) => {
+                                    const isBarcode = d.matchMethod === 'UPC' || d.matchMethod === 'EAN';
+                                    return (
+                                      <div key={i} className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-xs border-l-2 border-slate-700 pl-2.5 py-0.5">
+                                        <div className="min-w-0">
+                                          <span className="text-slate-500">src </span>
+                                          <span className="text-slate-300">{d.sourceTitle}</span>
+                                        </div>
+                                        <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                                          <span className={`badge text-[10px] ${d.outcome === 'lead' ? 'bg-green-500/15 text-green-400' : 'bg-slate-700 text-slate-400'}`}>{d.outcome}</span>
+                                          {d.matchMethod && (
+                                            <span className={`text-[10px] ${isBarcode ? 'text-blue-400' : 'text-amber-400'}`}>
+                                              {d.matchMethod}{d.matchConfidence != null ? ` ${d.matchConfidence}%` : ''}
+                                            </span>
+                                          )}
+                                          {d.upc && <span className="text-[10px] font-mono text-slate-500">UPC {d.upc}</span>}
+                                        </div>
+                                        <div className="min-w-0 sm:col-start-2">
+                                          {d.asin ? (
+                                            <>
+                                              <a href={`https://www.amazon.com/dp/${d.asin}`} target="_blank" rel="noreferrer" className="font-mono text-blue-400 hover:underline">{d.asin}</a>
+                                              <span className="text-slate-400"> {d.amazonTitle ?? ''}</span>
+                                            </>
+                                          ) : (
+                                            <span className="text-slate-600 italic">no ASIN matched{d.upc ? ' (had a UPC — barcode didn’t resolve)' : ''}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <p className="text-[10px] text-slate-500 mt-2">
+                                  Blue method = exact barcode match, amber = fuzzy title. If a source title and its matched Amazon title clearly differ, that match is wrong.
+                                </p>
+                              </div>
                             )}
                           </td>
                         </tr>

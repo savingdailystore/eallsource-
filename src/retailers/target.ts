@@ -12,7 +12,10 @@ const ACTOR_ID = 'kawsar/target-product-search-scraper';
 // title matching — this is what makes Target produce leads like Walmart does.
 // https://apify.com/elliotpadfield/target-scraper  (accepts tcins / productUrls)
 const UPC_ACTOR        = 'elliotpadfield/target-scraper';
-const UPC_TIMEOUT_MS   = 60_000; // one batched call for all TCINs
+const UPC_TIMEOUT_MS   = 90_000; // per-batch cap
+const UPC_BATCH_SIZE   = 6;      // URLs per actor run — one 18-URL run exceeded
+                                 // the timeout, so smaller parallel runs finish
+                                 // faster and one slow batch can't sink the rest
 
 // Hard cap on products handed to the pipeline per search. Each product costs
 // several Amazon SP-API calls, so this bounds total run time on serverless.
@@ -63,27 +66,35 @@ async function enrichUpc(products: RetailerProduct[], limit: number): Promise<vo
   const byUrl = new Map<string, RetailerProduct>();
   for (const p of targets) byUrl.set(normUrl(p.url), p);
 
-  try {
-    const items = await runApifyActor<TargetDetailItem>(
-      UPC_ACTOR,
-      { productUrls: targets.map((p) => p.url), includeProductDetails: true },
-      UPC_TIMEOUT_MS,
-    );
-    let found = 0;
-    for (const it of items) {
-      const upc = it.upc ?? it.gtin ?? it.barcode;
-      if (!upc) continue;
-      // Map the returned item back to a product by URL, then by TCIN.
-      const tcin = it.tcin != null ? String(it.tcin) : undefined;
-      const p =
-        (it.url && byUrl.get(normUrl(it.url))) ||
-        (tcin ? targets.find((t) => tcinFromUrl(t.url) === tcin) : undefined);
-      if (p) { p.upc = String(upc); found++; }
+  // Split into small batches run concurrently. A single 18-URL synchronous actor
+  // run exceeds the timeout; smaller parallel runs each finish faster, and a
+  // slow/failed batch only loses its own products (the rest still get a UPC).
+  const batches: RetailerProduct[][] = [];
+  for (let i = 0; i < targets.length; i += UPC_BATCH_SIZE) batches.push(targets.slice(i, i + UPC_BATCH_SIZE));
+
+  let found = 0;
+  await Promise.all(batches.map(async (batch) => {
+    try {
+      const items = await runApifyActor<TargetDetailItem>(
+        UPC_ACTOR,
+        { productUrls: batch.map((p) => p.url), includeProductDetails: true },
+        UPC_TIMEOUT_MS,
+      );
+      for (const it of items) {
+        const upc = it.upc ?? it.gtin ?? it.barcode;
+        if (!upc) continue;
+        // Map the returned item back to a product by URL, then by TCIN.
+        const tcin = it.tcin != null ? String(it.tcin) : undefined;
+        const p =
+          (it.url && byUrl.get(normUrl(it.url))) ||
+          (tcin ? targets.find((t) => tcinFromUrl(t.url) === tcin) : undefined);
+        if (p) { p.upc = String(upc); found++; }
+      }
+    } catch (err) {
+      console.error('[target] UPC enrichment batch failed (those fall back to title matching):', err);
     }
-    console.log(`[target] UPC enrichment: ${found}/${targets.length} products matched a UPC (actor returned ${items.length} items)`);
-  } catch (err) {
-    console.error('[target] UPC enrichment failed (falling back to title matching):', err);
-  }
+  }));
+  console.log(`[target] UPC enrichment: ${found}/${targets.length} products matched a UPC`);
 }
 
 export class TargetRetailer extends BaseRetailer {

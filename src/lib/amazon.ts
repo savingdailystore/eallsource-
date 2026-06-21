@@ -57,20 +57,31 @@ async function spApi(orgId: string, path: string, params: Record<string, string>
   const url = new URL(`${SP_API_BASE}${path}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      'x-amz-access-token': accessToken,
-      'x-amz-date':         new Date().toISOString().replace(/[:-]/g, '').slice(0, 15) + 'Z',
-      'Content-Type':       'application/json',
-    },
-  });
+  // SP-API catalog/pricing endpoints have low rate limits and return 429
+  // (QuotaExceeded) under burst — which otherwise surfaces as a bogus "no match"
+  // / "no pricing" outcome. Retry with exponential backoff + jitter so a
+  // transient throttle doesn't drop a real product. Bounded to stay well within
+  // the route's 300s budget.
+  const MAX_RETRIES = 4;
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url.toString(), {
+      headers: {
+        'x-amz-access-token': accessToken,
+        'x-amz-date':         new Date().toISOString().replace(/[:-]/g, '').slice(0, 15) + 'Z',
+        'Content-Type':       'application/json',
+      },
+    });
 
-  if (!res.ok) {
+    if (res.ok) return res.json();
+
     const body = await res.text();
+    if ((res.status === 429 || res.status === 503) && attempt < MAX_RETRIES) {
+      const backoffMs = 600 * 2 ** attempt + Math.random() * 300; // ~0.6s,1.2s,2.4s,4.8s + jitter
+      await new Promise((r) => setTimeout(r, backoffMs));
+      continue;
+    }
     throw new Error(`SP-API ${res.status}: ${body}`);
   }
-
-  return res.json();
 }
 
 // ─── Catalog search ───────────────────────────────────────────────────────────

@@ -38,18 +38,29 @@ export async function POST() {
     created++;
   }
 
+  // Map ASIN → seller SKU from synced inventory. A price push targets a SKU
+  // (a listing), not an ASIN, so a rule with no matching SKU can be proposed
+  // but not pushed until inventory is synced.
+  const skuByAsin = new Map<string, string>();
+  for (const item of inventory) {
+    if (item.sku && !skuByAsin.has(item.asin)) skuByAsin.set(item.asin, item.sku);
+  }
+
   // ── 2. Run every active rule ──────────────────────────────────────────────
   const rules = await prisma.repricingRule.findMany({ where: { orgId, isActive: true } });
 
-  let repriced = 0;
-  let skipped  = 0;
+  let proposed = 0; // actionable price changes awaiting approval
+  let hold     = 0; // ran fine, no change recommended
+  let skipped  = 0; // no market data to price against
 
   for (const rule of rules) {
     const product = await prisma.product.findFirst({ where: { orgId, asin: rule.asin } });
 
     // Repricing requires scanned Amazon market data (buy box, cost, resale price).
     const costBasis    = product?.totalLandedCost ?? product?.sourcePrice ?? 0;
-    const currentPrice = rule.lastRecommendedPrice ?? product?.estimatedResellPrice ?? 0;
+    // Prefer the price we last pushed live, then the last recommendation, then
+    // the scanned resale price, as our best guess of the current live price.
+    const currentPrice = rule.lastPushedPrice ?? rule.lastRecommendedPrice ?? product?.estimatedResellPrice ?? 0;
     const buyBoxPrice  = product?.buyBoxPrice ?? 0;
     const fbaSellers   = product?.fbaSellers ?? 0;
 
@@ -68,7 +79,18 @@ export async function POST() {
       floorPrice:   rule.floorPrice ?? undefined,
     });
 
+    // A change is only actionable if the price actually moves.
+    const isActionable = result.direction !== 'HOLD' && result.recommendedPrice !== currentPrice;
+    const status       = isActionable ? 'PROPOSED' : 'HOLD';
+    const sku          = skuByAsin.get(rule.asin) ?? null;
+
     await prisma.$transaction([
+      // Supersede any earlier un-actioned proposal so the queue shows only the
+      // latest recommendation per rule.
+      prisma.repricingHistory.updateMany({
+        where: { ruleId: rule.id, status: 'PROPOSED' },
+        data:  { status: 'SUPERSEDED' },
+      }),
       prisma.repricingRule.update({
         where: { id: rule.id },
         data: {
@@ -84,11 +106,16 @@ export async function POST() {
           recommendedPrice: result.recommendedPrice,
           direction:        result.direction,
           riskScore:        result.riskScore,
+          status,
+          previousPrice:    currentPrice,
+          sku,
         },
       }),
     ]);
-    repriced++;
+
+    if (isActionable) proposed++;
+    else hold++;
   }
 
-  return NextResponse.json({ success: true, created, repriced, skipped });
+  return NextResponse.json({ success: true, created, proposed, hold, skipped });
 }

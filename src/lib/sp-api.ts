@@ -85,5 +85,23 @@ export async function getSpApiClient(orgId: string) {
       if (!res.ok) throw new Error(`SP-API ${path} → ${res.status}: ${await res.text()}`);
       return res.json();
     },
+
+    async patch(path: string, query: Record<string, string>, body: unknown) {
+      const qs  = new URLSearchParams(query).toString();
+      const url = `${endpoint}${path}${qs ? '?' + qs : ''}`;
+
+      const res = await fetch(url, {
+        method:  'PATCH',
+        headers: {
+          'x-amz-access-token': accessToken,
+          'content-type':       'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      const text = await res.text();
+      if (!res.ok) throw new Error(`SP-API ${path} → ${res.status}: ${text}`);
+      return text ? JSON.parse(text) : {};
+    },
   };
 }

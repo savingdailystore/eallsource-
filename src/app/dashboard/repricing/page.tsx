@@ -7,6 +7,7 @@ import { RunAllButton } from '@/components/repricing/RunAllButton';
 import { EditRuleModal } from '@/components/repricing/EditRuleModal';
 import { DeleteRuleButton } from '@/components/repricing/DeleteRuleButton';
 import { ToggleRuleButton } from '@/components/repricing/ToggleRuleButton';
+import { ProposalsPanel } from '@/components/repricing/ProposalsPanel';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Repricing' };
@@ -15,6 +16,12 @@ const DIRECTION_ICON = {
   UP:   { icon: ArrowUp,   cls: 'text-green-400' },
   DOWN: { icon: ArrowDown, cls: 'text-red-400' },
   HOLD: { icon: Minus,     cls: 'text-slate-500' },
+};
+
+const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  PUSHED:   { label: 'Pushed live',  cls: 'bg-green-500/15 text-green-400' },
+  FAILED:   { label: 'Failed',       cls: 'bg-red-500/15 text-red-400' },
+  REJECTED: { label: 'Dismissed',    cls: 'bg-slate-700 text-slate-400' },
 };
 
 function RulesTable({ rules }: { rules: any[] }) {
@@ -94,19 +101,36 @@ export default async function RepricingPage() {
   }
 
   const orgId = session!.user.orgId;
-  const [rules, history] = await Promise.all([
+  const [rules, history, proposalRows] = await Promise.all([
     prisma.repricingRule.findMany({
       where: { orgId },
       orderBy: { updatedAt: 'desc' },
       include: { history: { orderBy: { createdAt: 'desc' }, take: 1 } },
     }),
     prisma.repricingHistory.findMany({
-      where: { rule: { orgId } },
+      where: { rule: { orgId }, status: { in: ['PUSHED', 'FAILED', 'REJECTED'] } },
       orderBy: { createdAt: 'desc' },
       take: 20,
       include: { rule: { select: { asin: true, title: true } } },
     }),
+    prisma.repricingHistory.findMany({
+      where: { rule: { orgId }, status: 'PROPOSED' },
+      orderBy: { recommendedPrice: 'desc' },
+      include: { rule: { select: { asin: true, title: true } } },
+    }),
   ]);
+
+  const proposals = proposalRows.map((p) => ({
+    id:               p.id,
+    asin:             p.rule.asin,
+    title:            p.rule.title,
+    previousPrice:    p.previousPrice,
+    recommendedPrice: p.recommendedPrice,
+    direction:        p.direction,
+    riskScore:        p.riskScore,
+    sku:              p.sku,
+    buyBoxPrice:      p.buyBoxPrice,
+  }));
 
   const activeRules   = rules.filter((r) => r.isActive);
   const inactiveRules = rules.filter((r) => !r.isActive);
@@ -120,6 +144,9 @@ export default async function RepricingPage() {
         </div>
         <RunAllButton />
       </div>
+
+      {/* Pending price changes awaiting approval */}
+      <ProposalsPanel proposals={proposals} />
 
       {/* Active rules */}
       <div className="card overflow-hidden">
@@ -157,6 +184,7 @@ export default async function RepricingPage() {
             {history.map((h) => {
               const dir = h.direction as 'UP' | 'DOWN' | 'HOLD';
               const { icon: DirIcon, cls } = DIRECTION_ICON[dir];
+              const badge = STATUS_BADGE[h.status] ?? STATUS_BADGE.REJECTED;
               return (
                 <div key={h.id} className="flex items-center gap-4 px-5 py-3">
                   <DirIcon className={`w-4 h-4 ${cls} flex-shrink-0`} />
@@ -164,12 +192,13 @@ export default async function RepricingPage() {
                     <div className="text-sm font-medium text-slate-100 truncate">{h.rule.title ?? h.rule.asin}</div>
                     <div className="text-xs text-slate-500">{h.rule.asin}</div>
                   </div>
+                  <span className={`badge text-xs ${badge.cls}`} title={h.pushError ?? undefined}>{badge.label}</span>
                   <div className="text-right">
                     <div className="text-sm font-semibold text-slate-50">{formatCurrency(h.recommendedPrice)}</div>
                     <div className="text-xs text-slate-500">Risk {h.riskScore.toFixed(0)}</div>
                   </div>
                   <div className="text-xs text-slate-500 w-24 text-right">
-                    {new Date(h.createdAt).toLocaleDateString()}
+                    {new Date(h.pushedAt ?? h.createdAt).toLocaleDateString()}
                   </div>
                 </div>
               );

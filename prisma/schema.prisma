@@ -334,6 +334,8 @@ model RepricingRule {
   lastRecommendedPrice Float?
   lastDirection        String?
   lastRepricedAt       DateTime?
+  lastPushedPrice      Float?     // last price actually pushed live to Amazon
+  lastPushedAt         DateTime?
   isActive             Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -356,9 +358,18 @@ model RepricingHistory {
   direction        String
   riskScore        Float
 
+  // Approval-queue lifecycle: a run creates PROPOSED (actionable) or HOLD (no
+  // change) rows; the owner then pushes or rejects. PUSHED/FAILED are terminal.
+  status        String    @default("PROPOSED") // PROPOSED | HOLD | PUSHED | FAILED | REJECTED | SUPERSEDED
+  previousPrice Float?    // the live price this proposal would change away from
+  sku           String?   // resolved seller SKU used for the push
+  pushedAt      DateTime?
+  pushError     String?
+
   createdAt DateTime @default(now())
 
   @@index([ruleId])
+  @@index([status])
   @@map("repricing_history")
 }
 

@@ -20,9 +20,15 @@ export function RunAllButton() {
     if (res.ok) {
       const parts: string[] = [];
       if (data.created)  parts.push(`${data.created} rule${data.created === 1 ? '' : 's'} created`);
-      if (data.repriced) parts.push(`${data.repriced} repriced`);
-      if (data.skipped)  parts.push(`${data.skipped} skipped (no price data)`);
-      setResult({ ok: true, message: parts.length ? parts.join(' · ') : 'Nothing to reprice yet.' });
+      if (data.proposed) parts.push(`${data.proposed} price change${data.proposed === 1 ? '' : 's'} to review`);
+      if (data.hold)     parts.push(`${data.hold} holding`);
+      if (data.skipped)  parts.push(`${data.skipped} skipped (no market data)`);
+      setResult({
+        ok: true,
+        message: data.proposed
+          ? `${parts.join(' · ')} — review them below before they go live.`
+          : (parts.length ? parts.join(' · ') : 'Nothing to reprice yet.'),
+      });
       router.refresh();
     } else {
       setResult({ ok: false, message: data.error ?? 'Run failed. Please try again.' });

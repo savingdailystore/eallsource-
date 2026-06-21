@@ -13,6 +13,7 @@ interface ScanResult {
   errors?:  number;
   // Skip-reason breakdown (each sums into `skipped`)
   noMatch?:          number;
+  noPricing?:        number;
   notProfitable?:    number;
   demandTooLow?:     number;
   velocityTooLow?:   number;
@@ -25,6 +26,7 @@ interface ScanResult {
 // Human labels for each skip reason, in a sensible reading order.
 const SKIP_LABELS: Array<{ key: keyof ScanResult; label: string }> = [
   { key: 'noMatch',          label: 'No Amazon match' },
+  { key: 'noPricing',        label: 'No Amazon pricing data' },
   { key: 'notProfitable',    label: 'Not profitable' },
   { key: 'priceTooLow',      label: 'Resale price too low' },
   { key: 'demandTooLow',     label: 'Weak BSR / demand' },

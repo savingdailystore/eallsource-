@@ -43,7 +43,7 @@ export async function POST() {
     failures: 0, broadcast: 0,
     ranSearches:     [] as string[],
     skippedSearches: [] as string[],
-    filtered: { noMatch: 0, notProfitable: 0, demandTooLow: 0, velocityTooLow: 0, noBuyBox: 0, priceDeclining: 0, priceTooLow: 0, validationFailed: 0 },
+    filtered: { noMatch: 0, noPricing: 0, notProfitable: 0, demandTooLow: 0, velocityTooLow: 0, noBuyBox: 0, priceDeclining: 0, priceTooLow: 0, validationFailed: 0 },
   };
 
   const allLeadIds: string[] = [];
@@ -67,6 +67,7 @@ export async function POST() {
       summary.leadsCreated  += result.created;
       summary.leadsUpdated  += result.updated;
       summary.filtered.noMatch          += result.noMatch;
+      summary.filtered.noPricing        += result.noPricing;
       summary.filtered.notProfitable    += result.notProfitable;
       summary.filtered.demandTooLow     += result.demandTooLow;
       summary.filtered.velocityTooLow   += result.velocityTooLow;

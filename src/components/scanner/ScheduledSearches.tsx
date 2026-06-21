@@ -143,6 +143,7 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
         const f = data.filtered ?? {};
         const reasons: string[] = [];
         if (f.noMatch)          reasons.push(`${f.noMatch} no Amazon match`);
+        if (f.noPricing)        reasons.push(`${f.noPricing} no Amazon pricing data`);
         if (f.notProfitable)    reasons.push(`${f.notProfitable} not profitable`);
         if (f.priceTooLow)      reasons.push(`${f.priceTooLow} resale price too low`);
         if (f.demandTooLow)     reasons.push(`${f.demandTooLow} weak BSR/demand`);
@@ -154,7 +155,7 @@ export function ScheduledSearches({ initialSearches, retailers }: Props) {
 
         // Reconcile: anything filtered but not in a named bucket above
         // (Amazon-on-listing, volatility, hazmat, private/generic brand, IP history…)
-        const namedFiltered = (f.noMatch ?? 0) + (f.notProfitable ?? 0) + (f.priceTooLow ?? 0)
+        const namedFiltered = (f.noMatch ?? 0) + (f.noPricing ?? 0) + (f.notProfitable ?? 0) + (f.priceTooLow ?? 0)
           + (f.demandTooLow ?? 0) + (f.velocityTooLow ?? 0) + (f.noBuyBox ?? 0)
           + (f.priceDeclining ?? 0) + (f.validationFailed ?? 0);
         const totalFiltered = Math.max(0, (data.productsFound ?? 0) - (data.leadsCreated ?? 0) - (data.leadsUpdated ?? 0));

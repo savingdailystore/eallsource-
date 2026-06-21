@@ -36,6 +36,7 @@ export type PipelineResult =
   | { outcome: 'lead_updated';      leadId: string; score: number }
   | { outcome: 'no_match' }
   | { outcome: 'no_amazon_data' }
+  | { outcome: 'no_pricing_data' }
   | { outcome: 'validation_failed'; reasons: string[] }
   | { outcome: 'not_profitable';    roi: number; profit: number }
   | { outcome: 'demand_too_low';    bsr: number }
@@ -124,6 +125,14 @@ export async function processRetailerProduct(
     // reach here only after a successful match and tolerate sparse data.
     if (opts.knownAsin && buyBoxPrice == null && lowestFbaPrice == null) {
       return { outcome: 'no_amazon_data' };
+    }
+
+    // Scans likewise can't be assessed without an Amazon resale price. Before,
+    // resellPrice silently fell back to the SOURCE price, making profit = -fees
+    // and burying a data gap as a bogus "not profitable" verdict. Surface it as
+    // its own outcome so missing pricing is distinguishable from real thin spread.
+    if (buyBoxPrice == null && lowestFbaPrice == null) {
+      return { outcome: 'no_pricing_data' };
     }
 
     const resellPrice = lowestFbaPrice ?? buyBoxPrice ?? product.price;

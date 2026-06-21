@@ -76,7 +76,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         <div>
           <h1 className="page-title">Lead Feed</h1>
           <p className="page-subtitle">
-            {total.toLocaleString()} qualified opportunities — 95%+ validation, 30%+ ROI, top-3% BSR
+            {total.toLocaleString()} qualified opportunities — 30%+ ROI, $8+ profit, top-6% BSR, validated matches
           </p>
         </div>
         <div className="flex items-center gap-2">

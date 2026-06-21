@@ -8,6 +8,7 @@ import { EditRuleModal } from '@/components/repricing/EditRuleModal';
 import { DeleteRuleButton } from '@/components/repricing/DeleteRuleButton';
 import { ToggleRuleButton } from '@/components/repricing/ToggleRuleButton';
 import { ProposalsPanel } from '@/components/repricing/ProposalsPanel';
+import { RepricingGuide } from '@/components/repricing/RepricingGuide';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Repricing' };
@@ -149,6 +150,9 @@ export default async function RepricingPage() {
         </div>
         <RunAllButton />
       </div>
+
+      {/* Beginner walkthrough */}
+      <RepricingGuide />
 
       {/* Pending price changes awaiting approval */}
       <ProposalsPanel proposals={proposals} />

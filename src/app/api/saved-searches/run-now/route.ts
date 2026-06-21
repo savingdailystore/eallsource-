@@ -43,7 +43,7 @@ export async function POST() {
     failures: 0, broadcast: 0,
     ranSearches:     [] as string[],
     skippedSearches: [] as string[],
-    filtered: { noMatch: 0, notProfitable: 0, demandTooLow: 0, validationFailed: 0 },
+    filtered: { noMatch: 0, notProfitable: 0, demandTooLow: 0, velocityTooLow: 0, noBuyBox: 0, priceDeclining: 0, priceTooLow: 0, validationFailed: 0 },
   };
 
   const allLeadIds: string[] = [];
@@ -69,6 +69,10 @@ export async function POST() {
       summary.filtered.noMatch          += result.noMatch;
       summary.filtered.notProfitable    += result.notProfitable;
       summary.filtered.demandTooLow     += result.demandTooLow;
+      summary.filtered.velocityTooLow   += result.velocityTooLow;
+      summary.filtered.noBuyBox         += result.noBuyBox;
+      summary.filtered.priceDeclining   += result.priceDeclining;
+      summary.filtered.priceTooLow      += result.priceTooLow;
       summary.filtered.validationFailed += result.validationFailed;
       allLeadIds.push(...result.leadIds);
       await prisma.savedSearch.update({ where: { id: search.id }, data: { lastRunAt: new Date(), lastResult: result as object } });

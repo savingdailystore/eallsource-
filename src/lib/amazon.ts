@@ -171,7 +171,7 @@ export async function getProductData(orgId: string, asin: string, marketplaceId 
     const [catalogData, offersData] = await Promise.allSettled([
       spApi(orgId, `/catalog/2022-04-01/items/${asin}`, {
         marketplaceIds: marketplaceId,
-        includedData:   'summaries,salesRanks,attributes,images',
+        includedData:   'summaries,salesRanks,attributes,images,relationships',
       }),
       spApi(orgId, `/products/pricing/v0/items/${asin}/offers`, {
         MarketplaceId: marketplaceId,
@@ -205,6 +205,18 @@ export async function getProductData(orgId: string, asin: string, marketplaceId 
     const totalSellers = sum?.TotalOfferCount ?? offerCounts.reduce((a, o) => a + (o.OfferCount ?? 0), 0);
     const fbaSellers   = offerCounts.filter((o) => o.fulfillmentChannel === 'Amazon').reduce((a, o) => a + (o.OfferCount ?? 0), 0);
 
+    // Buy box suppressed: offers exist but Amazon shows no buy box winner.
+    const buyBoxSuppressed = totalSellers > 0 && buyBoxPrice == null;
+
+    // Variation relationship: a CHILD variation (one size/color) reports the
+    // parent's aggregated BSR and shares the variation family's reviews, so its
+    // demand data is misleading. The relationships block lists the parent ASIN
+    // when this ASIN is itself a child.
+    const relationships = (catalog?.relationships?.[0]?.relationships ?? []) as Array<{ type?: string; parentAsins?: string[] }>;
+    const parentRel  = relationships.find((r) => Array.isArray(r.parentAsins) && r.parentAsins.length > 0);
+    const parentAsin = parentRel?.parentAsins?.[0];
+    const isVariation = parentAsin != null && parentAsin !== asin;
+
     return {
       asin,
       title:          summary?.itemName,
@@ -216,6 +228,9 @@ export async function getProductData(orgId: string, asin: string, marketplaceId 
       lowestFbaPrice,
       fbaSellers,
       totalSellers,
+      buyBoxSuppressed,
+      isVariation,
+      parentAsin,
     };
   } catch (err) {
     console.error('[amazon] getProductData error:', err);

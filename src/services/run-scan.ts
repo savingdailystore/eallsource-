@@ -21,6 +21,10 @@ export interface ScanRunResult {
   noMatch:          number;
   notProfitable:    number;
   demandTooLow:     number;
+  velocityTooLow:   number;
+  noBuyBox:         number;
+  priceDeclining:   number;
+  priceTooLow:      number;
   validationFailed: number;
 }
 
@@ -52,7 +56,7 @@ export async function runScanJob(args: {
 
   const result: ScanRunResult = {
     created: 0, updated: 0, skipped: 0, errors: 0, found: 0, leadIds: [],
-    noMatch: 0, notProfitable: 0, demandTooLow: 0, validationFailed: 0,
+    noMatch: 0, notProfitable: 0, demandTooLow: 0, velocityTooLow: 0, noBuyBox: 0, priceDeclining: 0, priceTooLow: 0, validationFailed: 0,
   };
 
   try {
@@ -68,6 +72,10 @@ export async function runScanJob(args: {
         case 'no_match':          result.skipped++; result.noMatch++;          break;
         case 'not_profitable':    result.skipped++; result.notProfitable++;    break;
         case 'demand_too_low':    result.skipped++; result.demandTooLow++;     break;
+        case 'velocity_too_low':  result.skipped++; result.velocityTooLow++;   break;
+        case 'no_buybox':         result.skipped++; result.noBuyBox++;         break;
+        case 'price_declining':   result.skipped++; result.priceDeclining++;   break;
+        case 'price_too_low':     result.skipped++; result.priceTooLow++;      break;
         case 'validation_failed': result.skipped++; result.validationFailed++; break;
         default:                  result.skipped++; break;
       }

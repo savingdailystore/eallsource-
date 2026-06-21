@@ -26,6 +26,12 @@ interface ValidationInput {
 // 97-100 and always clear it. Lower this only if pairing with UPC matching.
 const IDENTITY_MIN = 80;
 
+// Title-similarity matches are the single biggest source of bad leads (wrong
+// pack size/variant paired by fuzzy text overlap), so they're held to a higher
+// bar than the general floor. UPC/EAN (100) and BRAND_MODEL (85 fixed) still
+// clear this easily; only TITLE_SIMILARITY needs the extra margin.
+const TITLE_SIMILARITY_MIN = 88;
+
 export function validateProduct(input: ValidationInput): ValidationResult {
   const reasons: string[] = [];
 
@@ -60,8 +66,9 @@ export function validateProduct(input: ValidationInput): ValidationResult {
       reasons.push(`Brand mismatch: source "${sourceBrandShown}" vs Amazon "${input.amazon.brand}"`);
     }
   }
-  if (identityScore < IDENTITY_MIN) {
-    reasons.push(`Match confidence ${identityScore}% (need ≥ ${IDENTITY_MIN}%)`);
+  const identityMin = input.matchMethod === 'TITLE_SIMILARITY' ? TITLE_SIMILARITY_MIN : IDENTITY_MIN;
+  if (identityScore < identityMin) {
+    reasons.push(`Match confidence ${identityScore}% (need ≥ ${identityMin}%)`);
   }
 
   // ── URL confidence (stub — would check HTTP 200 in real impl) ─────────────
@@ -90,7 +97,7 @@ export function validateProduct(input: ValidationInput): ValidationResult {
 
   // ── Final gate ────────────────────────────────────────────────────────────
   const passed =
-    identityScore  >= IDENTITY_MIN &&
+    identityScore  >= identityMin &&
     urlScore       >= 95 &&
     priceScore     >= 70 &&
     inventoryScore >= 95;

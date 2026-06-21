@@ -196,12 +196,23 @@ model Product {
   bsr           Int?
   bsrPercentage Float?
 
+  // Sales velocity
+  monthlySales           Int?   // estimated units sold per month (Keepa)
+  expectedUnitsPerSeller Float? // monthlySales / (fbaSellers + 1) — your share
+
   // Seller / competition data
   buyBoxOwner      String?
   fbaSellers       Int?
   totalSellers     Int?
   amazonIsSeller   Boolean @default(false)
   amazonOwnsBuyBox Boolean @default(false)
+  buyBoxSuppressed Boolean @default(false)
+  isVariation      Boolean @default(false)
+  parentAsin       String?
+  roiImplausible   Boolean @default(false) // ROI high enough to suggest a bad match — verify
+  rating           Float?  // average star rating (0–5)
+  reviewCount      Int?    // total ratings/reviews on the listing
+  lowReviews       Boolean @default(false) // few reviews — new/unestablished listing risk
 
   // Validation scores (all must be >= 95 to pass)
   matchMethod      String?
@@ -219,10 +230,23 @@ model Product {
   hasHazmat         Boolean    @default(false)
   isBrandRestricted Boolean    @default(false)
   isCategoryGated   Boolean    @default(false)
+  isPrivateLabel    Boolean    @default(false)
+  isGenericBrand    Boolean    @default(false)
+  isMeltable        Boolean    @default(false)
+  feeEstimateConfirmed Boolean @default(false)
+
+  // Real per-ASIN IP complaint history — set manually by an owner after an
+  // actual takedown/complaint, not inferred. Once set, permanently blocks the
+  // ASIN from becoming a lead again (broadcast-wide, same as the brand-name
+  // heuristic but based on a confirmed incident instead of a guess).
+  hasIpComplaintHistory Boolean @default(false)
+  ipComplaintNote       String?
 
   // Demand & price stability
   demandLevel    DemandLevel @default(MEDIUM)
   priceStability String?
+  priceTrend     String?  // RISING | FLAT | DECLINING | UNKNOWN
+  priceTrendPct  Float?   // % change recent vs earlier window (negative = falling)
 
   // External links
   keepaLink String?

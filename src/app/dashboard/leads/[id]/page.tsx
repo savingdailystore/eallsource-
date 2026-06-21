@@ -12,6 +12,7 @@ import Link from 'next/link';
 import type { Discount } from '@/types';
 import { ProfitabilityCalculator } from '@/components/leads/ProfitabilityCalculator';
 import { LeadNotes } from '@/components/leads/LeadNotes';
+import { IpHistoryFlag } from '@/components/leads/IpHistoryFlag';
 import { ProductHero } from '@/components/leads/ProductHero';
 import { ungatingOutlook } from '@/engines/gating';
 
@@ -99,6 +100,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
+      <IpHistoryFlag
+        productId={p.id}
+        initialFlagged={p.hasIpComplaintHistory}
+        initialNote={p.ipComplaintNote}
+        canEdit={session!.user.role === 'OWNER'}
+      />
+
       {/* Match verification — title matches are fuzzy and must be confirmed */}
       {(() => {
         const verified = p.matchMethod === 'UPC' || p.matchMethod === 'EAN';
@@ -135,6 +143,36 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           </div>
         );
       })()}
+
+      {/* Too-good-to-be-true ROI — usually a mismatch, not a goldmine */}
+      {p.roiImplausible && (
+        <div className="rounded-xl border px-4 py-3 mb-6 flex gap-3 bg-red-500/10 border-red-500/30">
+          <TrendingUp className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-sm text-red-300 font-semibold">Unusually high ROI ({formatPercent(p.roi)}) — verify the match</p>
+            <p className="text-xs text-red-200/90 leading-relaxed mt-0.5">
+              An ROI this high is most often a <strong>wrong match</strong> — a single unit paired to a multipack listing,
+              or a different product entirely — rather than a real deal. Open both listings and confirm the
+              brand, model, and <strong>pack/quantity</strong> line up before buying.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Variation caveat — child ASINs report parent-level demand data */}
+      {p.isVariation && (
+        <div className="rounded-xl border px-4 py-3 mb-6 flex gap-3 bg-amber-500/10 border-amber-500/30">
+          <BarChart3 className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-sm text-amber-300 font-semibold">Variation listing (child ASIN)</p>
+            <p className="text-xs text-amber-200/90 leading-relaxed mt-0.5">
+              This is one variation of a parent listing{p.parentAsin ? ` (${p.parentAsin})` : ''}. BSR and review counts
+              reflect the <strong>whole variation family</strong>, not this specific size/color — so demand may look
+              stronger than this exact item actually sells. Verify your variation moves before buying deep.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Profitability */}
@@ -190,12 +228,19 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {[
                 ['Buy Box Price', p.buyBoxPrice != null ? formatCurrency(p.buyBoxPrice) : '—'],
                 ['Lowest FBA Price', p.lowestFbaPrice != null ? formatCurrency(p.lowestFbaPrice) : '—'],
-                ['BSR', p.bsr != null ? `#${p.bsr.toLocaleString()}` : '—'],
+                ['BSR', p.bsr != null ? `#${p.bsr.toLocaleString()}${p.isVariation ? ' (parent)' : ''}` : '—'],
                 ['BSR %', p.bsrPercentage != null ? `Top ${p.bsrPercentage.toFixed(2)}%` : '—'],
-                ['Buy Box Owner', p.buyBoxOwner ?? '—'],
+                ['Est. Monthly Sales', p.monthlySales != null ? `~${p.monthlySales.toLocaleString()}/mo` : '—'],
+                ['Your Est. Share', p.expectedUnitsPerSeller != null ? `~${p.expectedUnitsPerSeller.toFixed(1)} units/mo` : '—'],
+                ['Rating', p.rating != null ? `${p.rating.toFixed(1)}★` : '—'],
+                ['Reviews', p.reviewCount != null ? `${p.reviewCount.toLocaleString()}${p.lowReviews ? ' ⚠️ new listing' : ''}` : '—'],
+                ['Buy Box Owner', p.buyBoxSuppressed ? 'None (suppressed) ⚠️' : (p.buyBoxOwner ?? '—')],
                 ['Amazon Sells It', p.amazonOwnsBuyBox ? 'Yes ⚠️' : 'No ✓'],
                 ['Demand Level', p.demandLevel],
                 ['Price Stability', p.priceStability ?? '—'],
+                ['Price Trend', p.priceTrend && p.priceTrend !== 'UNKNOWN'
+                  ? `${p.priceTrend === 'DECLINING' ? '↓' : p.priceTrend === 'RISING' ? '↑' : '→'} ${p.priceTrend}${p.priceTrendPct != null ? ` (${p.priceTrendPct > 0 ? '+' : ''}${p.priceTrendPct}%)` : ''}${p.priceTrend === 'DECLINING' ? ' ⚠️' : ''}`
+                  : '—'],
               ].map(([label, value]) => (
                 <div key={label as string}>
                   <div className="text-xs text-slate-500">{label}</div>
@@ -261,6 +306,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 ['Hazmat',       p.hasHazmat ? 'Yes ⚠️' : 'No', !p.hasHazmat],
                 ['Brand Restricted', p.isBrandRestricted ? 'Yes ⚠️' : 'No', !p.isBrandRestricted],
                 ['Category Gated',   p.isCategoryGated   ? 'Yes ⚠️' : 'No', !p.isCategoryGated],
+                ['Private Label',    p.isPrivateLabel    ? 'Yes ⚠️' : 'No', !p.isPrivateLabel],
+                ['Generic Brand',    p.isGenericBrand    ? 'Yes ⚠️' : 'No', !p.isGenericBrand],
+                ['Meltable',         p.isMeltable        ? 'Yes ⚠️' : 'No', !p.isMeltable],
+                ['Fee Estimate',     p.feeEstimateConfirmed ? 'Confirmed ✓' : 'Unconfirmed ⚠️', p.feeEstimateConfirmed],
               ].map(([label, value, good]) => (
                 <div key={label as string} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
                   <span className="text-sm text-slate-400">{label as string}</span>

@@ -2,13 +2,37 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Radar, Loader2, CheckCircle2, XCircle, Clock, Play } from 'lucide-react';
+import { Radar, Loader2, CheckCircle2, XCircle, Clock, Play, ChevronDown, ChevronUp } from 'lucide-react';
+import React from 'react';
 
 interface ScanResult {
   found?:   number;
   created?: number;
   updated?: number;
+  skipped?: number;
+  errors?:  number;
+  // Skip-reason breakdown (each sums into `skipped`)
+  noMatch?:          number;
+  notProfitable?:    number;
+  demandTooLow?:     number;
+  velocityTooLow?:   number;
+  noBuyBox?:         number;
+  priceDeclining?:   number;
+  priceTooLow?:      number;
+  validationFailed?: number;
 }
+
+// Human labels for each skip reason, in a sensible reading order.
+const SKIP_LABELS: Array<{ key: keyof ScanResult; label: string }> = [
+  { key: 'noMatch',          label: 'No Amazon match' },
+  { key: 'notProfitable',    label: 'Not profitable' },
+  { key: 'priceTooLow',      label: 'Resale price too low' },
+  { key: 'demandTooLow',     label: 'Weak BSR / demand' },
+  { key: 'velocityTooLow',   label: 'Low sales velocity' },
+  { key: 'noBuyBox',         label: 'No buy box' },
+  { key: 'priceDeclining',   label: 'Price declining' },
+  { key: 'validationFailed', label: 'Failed validation' },
+];
 
 interface Job {
   id:          string;
@@ -35,6 +59,7 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
   const [category, setCategory] = useState('');
   const [loading, setLoading]   = useState(false);
   const [result, setResult]     = useState<{ ok: boolean; message: string } | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const hasActive = jobs.some((j) => j.status === 'PENDING' || j.status === 'RUNNING');
 
@@ -139,8 +164,8 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-800/40">
-                  {['Retailer', 'Query', 'Status', 'Products', 'Leads', 'Started'].map((h) => (
-                    <th key={h} className="table-th">{h}</th>
+                  {['Retailer', 'Query', 'Status', 'Products', 'Leads', 'Started', ''].map((h, i) => (
+                    <th key={h || i} className="table-th">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -150,27 +175,71 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                   const found    = job.result?.found;
                   const leads    = (job.result?.created ?? 0) + (job.result?.updated ?? 0);
                   const hasStats = job.status === 'DONE' && job.result != null;
+                  const r        = job.result;
+                  const skipped  = r?.skipped ?? 0;
+                  const namedSkips = SKIP_LABELS.reduce((sum, { key }) => sum + (Number(r?.[key]) || 0), 0);
+                  const otherSkips = Math.max(0, skipped - namedSkips);
+                  const canExpand  = hasStats && skipped > 0;
+                  const isExp      = expanded === job.id;
                   return (
-                    <tr key={job.id} className="hover:bg-slate-800/40">
-                      <td className="table-td font-medium text-slate-100">{job.retailer ?? '—'}</td>
-                      <td className="table-td text-slate-300">{job.query || <span className="text-slate-500">all</span>}</td>
-                      <td className="table-td">
-                        <span className={`badge text-xs ${s.cls}`}>
-                          <s.icon className={`w-3 h-3 mr-1 ${job.status === 'RUNNING' ? 'animate-spin' : ''}`} />
-                          {job.status}
-                        </span>
-                        {job.status === 'FAILED' && job.error && (
-                          <div className="text-[10px] text-red-400 mt-1 max-w-xs truncate" title={job.error}>{job.error}</div>
-                        )}
-                      </td>
-                      <td className="table-td text-slate-300 text-xs">{hasStats && found != null ? found : '—'}</td>
-                      <td className="table-td text-xs">
-                        {hasStats
-                          ? <span className={leads > 0 ? 'font-semibold text-green-400' : 'text-slate-500'}>{leads}</span>
-                          : <span className="text-slate-500">—</span>}
-                      </td>
-                      <td className="table-td text-slate-400 text-xs">{new Date(job.createdAt).toLocaleString()}</td>
-                    </tr>
+                    <React.Fragment key={job.id}>
+                      <tr
+                        className={`hover:bg-slate-800/40 ${canExpand ? 'cursor-pointer' : ''}`}
+                        onClick={canExpand ? () => setExpanded(isExp ? null : job.id) : undefined}
+                      >
+                        <td className="table-td font-medium text-slate-100">{job.retailer ?? '—'}</td>
+                        <td className="table-td text-slate-300">{job.query || <span className="text-slate-500">all</span>}</td>
+                        <td className="table-td">
+                          <span className={`badge text-xs ${s.cls}`}>
+                            <s.icon className={`w-3 h-3 mr-1 ${job.status === 'RUNNING' ? 'animate-spin' : ''}`} />
+                            {job.status}
+                          </span>
+                          {job.status === 'FAILED' && job.error && (
+                            <div className="text-[10px] text-red-400 mt-1 max-w-xs truncate" title={job.error}>{job.error}</div>
+                          )}
+                        </td>
+                        <td className="table-td text-slate-300 text-xs">{hasStats && found != null ? found : '—'}</td>
+                        <td className="table-td text-xs">
+                          {hasStats
+                            ? <span className={leads > 0 ? 'font-semibold text-green-400' : 'text-slate-500'}>{leads}</span>
+                            : <span className="text-slate-500">—</span>}
+                        </td>
+                        <td className="table-td text-slate-400 text-xs">{new Date(job.createdAt).toLocaleString()}</td>
+                        <td className="table-td text-xs text-slate-500">
+                          {canExpand && (isExp
+                            ? <ChevronUp className="w-3.5 h-3.5" />
+                            : <span className="flex items-center gap-1">{skipped} filtered<ChevronDown className="w-3.5 h-3.5" /></span>)}
+                        </td>
+                      </tr>
+                      {isExp && r && (
+                        <tr className="bg-slate-800/40">
+                          <td colSpan={7} className="px-5 py-3">
+                            <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">
+                              Why {skipped} product{skipped === 1 ? '' : 's'} didn’t become leads
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5">
+                              {SKIP_LABELS.filter(({ key }) => (Number(r[key]) || 0) > 0).map(({ key, label }) => (
+                                <div key={key} className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-400">{label}</span>
+                                  <span className="font-mono text-slate-200">{Number(r[key]) || 0}</span>
+                                </div>
+                              ))}
+                              {otherSkips > 0 && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-slate-400">Other risk gates</span>
+                                  <span className="font-mono text-slate-200">{otherSkips}</span>
+                                </div>
+                              )}
+                            </div>
+                            {otherSkips > 0 && (
+                              <p className="text-[10px] text-slate-500 mt-2">
+                                “Other risk gates” = Amazon-on-listing, suppressed-by-volatility, hazmat, private/generic brand, IP history, etc.
+                              </p>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>

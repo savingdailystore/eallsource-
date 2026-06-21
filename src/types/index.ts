@@ -88,6 +88,9 @@ export interface AmazonProductData {
   totalSellers?: number;
   amazonIsSeller?: boolean;
   amazonOwnsBuyBox?: boolean;
+  buyBoxSuppressed?: boolean; // offers exist but no buy box is shown
+  isVariation?: boolean;      // this ASIN is a child of a parent variation listing
+  parentAsin?: string;        // parent ASIN when isVariation is true
   referralFeeRate?: number;
   fbaFee?: number;
   storageFee?: number;
@@ -122,6 +125,7 @@ export interface ProfitabilityResult {
   roi: number;
   margin: number;
   qualifies: boolean;
+  feeEstimateConfirmed: boolean;
 }
 
 // ─── Validation engine ──────────────────────────────────────────────────────
@@ -152,12 +156,16 @@ export interface DemandInput {
   category: string;
   fbaSellers: number;
   totalSellers: number;
+  monthlySales?: number;   // estimated units sold per month (Keepa); undefined = unknown
   priceHistory?: number[];
 }
 
 export interface DemandResult {
   level: DemandLevel;
   reasons: string[];
+  monthlySales?: number;          // echoed through for persistence/display
+  expectedUnitsPerSeller?: number; // monthlySales / (fbaSellers + 1)
+  velocityTooLow: boolean;        // true when we have data and share is below the floor
 }
 
 // ─── Gating engine ──────────────────────────────────────────────────────────
@@ -175,6 +183,9 @@ export interface GatingResult {
   isBrandRestricted: boolean;
   isCategoryGated: boolean;
   hasHazmat: boolean;
+  isPrivateLabel: boolean;
+  isGenericBrand: boolean;
+  isMeltable: boolean;
   reasons: string[];
 }
 

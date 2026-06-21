@@ -63,6 +63,12 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
     ? resellPrice * referralFeeRate
     : estimateReferralFee(resellPrice, category);
 
+  // When SP-API's real fee estimate isn't available, estimateFbaFee() assumes
+  // the cheapest 1lb tier — fine for a typical small item, but it silently
+  // understates cost for anything actually heavy/oversized. Track whether the
+  // real fee was used so callers can flag unconfirmed estimates instead of
+  // treating them as verified economics.
+  const feeEstimateConfirmed = inputFbaFee != null;
   const fbaFee       = inputFbaFee ?? estimateFbaFee();
   const taxAmount    = resellPrice * 0.0875; // estimated avg sales tax
   const amazonFees   = referralFee + fbaFee + storageFee;
@@ -73,7 +79,9 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const roi    = totalLandedCost > 0 ? (profit / totalLandedCost) * 100 : 0;
   const margin = resellPrice > 0     ? (profit / resellPrice) * 100     : 0;
 
-  const qualifies = roi >= 30 && profit >= 5;
+  // Profit floor raised from $5 → $8: at $5, normal fee volatility or a $1
+  // price drop wipes the margin entirely — too thin to be worth a warehouse slot.
+  const qualifies = roi >= 30 && profit >= 8;
 
   return {
     finalCost,
@@ -89,6 +97,7 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
     roi,
     margin,
     qualifies,
+    feeEstimateConfirmed,
   };
 }
 

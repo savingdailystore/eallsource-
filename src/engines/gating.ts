@@ -32,6 +32,9 @@ const HIGH_IP_BRANDS = new Set([
   'Star Wars', 'Pokémon', 'Nintendo', 'Sony', 'Samsung',
   'Dyson', 'Peloton', 'Vitamix', 'Yeti', 'Stanley',
   'Hydro Flask', 'Keurig', 'Nespresso',
+  'Lululemon', 'Patagonia', 'The North Face', 'Crocs', 'Birkenstock',
+  'Ray-Ban', 'Oakley', 'Funko', 'Hasbro', 'Mattel', 'Harry Potter',
+  'Supreme', 'Gucci', 'Louis Vuitton', 'Chanel', 'GoPro',
 ]);
 
 const MEDIUM_IP_BRANDS = new Set([
@@ -40,11 +43,46 @@ const MEDIUM_IP_BRANDS = new Set([
   'iRobot', 'Roomba', 'Bose', 'JBL', 'Beats',
 ]);
 
-// Hazmat keywords
+// Amazon's own private-label brands. These are manufactured and sold
+// exclusively by Amazon — there is no buy box to win and no legitimate way to
+// source genuine inventory through retail arbitrage, so any match here is a
+// dead lead regardless of margin.
+const PRIVATE_LABEL_BRANDS = new Set([
+  'amazon basics', 'amazonbasics', 'amazon essentials', 'amazon collection',
+  'solimo', 'presto!', 'presto', 'happy belly', 'mama bear', 'mama bear organic',
+  'wag', 'revly', 'goodthreads', 'amazon brand', 'core 10', 'daily ritual',
+  'symbology', 'find.', 'lark & ro', 'buttoned down', '206 collective',
+  'amazon elements', 'pinzon', 'rivet', 'stone & beam', 'rivet & quartz',
+  'ravenna home', 'mr. beams', 'mr beams', 'pikolin home', 'gravity',
+  'vedo', 'today\'s woman',
+]);
+
+// Hazmat / dangerous goods keywords — covers common FBA-restricted materials
+// (flammables, corrosives, batteries, pressurized containers, oxidizers).
 const HAZMAT_KEYWORDS = [
-  'lithium battery', 'aerosol', 'flammable', 'corrosive',
-  'bleach', 'paint thinner', 'acetone', 'propane',
-  'compressed gas', 'acid', 'explosive', 'peroxide',
+  'lithium battery', 'lithium-ion', 'lithium ion', 'aerosol', 'flammable',
+  'corrosive', 'bleach', 'paint thinner', 'acetone', 'propane', 'butane',
+  'compressed gas', 'acid', 'explosive', 'peroxide', 'pesticide',
+  'fertilizer', 'ammonia', 'gasoline', 'kerosene', 'lighter fluid',
+  'oxidizer', 'pressurized', 'combustible', 'toxic', 'poison',
+  'rechargeable battery', 'car battery', 'gun powder', 'gunpowder',
+];
+
+// Meltable / temperature-sensitive keywords — risk depends on season and
+// shipping speed, not a fixed disqualifier, so this is informational only.
+const MELTABLE_KEYWORDS = [
+  'chocolate', 'candle', 'wax melt', 'wax', 'gummy', 'gummies', 'lip balm',
+  'lipstick', 'crayon', 'gum', 'caramel', 'marshmallow', 'cheese',
+  'butter', 'cocoa', 'lotion bar', 'bath bomb', 'soap bar', 'deodorant stick',
+];
+
+// Brand strings that indicate "no real brand" — unbranded/private-seller
+// listings. These carry higher IP-complaint risk (anyone can claim
+// infringement on an unbranded knockoff) and unreliable supply since there's
+// no actual manufacturer backing the listing.
+const GENERIC_BRAND_PATTERNS = [
+  'generic', 'unbranded', 'no brand', 'n/a', 'na', 'none', 'other',
+  'various', 'assorted', 'oem', 'unknown',
 ];
 
 // Gated categories that require approval
@@ -65,6 +103,13 @@ export function assessGating(input: GatingInput): GatingResult {
   const reasons: string[] = [];
   let risk: GatingRisk = 'LOW';
 
+  // Private-label check — no buy box to win, hard reject regardless of margin
+  const isPrivateLabel = !!brand && PRIVATE_LABEL_BRANDS.has(brand.toLowerCase().trim());
+  if (isPrivateLabel) {
+    risk = 'HIGH';
+    reasons.push(`Amazon private-label brand: ${brand} — no buy box to win`);
+  }
+
   // Brand restriction check
   const isBrandRestricted = !!brand && HIGH_IP_BRANDS.has(brand);
   if (isBrandRestricted) {
@@ -82,12 +127,27 @@ export function assessGating(input: GatingInput): GatingResult {
     reasons.push(`Gated category: ${category}`);
   }
 
-  // Hazmat check
+  // Hazmat / dangerous goods check
   const titleLower = title.toLowerCase();
   const hasHazmat = knownHazmat || HAZMAT_KEYWORDS.some((kw) => titleLower.includes(kw));
   if (hasHazmat) {
     risk = 'HIGH';
-    reasons.push('Potential hazmat materials detected');
+    reasons.push('Potential hazmat / dangerous goods materials detected');
+  }
+
+  // Meltable check — informational only, doesn't raise risk or block
+  const isMeltable = MELTABLE_KEYWORDS.some((kw) => titleLower.includes(kw));
+  if (isMeltable) {
+    reasons.push('Temperature-sensitive item — melt risk in transit/storage during warm months');
+  }
+
+  // Generic / unbranded check — no brand at all, or a brand string that's
+  // really just a placeholder rather than a real manufacturer name.
+  const brandNorm = (brand ?? '').toLowerCase().trim();
+  const isGenericBrand = !brand || GENERIC_BRAND_PATTERNS.includes(brandNorm);
+  if (isGenericBrand) {
+    risk = 'HIGH';
+    reasons.push(brand ? `Generic/placeholder brand: ${brand}` : 'No brand provided');
   }
 
   // Auto-ungated check
@@ -99,6 +159,9 @@ export function assessGating(input: GatingInput): GatingResult {
     isBrandRestricted,
     isCategoryGated,
     hasHazmat,
+    isPrivateLabel,
+    isGenericBrand,
+    isMeltable,
     reasons,
   };
 }
@@ -128,10 +191,20 @@ export function ungatingOutlook(p: {
   isBrandRestricted?: boolean | null;
   isCategoryGated?:   boolean | null;
   hasHazmat?:         boolean | null;
+  isPrivateLabel?:    boolean | null;
+  isGenericBrand?:    boolean | null;
 }): UngatingOutlook {
+  if (p.isPrivateLabel) {
+    return { key: 'RESTRICTED', label: 'Private label', tone: 'bad',
+      hint: "Amazon's own brand — Amazon holds the buy box exclusively, there's nothing to win here." };
+  }
   if (p.hasHazmat) {
     return { key: 'RESTRICTED', label: 'Hazmat', tone: 'bad',
-      hint: 'Hazmat items need special approval and FBA handling.' };
+      hint: 'Hazmat / dangerous goods — needs special approval and FBA handling.' };
+  }
+  if (p.isGenericBrand) {
+    return { key: 'RESTRICTED', label: 'Generic / unbranded', tone: 'bad',
+      hint: 'No real brand on file — higher IP-complaint and supply risk, generally avoided.' };
   }
   if (p.isBrandRestricted || p.ipRiskScore === 'HIGH') {
     return { key: 'RESTRICTED', label: 'Restricted brand', tone: 'bad',

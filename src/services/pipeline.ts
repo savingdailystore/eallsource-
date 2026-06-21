@@ -24,6 +24,13 @@ import { validateProduct } from '@/engines/validation';
 import { calculateScore } from '@/engines/scoring';
 import type { RetailerProduct, AmazonMatch } from '@/types';
 
+// Minimum Amazon resale price for a lead to be worth sourcing. Below this, fees
+// eat the margin and the per-unit labor isn't worth it.
+const MIN_RESALE_PRICE = 12;
+// Review count below which a listing reads as new/unestablished (hijack &
+// counterfeit-bait risk, no proven demand). Informational flag, not a gate.
+const LOW_REVIEW_THRESHOLD = 3;
+
 export type PipelineResult =
   | { outcome: 'lead_created';      leadId: string; score: number }
   | { outcome: 'lead_updated';      leadId: string; score: number }
@@ -32,6 +39,16 @@ export type PipelineResult =
   | { outcome: 'validation_failed'; reasons: string[] }
   | { outcome: 'not_profitable';    roi: number; profit: number }
   | { outcome: 'demand_too_low';    bsr: number }
+  | { outcome: 'velocity_too_low';  expectedUnits: number }
+  | { outcome: 'price_too_low';     resellPrice: number }
+  | { outcome: 'amazon_sells_it' }
+  | { outcome: 'no_buybox' }
+  | { outcome: 'price_unstable' }
+  | { outcome: 'price_declining';   trendPct: number }
+  | { outcome: 'private_label' }
+  | { outcome: 'hazmat' }
+  | { outcome: 'generic_brand' }
+  | { outcome: 'ip_complaint_history' }
   | { outcome: 'error';             message: string };
 
 export interface ProcessOptions {
@@ -59,6 +76,17 @@ export async function processRetailerProduct(
 
     const { asin, amazonUrl, matchMethod, matchConfidence } = match;
 
+    // Real IP-complaint history gate — checked across ALL orgs since this is a
+    // confirmed fact about the ASIN itself, not org-specific. Once an owner has
+    // marked an ASIN this way (after an actual takedown/complaint), it's
+    // permanently blocked everywhere — never bypassed, even by force, since
+    // this is verified risk rather than a heuristic guess.
+    const flaggedAsin = await prisma.product.findFirst({
+      where:  { asin, hasIpComplaintHistory: true },
+      select: { id: true },
+    });
+    if (flaggedAsin) return { outcome: 'ip_complaint_history' };
+
     // ── 2. Get market data ────────────────────────────────────────────────────
     // Try SP-API first (requires connected cred), fall back to Keepa
     const [spData, keepaData] = await Promise.allSettled([
@@ -80,7 +108,14 @@ export async function processRetailerProduct(
     const fbaSellers     = sp?.fbaSellers    ?? keepa?.fbaSellers    ?? 0;
     const totalSellers   = sp?.totalSellers  ?? keepa?.totalSellers  ?? 0;
     const amazonIsSeller = sp?.amazonIsSeller ?? keepa?.amazonIsSeller ?? false;
+    const monthlySales   = keepa?.monthlySales; // velocity signal (Keepa only)
+    const isVariation    = sp?.isVariation ?? keepa?.isVariation ?? false;
+    const parentAsin     = sp?.parentAsin  ?? keepa?.parentAsin;
+    const rating         = keepa?.rating;       // Keepa only
+    const reviewCount    = keepa?.reviewCount;  // Keepa only
     const priceStability = keepa?.priceStability ?? 'UNKNOWN';
+    const priceTrend     = keepa?.priceTrend ?? 'UNKNOWN'; // directional (Keepa only)
+    const priceTrendPct  = keepa?.priceTrendPct;
     const keepaLink      = keepa?.keepaLink;
 
     // Manual entries must come back with real Amazon data. Without a resell price
@@ -94,8 +129,51 @@ export async function processRetailerProduct(
     const resellPrice = lowestFbaPrice ?? buyBoxPrice ?? product.price;
     const category    = amazonCategory ?? product.category ?? 'Other';
 
-    // ── 3. Demand gate (BSR must be top 3%) ───────────────────────────────────
-    const demandResult = assessDemand({ bsr: bsr ?? 999999, category, fbaSellers, totalSellers });
+    // Minimum resale-price floor: sub-$12 ASP items rarely clear the profit
+    // floor after fees, and the per-unit labor (prep, ship, manage) isn't worth
+    // it even when they do. Hard reject.
+    if (!opts.force && resellPrice < MIN_RESALE_PRICE) {
+      return { outcome: 'price_too_low', resellPrice };
+    }
+
+    // Buy box suppression: there are live offers but no buy box winner. Computed
+    // from the merged data so it holds regardless of which source answered.
+    const buyBoxSuppressed = buyBoxPrice == null && totalSellers > 0;
+
+    // Amazon-as-seller gate: when Amazon itself holds the buy box, third-party
+    // sellers rarely win it — the listed margin almost never converts to real
+    // sales, so this is a hard reject rather than just a display flag.
+    if (!opts.force && amazonIsSeller) {
+      return { outcome: 'amazon_sells_it' };
+    }
+
+    // No-buy-box gate: a suppressed buy box means no one-click "Buy Now" for
+    // customers — conversion craters, so the listed economics are misleading.
+    if (!opts.force && buyBoxSuppressed) {
+      return { outcome: 'no_buybox' };
+    }
+
+    // Price-stability gate: a crashing/volatile price history is one of the
+    // more predictive "don't buy" signals — a margin computed off today's
+    // snapshot price is unreliable if the price has been swinging.
+    if (!opts.force && priceStability === 'VOLATILE') {
+      return { outcome: 'price_unstable' };
+    }
+
+    // Price-trend gate: a steadily declining buy box price (race to the bottom)
+    // means today's margin erodes over your sell-through window — distinct from
+    // volatility, which is noise rather than direction.
+    if (!opts.force && priceTrend === 'DECLINING') {
+      return { outcome: 'price_declining', trendPct: priceTrendPct ?? 0 };
+    }
+
+    // ── 3. Demand gate (BSR top 6%, not oversaturated, enough velocity per seller) ──
+    const demandResult = assessDemand({ bsr: bsr ?? 999999, category, fbaSellers, totalSellers, monthlySales });
+    // Velocity reject gets its own outcome so it's distinguishable from a plain
+    // weak-BSR rejection in the scan stats.
+    if (!opts.force && demandResult.velocityTooLow) {
+      return { outcome: 'velocity_too_low', expectedUnits: demandResult.expectedUnitsPerSeller ?? 0 };
+    }
     if (!opts.force && demandResult.level === 'LOW' && bsr != null) {
       return { outcome: 'demand_too_low', bsr };
     }
@@ -107,6 +185,24 @@ export async function processRetailerProduct(
       category,
       hasHazmat: false,
     });
+
+    // Private-label gate: Amazon's own brands have no buy box to win — a hard
+    // reject, not just a risk flag, since the lead can never actually be sold.
+    if (!opts.force && gatingResult.isPrivateLabel) {
+      return { outcome: 'private_label' };
+    }
+
+    // Hazmat / dangerous goods gate: requires special FBA approval/handling —
+    // rarely worth it for arbitrage, hard reject.
+    if (!opts.force && gatingResult.hasHazmat) {
+      return { outcome: 'hazmat' };
+    }
+
+    // Generic/unbranded gate: no real manufacturer backing the listing means
+    // higher IP-complaint exposure and unreliable supply — hard reject.
+    if (!opts.force && gatingResult.isGenericBrand) {
+      return { outcome: 'generic_brand' };
+    }
 
     // ── 5. Get real fee data if SP-API is connected ───────────────────────────
     let referralFee: number | undefined;
@@ -133,6 +229,21 @@ export async function processRetailerProduct(
     if (!opts.force && !profitResult.qualifies) {
       return { outcome: 'not_profitable', roi: profitResult.roi, profit: profitResult.profit };
     }
+
+    // Too-good-to-be-true ROI: an implausibly high ROI is usually a bad match
+    // (a single item paired to a multipack listing, or the wrong ASIN) rather
+    // than a real goldmine. We FLAG rather than reject — genuine clearance finds
+    // exist — but the bar is lower for non-barcode matches, which are where
+    // mismatches actually happen. Barcode (UPC/EAN) matches are exact, so only
+    // a truly extreme ROI is worth a second look there.
+    const isBarcodeMatch = matchMethod === 'UPC' || matchMethod === 'EAN';
+    const roiImplausibleThreshold = isBarcodeMatch ? 400 : 200;
+    const roiImplausible = profitResult.roi >= roiImplausibleThreshold;
+
+    // Low-reviews flag: an established listing has a review track record; very
+    // few reviews can mean a brand-new or hijacked/counterfeit-prone listing.
+    // Informational only — new listings can still be legitimate opportunities.
+    const lowReviews = reviewCount != null && reviewCount < LOW_REVIEW_THRESHOLD;
 
     // ── 7. Validation ─────────────────────────────────────────────────────────
     const validationResult = validateProduct({
@@ -216,9 +327,12 @@ export async function processRetailerProduct(
       bsrPercentage,
       fbaSellers,
       totalSellers,
+      monthlySales:            demandResult.monthlySales ?? null,
+      expectedUnitsPerSeller:  demandResult.expectedUnitsPerSeller ?? null,
       amazonIsSeller,
       amazonOwnsBuyBox: amazonIsSeller,
-      buyBoxOwner:      amazonIsSeller ? 'Amazon' : 'Third-party',
+      buyBoxSuppressed,
+      buyBoxOwner:      buyBoxSuppressed ? 'None (suppressed)' : amazonIsSeller ? 'Amazon' : 'Third-party',
 
       matchMethod,
       matchConfidence,
@@ -234,9 +348,21 @@ export async function processRetailerProduct(
       hasHazmat:        gatingResult.hasHazmat,
       isBrandRestricted: gatingResult.isBrandRestricted,
       isCategoryGated:  gatingResult.isCategoryGated,
+      isPrivateLabel:   gatingResult.isPrivateLabel,
+      isGenericBrand:   gatingResult.isGenericBrand,
+      isMeltable:       gatingResult.isMeltable,
+      feeEstimateConfirmed: profitResult.feeEstimateConfirmed,
 
       demandLevel:      demandResult.level,
       priceStability:   priceStability,
+      priceTrend:       priceTrend,
+      priceTrendPct:    priceTrendPct ?? null,
+      isVariation,
+      parentAsin:       parentAsin ?? null,
+      roiImplausible,
+      rating:           rating ?? null,
+      reviewCount:      reviewCount ?? null,
+      lowReviews,
       keepaLink,
       notes:            opts.notes?.trim() || null,
       score,

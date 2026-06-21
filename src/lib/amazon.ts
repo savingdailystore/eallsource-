@@ -263,11 +263,25 @@ export async function getFeeEstimate(orgId: string, asin: string, price: number,
 
     if (!res.ok) return null;
 
-    const data = await res.json() as any;
-    const fees = data?.payload?.FeesEstimateResult?.FeesEstimate?.FeeDetailList ?? [];
+    const data   = await res.json() as any;
+    const result = data?.payload?.FeesEstimateResult;
+
+    // SP-API can return a 200 whose FeesEstimateResult.Status is 'ClientError'
+    // or 'ServerError' with no FeesEstimate body at all. Treat anything but a
+    // successful estimate as "no data" so the caller falls back to our own fee
+    // estimates instead of charging $0 in fees.
+    if (result?.Status !== 'Success') return null;
+
+    const fees = result?.FeesEstimate?.FeeDetailList ?? [];
 
     const referralFee = fees.find((f: any) => f.FeeType === 'ReferralFee')?.FinalFee?.Amount ?? 0;
     const fbaFee      = fees.find((f: any) => f.FeeType === 'FBAFees')?.FinalFee?.Amount      ?? 0;
+
+    // Every real FBA listing carries a referral fee (>0) and a fulfillment fee
+    // (>0). If either is missing or zero, the detail list came back incomplete —
+    // return null so estimates fill the gap rather than reporting near-zero fees
+    // and a wildly inflated profit/ROI. (This was the "$0.50 Amazon fees" bug.)
+    if (referralFee <= 0 || fbaFee <= 0) return null;
 
     return { referralFee, fbaFee };
   } catch (err) {

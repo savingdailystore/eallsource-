@@ -62,7 +62,10 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const totalLandedCost = finalCost + sourceTax + sourceShipping;
 
   // ── Amazon fees ────────────────────────────────────────────────────────
-  const referralFee = referralFeeRate != null
+  // Treat a zero (or missing) referral rate as "no real data" — a 0% referral
+  // fee never happens on Amazon, so it can only mean an empty fee response leaked
+  // through. Fall back to the category estimate rather than charging nothing.
+  const referralFee = referralFeeRate != null && referralFeeRate > 0
     ? resellPrice * referralFeeRate
     : estimateReferralFee(resellPrice, category);
 
@@ -71,8 +74,10 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   // understates cost for anything actually heavy/oversized. Track whether the
   // real fee was used so callers can flag unconfirmed estimates instead of
   // treating them as verified economics.
-  const feeEstimateConfirmed = inputFbaFee != null;
-  const fbaFee       = inputFbaFee ?? estimateFbaFee();
+  // A real FBA fee is always > 0; a 0 here means no confirmed estimate came
+  // through, so it's neither "confirmed" nor usable — fall back to the table.
+  const feeEstimateConfirmed = inputFbaFee != null && inputFbaFee > 0;
+  const fbaFee       = feeEstimateConfirmed ? inputFbaFee! : estimateFbaFee();
   // Sales tax is the tax YOU pay buying from the retailer (on the source cost),
   // not a cut of the resale price. The tax a customer pays on Amazon is
   // collected and remitted by Amazon — it is never the seller's cost. Charging

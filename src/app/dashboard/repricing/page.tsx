@@ -30,7 +30,7 @@ function RulesTable({ rules }: { rules: any[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-800 bg-slate-800/40">
-            {['ASIN', 'Product', 'Strategy', 'Min ROI', 'Min Profit', 'Floor', 'Last Price', 'Direction', 'Last Run', ''].map((h) => (
+            {['ASIN', 'Product', 'Strategy', 'Min ROI', 'Min Profit', 'Cost', 'Floor', 'Last Price', 'Direction', 'Last Run', ''].map((h) => (
               <th key={h} className="table-th">{h}</th>
             ))}
           </tr>
@@ -51,6 +51,11 @@ function RulesTable({ rules }: { rules: any[] }) {
                 </td>
                 <td className="table-td">{rule.minRoi}%</td>
                 <td className="table-td">{formatCurrency(rule.minProfit)}</td>
+                <td className="table-td">
+                  {rule.costBasis != null
+                    ? formatCurrency(rule.costBasis)
+                    : <span className="text-amber-400/80 text-xs" title="Set a unit cost so the repricer can protect your margin">Not set</span>}
+                </td>
                 <td className="table-td text-slate-300">{rule.floorPrice != null ? formatCurrency(rule.floorPrice) : '—'}</td>
                 <td className="table-td font-medium">
                   {rule.lastRecommendedPrice ? formatCurrency(rule.lastRecommendedPrice) : '—'}

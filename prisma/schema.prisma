@@ -330,6 +330,7 @@ model RepricingRule {
   minProfit  Float   @default(5)
   strategy   String  @default("COMPETITIVE")
   floorPrice Float?  // optional hard floor — price never drops below this
+  costBasis  Float?  // what you paid per unit; needed for the ROI/profit floor
 
   lastRecommendedPrice Float?
   lastDirection        String?

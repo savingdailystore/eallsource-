@@ -2,21 +2,39 @@ import { getSpApiClient } from './sp-api';
 
 type SpClient = Awaited<ReturnType<typeof getSpApiClient>>;
 
+export interface ListingMarket {
+  productType?:  string;
+  currentPrice?: number; // the seller's own current listing price
+}
+
 /**
- * Fetch the productType for a given seller SKU. The Listings Items PATCH
- * requires the listing's real productType (e.g. "CHEMICAL", "SHOES"); a generic
- * value is often rejected. Returns null if the SKU/listing can't be read.
+ * Read a seller SKU's listing: its productType (required for the price PATCH)
+ * and the seller's current price. Returns an empty object if it can't be read.
  */
-async function getListingProductType(client: SpClient, sku: string): Promise<string | null> {
+async function readListing(client: SpClient, sku: string): Promise<ListingMarket> {
   try {
     const data = await client.get(
       `/listings/2021-08-01/items/${client.sellerId}/${encodeURIComponent(sku)}`,
-      { marketplaceIds: client.marketplaceId, includedData: 'summaries' },
+      { marketplaceIds: client.marketplaceId, includedData: 'summaries,offers' },
     );
-    const summaries = data?.summaries ?? [];
-    return summaries[0]?.productType ?? null;
+    const productType = data?.summaries?.[0]?.productType ?? undefined;
+    // Listings Items offers: [{ offerType, price: { currencyCode, amount } }]
+    const rawPrice    = data?.offers?.[0]?.price?.amount;
+    const currentPrice = rawPrice != null && !Number.isNaN(Number(rawPrice)) ? Number(rawPrice) : undefined;
+    return { productType, currentPrice };
   } catch {
-    return null;
+    return {};
+  }
+}
+
+/** Public: fetch a SKU's current listing price + productType for repricing. */
+export async function getListingMarket(orgId: string, sku: string): Promise<ListingMarket> {
+  if (!sku) return {};
+  try {
+    const client = await getSpApiClient(orgId);
+    return await readListing(client, sku);
+  } catch {
+    return {};
   }
 }
 
@@ -46,7 +64,7 @@ export async function pushListingPrice(orgId: string, sku: string, price: number
 
   if (!client.sellerId) return { ok: false, error: 'Missing Amazon seller ID — reconnect your account.' };
 
-  const productType = await getListingProductType(client, sku);
+  const { productType } = await readListing(client, sku);
   if (!productType) {
     return { ok: false, error: `Could not read listing for SKU "${sku}" — it may not exist on your account.` };
   }

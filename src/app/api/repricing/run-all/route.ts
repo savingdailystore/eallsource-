@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { calculateReprice } from '@/engines/repricing';
+import { getProductData } from '@/lib/amazon';
+import { getListingMarket } from '@/lib/amazon-listings';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -51,21 +53,52 @@ export async function POST() {
 
   let proposed = 0; // actionable price changes awaiting approval
   let hold     = 0; // ran fine, no change recommended
-  let skipped  = 0; // no market data to price against
+  let noPrice  = 0; // couldn't determine a current/market price to act on
+  let noCost   = 0; // no cost basis and no manual floor → can't protect margin
 
   for (const rule of rules) {
     const product = await prisma.product.findFirst({ where: { orgId, asin: rule.asin } });
+    const sku     = skuByAsin.get(rule.asin) ?? null;
 
-    // Repricing requires scanned Amazon market data (buy box, cost, resale price).
-    const costBasis    = product?.totalLandedCost ?? product?.sourcePrice ?? 0;
-    // Prefer the price we last pushed live, then the last recommendation, then
-    // the scanned resale price, as our best guess of the current live price.
-    const currentPrice = rule.lastPushedPrice ?? rule.lastRecommendedPrice ?? product?.estimatedResellPrice ?? 0;
-    const buyBoxPrice  = product?.buyBoxPrice ?? 0;
-    const fbaSellers   = product?.fbaSellers ?? 0;
+    // Most repricing targets are the seller's OWN inventory, which was never run
+    // through the sourcing scanner — so there's no Product row. Pull live market
+    // data from Amazon (buy box, sellers) and the seller's current listing price
+    // so owned inventory can be repriced, not just scanned leads.
+    let liveBuyBox:  number | undefined;
+    let liveSellers: number | undefined;
+    let liveCurrent: number | undefined;
 
-    // Can't compute anything meaningful without a cost and a price.
-    if (costBasis <= 0 || currentPrice <= 0) { skipped++; continue; }
+    if (!product?.buyBoxPrice) {
+      const live = await getProductData(orgId, rule.asin).catch(() => null);
+      liveBuyBox  = live?.buyBoxPrice ?? live?.lowestFbaPrice;
+      liveSellers = live?.fbaSellers;
+    }
+    if (sku) {
+      const listing = await getListingMarket(orgId, sku);
+      liveCurrent = listing.currentPrice;
+    }
+
+    // Cost basis: the rule's stored cost, else scanned product cost.
+    const costBasis    = rule.costBasis ?? product?.totalLandedCost ?? product?.sourcePrice ?? 0;
+    const buyBoxPrice  = product?.buyBoxPrice ?? liveBuyBox ?? 0;
+    const fbaSellers   = product?.fbaSellers ?? liveSellers ?? 0;
+    // Best estimate of the current live price: last price we pushed, then the
+    // seller's live listing price, then buy box, then the scanned resale price.
+    const currentPrice =
+      rule.lastPushedPrice
+      ?? liveCurrent
+      ?? (buyBoxPrice > 0 ? buyBoxPrice : undefined)
+      ?? product?.estimatedResellPrice
+      ?? 0;
+
+    const hasManualFloor = (rule.floorPrice ?? 0) > 0;
+
+    // Need a price to act on at all.
+    if (currentPrice <= 0) { noPrice++; continue; }
+    // Without a cost basis we can't compute the ROI/profit floor, so the only
+    // safe protection is a manual floor. Require one or skip — never push a
+    // price we can't prove is profitable.
+    if (costBasis <= 0 && !hasManualFloor) { noCost++; continue; }
 
     const result = calculateReprice({
       asin:         rule.asin,
@@ -82,7 +115,6 @@ export async function POST() {
     // A change is only actionable if the price actually moves.
     const isActionable = result.direction !== 'HOLD' && result.recommendedPrice !== currentPrice;
     const status       = isActionable ? 'PROPOSED' : 'HOLD';
-    const sku          = skuByAsin.get(rule.asin) ?? null;
 
     await prisma.$transaction([
       // Supersede any earlier un-actioned proposal so the queue shows only the
@@ -117,5 +149,5 @@ export async function POST() {
     else hold++;
   }
 
-  return NextResponse.json({ success: true, created, proposed, hold, skipped });
+  return NextResponse.json({ success: true, created, proposed, hold, noPrice, noCost });
 }

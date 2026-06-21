@@ -21,8 +21,9 @@ export function RunAllButton() {
       const parts: string[] = [];
       if (data.created)  parts.push(`${data.created} rule${data.created === 1 ? '' : 's'} created`);
       if (data.proposed) parts.push(`${data.proposed} price change${data.proposed === 1 ? '' : 's'} to review`);
-      if (data.hold)     parts.push(`${data.hold} holding`);
-      if (data.skipped)  parts.push(`${data.skipped} skipped (no market data)`);
+      if (data.hold)     parts.push(`${data.hold} holding (no change)`);
+      if (data.noPrice)  parts.push(`${data.noPrice} skipped — no live price found`);
+      if (data.noCost)   parts.push(`${data.noCost} skipped — add a unit cost or floor`);
       setResult({
         ok: true,
         message: data.proposed

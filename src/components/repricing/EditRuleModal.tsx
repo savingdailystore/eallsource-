@@ -13,6 +13,7 @@ interface Rule {
   strategy:   string;
   isActive:   boolean;
   floorPrice: number | null;
+  costBasis:  number | null;
 }
 
 const STRATEGIES = [
@@ -32,6 +33,7 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
     minRoi:     String(rule.minRoi),
     minProfit:  String(rule.minProfit),
     floorPrice: rule.floorPrice != null ? String(rule.floorPrice) : '',
+    costBasis:  rule.costBasis != null ? String(rule.costBasis) : '',
     isActive:   rule.isActive,
   });
 
@@ -50,6 +52,7 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
         minRoi:     parseFloat(form.minRoi),
         minProfit:  parseFloat(form.minProfit),
         floorPrice: form.floorPrice.trim() === '' ? null : parseFloat(form.floorPrice),
+        costBasis:  form.costBasis.trim()  === '' ? null : parseFloat(form.costBasis),
         isActive:   form.isActive,
       }),
     });
@@ -110,6 +113,19 @@ export function EditRuleModal({ rule }: { rule: Rule }) {
                   <label className="label">Min Profit ($)</label>
                   <input value={form.minProfit} onChange={(e) => setForm((f) => ({ ...f, minProfit: e.target.value }))} type="number" step="0.01" min="0" required className="input" />
                 </div>
+              </div>
+
+              <div>
+                <label className="label">Unit Cost ($) <span className="text-slate-500 font-normal">(what you paid)</span></label>
+                <input
+                  value={form.costBasis}
+                  onChange={(e) => setForm((f) => ({ ...f, costBasis: e.target.value }))}
+                  type="number" step="0.01" min="0" className="input"
+                  placeholder="e.g. 14.50"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Your landed cost per unit. Required to compute the Min ROI / Min Profit floor. Without it, set a manual floor below or the rule is skipped.
+                </p>
               </div>
 
               <div>

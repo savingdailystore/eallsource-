@@ -13,6 +13,7 @@ const updateSchema = z.object({
   isActive:   z.boolean().optional(),
   title:      z.string().max(500).optional(),
   floorPrice: z.number().min(0).nullable().optional(),
+  costBasis:  z.number().min(0).nullable().optional(),
 });
 
 async function getRule(id: string, orgId: string) {

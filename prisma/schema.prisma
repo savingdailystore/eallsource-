@@ -34,6 +34,7 @@ enum DemandLevel {
   LOW
   MEDIUM
   HIGH
+  UNKNOWN // no BSR/sales-rank data returned — distinct from a confirmed weak rank
 }
 
 enum GatingRisk {

@@ -152,7 +152,7 @@ export interface ScoringInput {
 // ─── Demand engine ──────────────────────────────────────────────────────────
 
 export interface DemandInput {
-  bsr: number;
+  bsr?: number; // undefined = Amazon returned no sales rank for this ASIN
   category: string;
   fbaSellers: number;
   totalSellers: number;

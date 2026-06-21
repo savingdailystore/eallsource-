@@ -72,6 +72,13 @@ function IpBadge({ score }: { score?: string | null }) {
 }
 
 function DemandBadge({ level }: { level: string }) {
+  if (level === 'UNKNOWN') {
+    return (
+      <span className="badge text-xs bg-slate-700 text-slate-400" title="No sales-rank data available for this ASIN — demand could not be assessed">
+        Unknown
+      </span>
+    );
+  }
   const cls = level === 'HIGH' ? 'bg-green-500/15 text-green-400' : level === 'MEDIUM' ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400';
   return <span className={`badge text-xs ${cls}`}>{level}</span>;
 }

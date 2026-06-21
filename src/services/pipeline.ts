@@ -39,7 +39,7 @@ export type PipelineResult =
   | { outcome: 'no_pricing_data' }
   | { outcome: 'validation_failed'; reasons: string[] }
   | { outcome: 'not_profitable';    roi: number; profit: number }
-  | { outcome: 'demand_too_low';    bsr: number }
+  | { outcome: 'demand_too_low';    bsr?: number } // undefined when rejected for saturation, not a confirmed weak rank
   | { outcome: 'velocity_too_low';  expectedUnits: number }
   | { outcome: 'price_too_low';     resellPrice: number }
   | { outcome: 'amazon_sells_it' }
@@ -177,13 +177,16 @@ export async function processRetailerProduct(
     }
 
     // ── 3. Demand gate (BSR top 6%, not oversaturated, enough velocity per seller) ──
-    const demandResult = assessDemand({ bsr: bsr ?? 999999, category, fbaSellers, totalSellers, monthlySales });
+    const demandResult = assessDemand({ bsr, category, fbaSellers, totalSellers, monthlySales });
     // Velocity reject gets its own outcome so it's distinguishable from a plain
     // weak-BSR rejection in the scan stats.
     if (!opts.force && demandResult.velocityTooLow) {
       return { outcome: 'velocity_too_low', expectedUnits: demandResult.expectedUnitsPerSeller ?? 0 };
     }
-    if (!opts.force && demandResult.level === 'LOW' && bsr != null) {
+    // LOW now only fires for a confirmed negative signal (weak BSR, saturation).
+    // Missing BSR data returns UNKNOWN, which is never rejected here — we don't
+    // reject a lead just because Amazon didn't return a rank.
+    if (!opts.force && demandResult.level === 'LOW') {
       return { outcome: 'demand_too_low', bsr };
     }
 

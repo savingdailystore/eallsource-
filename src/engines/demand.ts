@@ -50,24 +50,13 @@ export function assessDemand(input: DemandInput): DemandResult {
   const { bsr, category, fbaSellers, totalSellers, monthlySales } = input;
   const reasons: string[] = [];
 
-  const percentile = bsrToPercentile(bsr, category);
-  const bsrLimit   = getBsrLimit(category);
-
   // Velocity / expected-share — computed once, echoed through every return path.
   const share = monthlySales != null ? expectedUnitsPerSeller(monthlySales, fbaSellers) : undefined;
   const velocityTooLow = share != null && share < MIN_EXPECTED_UNITS_PER_SELLER;
   const velocity = { monthlySales, expectedUnitsPerSeller: share };
 
-  // BSR gating — reject if not top 6%
-  if (bsr > bsrLimit) {
-    return {
-      level: 'LOW',
-      reasons: [`BSR ${bsr.toLocaleString()} exceeds limit ${bsrLimit.toLocaleString()} for ${category} (top 6%)`],
-      ...velocity, velocityTooLow,
-    };
-  }
-
-  // Seller saturation gating — reject regardless of BSR if the listing is oversaturated
+  // Seller saturation gating — reject regardless of BSR if the listing is
+  // oversaturated. This is real, independent of whether we have a rank.
   if (totalSellers > MAX_TOTAL_SELLERS || fbaSellers > MAX_FBA_SELLERS) {
     return {
       level: 'LOW',
@@ -77,11 +66,34 @@ export function assessDemand(input: DemandInput): DemandResult {
   }
 
   // Velocity gating — strong rank but the demand, split across sellers, leaves
-  // too few units for you to actually move.
+  // too few units for you to actually move. Also independent of BSR.
   if (velocityTooLow) {
     return {
       level: 'LOW',
       reasons: [`Low expected sales: ~${share!.toFixed(1)} units/mo for you (${monthlySales}/mo split across ${fbaSellers} FBA sellers, need ≥ ${MIN_EXPECTED_UNITS_PER_SELLER})`],
+      ...velocity, velocityTooLow,
+    };
+  }
+
+  // No sales-rank data at all (Amazon/Keepa returned none). This is NOT the
+  // same as a confirmed weak rank — labeling it LOW would falsely claim "won't
+  // sell" when the truth is just "no data." Surface it honestly as UNKNOWN.
+  if (bsr == null) {
+    return {
+      level: 'UNKNOWN',
+      reasons: ['No BSR/sales-rank data available for this ASIN — demand unknown'],
+      ...velocity, velocityTooLow,
+    };
+  }
+
+  const percentile = bsrToPercentile(bsr, category);
+  const bsrLimit   = getBsrLimit(category);
+
+  // BSR gating — reject if not top 6%
+  if (bsr > bsrLimit) {
+    return {
+      level: 'LOW',
+      reasons: [`BSR ${bsr.toLocaleString()} exceeds limit ${bsrLimit.toLocaleString()} for ${category} (top 6%)`],
       ...velocity, velocityTooLow,
     };
   }

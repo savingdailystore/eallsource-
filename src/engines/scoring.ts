@@ -11,7 +11,12 @@ function roiScore(roi: number): number {
 }
 
 function demandScore(level: string): number {
-  return level === 'HIGH' ? 100 : level === 'MEDIUM' ? 60 : 20;
+  // UNKNOWN (no BSR data) is genuine uncertainty, not a confirmed weak signal —
+  // score it between LOW and MEDIUM rather than punishing it like real LOW.
+  if (level === 'HIGH')    return 100;
+  if (level === 'MEDIUM')  return 60;
+  if (level === 'UNKNOWN') return 40;
+  return 20; // LOW
 }
 
 function riskScore(risk: string): number {

@@ -111,7 +111,7 @@ export function startWorkers(redisUrl: string) {
     });
 
     const demandResult = assessDemand({
-      bsr: product.bsr ?? 999999,
+      bsr: product.bsr ?? undefined,
       category: product.category ?? 'Other',
       fbaSellers: product.fbaSellers ?? 0,
       totalSellers: product.totalSellers ?? 0,

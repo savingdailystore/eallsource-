@@ -2,42 +2,27 @@ import { BaseRetailer } from './base';
 import { runApifyActor } from '@/lib/apify';
 import type { RetailerProduct } from '@/types';
 
-// Primary search actor: reads Target's RedSky API and returns the UPC inline in
-// the search response (one fast call — no slow per-product detail round-trip).
-// Exact UPC matching against Amazon is far more reliable than fuzzy title
-// matching, and is what lets Target produce leads like Walmart.
-// https://apify.com/makework36/target-scraper
-const SEARCH_ACTOR     = 'makework36/target-scraper';
-const SEARCH_TIMEOUT_MS = 90_000;
-
-// Fallback search actor (title/price only, no UPC). Used only if the primary
-// actor errors or returns nothing, so Target can never regress below the
-// previous title-matching behavior.
+// Target search via Apify (handles Akamai bot-detection/proxy for us). With
+// fetchProductDetails the actor returns regularPrice/onSale/brand/description —
+// enough to detect clearance items (where the arbitrage margin is) and prioritise
+// them. NOTE: Target exposes no UPC through any actor we can access — only a TCIN
+// (Target's internal id), which Amazon can't match on — so Target matches by
+// title. Direct actor testing (2026-06-21) confirmed the "UPC" actors are broken
+// or paid; see memory note target-scraper-no-upc.
 // https://apify.com/kawsar/target-product-search-scraper
-const FALLBACK_ACTOR = 'kawsar/target-product-search-scraper';
+const ACTOR_ID = 'kawsar/target-product-search-scraper';
 
-// Hard cap on products handed to the pipeline per search. Each product costs
-// several Amazon SP-API calls, so this bounds total run time on serverless.
+// Cap items the actor details + we hand to the pipeline. fetchProductDetails
+// fetches a detail page per item, so keep this tight to bound run time.
+const MAX_ITEMS    = 20;
 const MAX_PRODUCTS = 18;
 
-// makework36 (RedSky) — UPC arrives inline when fetchProductDetails is on.
-interface MakeworkTargetItem {
-  title?:        string;
-  brand?:        string;
-  price?:        number;
-  regularPrice?: number;
-  salePrice?:    number;
-  url?:          string;
-  imageUrl?:     string;
-  upc?:          string | number;
-  gtin?:         string | number;
-}
-
-// kawsar fallback — search-only fields, no identifiers.
 interface ApifyTargetItem {
   productTitle?:    string;
   brand?:           string;
   currentPrice?:    number;
+  regularPrice?:    number;
+  onSale?:          boolean;
   url?:             string;
   imageUrl?:        string;
   availableOnline?: boolean;
@@ -51,74 +36,43 @@ export class TargetRetailer extends BaseRetailer {
   async search(query: string, category?: string): Promise<RetailerProduct[]> {
     const term = category ? `${query} ${category}` : query;
 
-    // Primary: RedSky actor with UPCs inline.
+    // Prefer the detail-enriched call (gives sale data); fall back to the plain
+    // search if it errors so Target never returns nothing on a transient issue.
+    let items: ApifyTargetItem[];
     try {
-      const items = await runApifyActor<MakeworkTargetItem>(
-        SEARCH_ACTOR,
-        { searchQueries: [term], maxProducts: 50, fetchProductDetails: true },
-        SEARCH_TIMEOUT_MS,
-      );
-
-      const products = items
-        .filter((item) => item.title && item.url && typeof (item.price ?? item.salePrice) === 'number')
-        .map((item) => {
-          const price        = (item.price ?? item.salePrice) as number;
-          const regularPrice = item.regularPrice;
-          const onSale       = typeof regularPrice === 'number' && regularPrice > price;
-          const upc          = item.upc ?? item.gtin;
-          return this.normalize({
-            title:     item.title,
-            brand:     item.brand,
-            upc:       upc != null ? String(upc) : undefined,
-            price,
-            listPrice: onSale ? regularPrice : undefined,
-            onSale,
-            inStock:   true,
-            url:       item.url,
-            imageUrl:  item.imageUrl,
-          });
-        });
-
-      if (products.length > 0) {
-        const withUpc = products.filter((p) => p.upc).length;
-        console.log(`[target] RedSky search: ${products.length} products, ${withUpc} with a UPC`);
-        // Prioritise on-sale items — that's where arbitrage margin lives.
-        products.sort((a, b) => Number(b.onSale ?? false) - Number(a.onSale ?? false));
-        return products.slice(0, MAX_PRODUCTS);
-      }
-      console.warn('[target] RedSky search returned 0 products — falling back to kawsar');
+      items = await runApifyActor<ApifyTargetItem>(ACTOR_ID, {
+        queries: [term], maxItems: MAX_ITEMS, fetchProductDetails: true,
+      });
     } catch (err) {
-      console.error('[target] RedSky search failed — falling back to kawsar:', err);
+      console.error('[target] detail search failed, retrying plain search:', err);
+      try {
+        items = await runApifyActor<ApifyTargetItem>(ACTOR_ID, { queries: [term], maxItems: MAX_ITEMS });
+      } catch (err2) {
+        console.error('[target] search error:', err2);
+        return [];
+      }
     }
 
-    // Fallback: title-only search (no UPC).
-    return this.fallbackSearch(term);
-  }
-
-  private async fallbackSearch(term: string): Promise<RetailerProduct[]> {
-    try {
-      const items = await runApifyActor<ApifyTargetItem>(FALLBACK_ACTOR, {
-        queries: [term],
-        maxItems: 50,
+    const products = items
+      .filter((item) => item.productTitle && typeof item.currentPrice === 'number' && item.url)
+      .map((item) => {
+        const price  = item.currentPrice as number;
+        const onSale = item.onSale ?? (typeof item.regularPrice === 'number' && item.regularPrice > price);
+        return this.normalize({
+          title:     item.productTitle,
+          brand:     item.brand,
+          price,
+          listPrice: typeof item.regularPrice === 'number' && item.regularPrice > price ? item.regularPrice : undefined,
+          onSale,
+          inStock:   item.availableOnline ?? true,
+          url:       item.url,
+          imageUrl:  item.imageUrl,
+        });
       });
 
-      return items
-        .filter((item) => item.productTitle && typeof item.currentPrice === 'number' && item.url)
-        .map((item) =>
-          this.normalize({
-            title:    item.productTitle,
-            brand:    item.brand,
-            price:    item.currentPrice,
-            inStock:  item.availableOnline ?? true,
-            url:      item.url,
-            imageUrl: item.imageUrl,
-          })
-        )
-        .slice(0, MAX_PRODUCTS);
-    } catch (err) {
-      console.error('[target] fallback search error:', err);
-      return [];
-    }
+    // Prioritise on-sale items — that's where arbitrage margin lives — then cap.
+    products.sort((a, b) => Number(b.onSale ?? false) - Number(a.onSale ?? false));
+    return products.slice(0, MAX_PRODUCTS);
   }
 
   async getProduct(): Promise<RetailerProduct | null> {

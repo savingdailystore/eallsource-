@@ -86,6 +86,20 @@ async function spApi(orgId: string, path: string, params: Record<string, string>
 
 // ─── Catalog search ───────────────────────────────────────────────────────────
 
+// "Renewed"/refurbished listings are a different (lower-priced) condition. A new
+// retail product must NEVER match one — the renewed resale price makes a real
+// flip look unprofitable (or matches the wrong listing entirely). Prefer a new
+// listing; only fall back to a flagged one if nothing else exists.
+const RENEWED_RE = /\b(renewed|refurbished|refurb|pre-?owned|open[\s-]?box|restored)\b/i;
+const isRenewedName = (name?: string): boolean => !!name && RENEWED_RE.test(name);
+
+type CatalogItem = { asin: string; summaries?: Array<{ itemName?: string }> };
+// Pick the first non-renewed candidate; fall back to the first item so a
+// barcode match isn't dropped when only a renewed listing exists.
+function pickNewItem(items: CatalogItem[]): CatalogItem | undefined {
+  return items.find((it) => !isRenewedName(it.summaries?.[0]?.itemName)) ?? items[0];
+}
+
 export async function searchCatalogByUpc(orgId: string, upc: string, marketplaceId = 'ATVPDKIKX0DER'): Promise<AmazonMatch | null> {
   try {
     const data = await spApi(orgId, '/catalog/2022-04-01/items', {
@@ -93,9 +107,9 @@ export async function searchCatalogByUpc(orgId: string, upc: string, marketplace
       identifiersType:    'UPC',
       marketplaceIds:     marketplaceId,
       includedData:       'identifiers,summaries',
-    }) as { items?: Array<{ asin: string }> };
+    }) as { items?: CatalogItem[] };
 
-    const item = data.items?.[0];
+    const item = pickNewItem(data.items ?? []);
     if (!item) return null;
 
     return {
@@ -117,9 +131,9 @@ export async function searchCatalogByEan(orgId: string, ean: string, marketplace
       identifiersType: 'EAN',
       marketplaceIds:  marketplaceId,
       includedData:    'identifiers,summaries',
-    }) as { items?: Array<{ asin: string }> };
+    }) as { items?: CatalogItem[] };
 
-    const item = data.items?.[0];
+    const item = pickNewItem(data.items ?? []);
     if (!item) return null;
 
     return {
@@ -140,7 +154,7 @@ export async function searchCatalogByKeywords(orgId: string, keywords: string, m
       keywords:       keywords,
       marketplaceIds: marketplaceId,
       includedData:   'identifiers,summaries',
-    }) as { items?: Array<{ asin: string; summaries?: Array<{ itemName?: string }> }> };
+    }) as { items?: CatalogItem[] };
 
     const items = data.items ?? [];
     if (items.length === 0) return null;
@@ -149,10 +163,13 @@ export async function searchCatalogByKeywords(orgId: string, keywords: string, m
     // is good but the #1 result isn't always the closest title match. Reject
     // candidates whose pack size conflicts with the source (e.g. a single item
     // matched to a 12-pack), which otherwise produces fake "profitable" leads.
+    // Look past the first few results (widened to 8) because Renewed listings
+    // often outrank the new one for popular brands.
     const srcQty = extractPackCount(keywords);
     let best: { asin: string; confidence: number } | null = null;
-    for (const it of items.slice(0, 5)) {
+    for (const it of items.slice(0, 8)) {
       const name  = it.summaries?.[0]?.itemName ?? '';
+      if (isRenewedName(name)) continue; // never match a new product to a renewed listing
       const itQty = extractPackCount(name);
       if (srcQty != null && itQty != null && srcQty !== itQty) continue; // pack-size mismatch
       const c = estimateTitleConfidence(keywords, name);

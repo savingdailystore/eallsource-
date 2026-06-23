@@ -11,9 +11,13 @@ const ACTOR_ID = 'automation-lab/walmart-scraper';
 // Exact UPC matching is far more reliable than fuzzy title matching.
 // https://apify.com/pratikdani/walmart-product-scraper
 const UPC_ACTOR        = 'pratikdani/walmart-product-scraper';
-const UPC_ENRICH_LIMIT = 12;     // cap products enriched per search (bounds time + cost)
-const UPC_CONCURRENCY  = 5;      // parallel detail fetches
-const UPC_TIMEOUT_MS   = 25_000; // per-detail-fetch cap so one stuck call can't blow the budget
+const UPC_ENRICH_LIMIT = 18;     // enrich every product we hand off (matches MAX_PRODUCTS)
+const UPC_CONCURRENCY  = 7;      // parallel detail fetches — more rounds finish per wall-second
+// Direct testing (2026-06-21) showed pratikdani returns UPCs reliably but each
+// lookup takes ~4–35s. The old 25s cap aborted the slow-but-valid ones, so only
+// ~1–2 of 18 products got a UPC. 45s captures the slow tail; concurrency keeps
+// total wall-time bounded since most lookups finish in well under 10s.
+const UPC_TIMEOUT_MS   = 45_000;
 
 // Hard cap on products handed to the pipeline per search. Each product costs
 // several Amazon SP-API calls, so this bounds total run time on serverless.

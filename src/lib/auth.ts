@@ -57,24 +57,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    jwt({ token, user }) {
       if (user) {
         token.id      = user.id;
         token.role    = (user as any).role;
         token.orgId   = (user as any).orgId;
         token.orgSlug = (user as any).orgSlug;
         token.plan    = (user as any).plan;
-      } else if (token.orgId) {
-        // Plan can change out-of-band (Stripe webhook upgrade/downgrade), so
-        // re-read it from the DB on every refresh instead of trusting the
-        // value cached at sign-in — otherwise an upgrade only shows up after
-        // the user signs out and back in.
-        const org = await prisma.organization.findUnique({
-          where:  { id: token.orgId as string },
-          select: { plan: true },
-        });
-        if (org) token.plan = org.plan;
       }
+      // NOTE: do NOT call Prisma here. This callback runs inside the Edge
+      // middleware that guards protected routes, and PrismaClient cannot run
+      // in the Edge runtime — doing so throws JWTSessionError and logs every
+      // user out in a redirect loop. Out-of-band plan changes (Stripe
+      // upgrades) are refreshed in server components that read the DB
+      // directly, not from this token.
       return token;
     },
     session({ session, token }) {

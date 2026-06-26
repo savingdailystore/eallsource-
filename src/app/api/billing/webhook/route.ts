@@ -81,7 +81,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Log billing event
+    // Log billing event. Stripe retries delivery of the same event (e.g. on a
+    // slow response, or a manual "resend"), which would otherwise crash this
+    // handler on the stripeEventId unique constraint — swallow that one case
+    // since the plan/subscription update above already ran idempotently.
     const sub = event.data.object as any;
     const custId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
     if (custId) {
@@ -94,6 +97,8 @@ export async function POST(req: NextRequest) {
             type:           event.type,
             data:           event.data.object as any,
           },
+        }).catch((err) => {
+          if (err?.code !== 'P2002') throw err;
         });
       }
     }
@@ -108,15 +113,6 @@ export async function POST(req: NextRequest) {
 
 function getPlanFromPriceId(priceId?: string) {
   if (!priceId) return 'STARTER' as const;
-  // TEMP DIAGNOSTIC (2026-06-25): a live test showed the webhook setting a
-  // renewal date but leaving plan=STARTER, implying this comparison fails.
-  // Logging both sides (price IDs are not secret) to find the mismatch, then
-  // removing this once confirmed.
-  console.log('[webhook] price match check', {
-    incoming: priceId,
-    envPro:   process.env.STRIPE_PRO_PRICE_ID,
-    match:    priceId === process.env.STRIPE_PRO_PRICE_ID,
-  });
   if (priceId === process.env.STRIPE_PRO_PRICE_ID)        return 'PRO' as const;
   if (priceId === process.env.STRIPE_ENTERPRISE_PRICE_ID) return 'ENTERPRISE' as const;
   return 'STARTER' as const;

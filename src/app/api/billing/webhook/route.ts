@@ -108,6 +108,15 @@ export async function POST(req: NextRequest) {
 
 function getPlanFromPriceId(priceId?: string) {
   if (!priceId) return 'STARTER' as const;
+  // TEMP DIAGNOSTIC (2026-06-25): a live test showed the webhook setting a
+  // renewal date but leaving plan=STARTER, implying this comparison fails.
+  // Logging both sides (price IDs are not secret) to find the mismatch, then
+  // removing this once confirmed.
+  console.log('[webhook] price match check', {
+    incoming: priceId,
+    envPro:   process.env.STRIPE_PRO_PRICE_ID,
+    match:    priceId === process.env.STRIPE_PRO_PRICE_ID,
+  });
   if (priceId === process.env.STRIPE_PRO_PRICE_ID)        return 'PRO' as const;
   if (priceId === process.env.STRIPE_ENTERPRISE_PRICE_ID) return 'ENTERPRISE' as const;
   return 'STARTER' as const;

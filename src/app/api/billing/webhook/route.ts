@@ -27,8 +27,16 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub    = event.data.object as Stripe.Subscription;
-        const plan   = getPlanFromPriceId(sub.items.data[0]?.price?.id);
+        const item   = sub.items.data[0];
+        const plan   = getPlanFromPriceId(item?.price?.id);
         const custId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
+
+        // current_period_end moved from the subscription root to the item level
+        // in newer Stripe API versions (Stripe webhook destinations can be
+        // configured on a different API version than the SDK pinned in stripe.ts).
+        // Reading it off the item works regardless of which version sent the event.
+        const periodEndTs = (item as unknown as { current_period_end?: number })?.current_period_end
+          ?? (sub as unknown as { current_period_end?: number }).current_period_end;
 
         const existing = await prisma.subscription.findUnique({ where: { stripeCustomerId: custId } });
         if (existing) {
@@ -39,7 +47,7 @@ export async function POST(req: NextRequest) {
                 plan,
                 stripeSubId:      sub.id,
                 status:           sub.status,
-                currentPeriodEnd: new Date(sub.current_period_end * 1000),
+                currentPeriodEnd: periodEndTs ? new Date(periodEndTs * 1000) : existing.currentPeriodEnd,
                 cancelAtPeriodEnd: sub.cancel_at_period_end,
               },
             }),

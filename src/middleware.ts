@@ -1,7 +1,13 @@
 import { auth } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/api/auth'];
+// Auth pages: visible only when signed out — an authed user is bounced to the
+// dashboard so they don't see the login/register screens again.
+const AUTH_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
+
+// Marketing / legal pages: visible to everyone, signed in or not. Amazon's
+// SP-API review and Stripe both require these to be publicly reachable.
+const OPEN_PATHS = ['/privacy', '/terms', '/contact'];
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
@@ -15,13 +21,24 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  // The landing page (root) is public; it redirects authed users to the
+  // dashboard itself, in the page component.
+  if (pathname === '/') {
+    return NextResponse.next();
+  }
 
-  if (isPublic && isAuthed) {
+  // Always-public pages — never redirect, regardless of auth state.
+  if (OPEN_PATHS.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p));
+
+  if (isAuthPage && isAuthed) {
     return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
   }
 
-  if (!isPublic && !isAuthed) {
+  if (!isAuthPage && !isAuthed) {
     const url = new URL('/login', req.nextUrl);
     url.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(url);

@@ -24,6 +24,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/amazon?error=missing_code', req.url));
   }
 
+  // Amazon seller/merchant IDs are short alphanumeric identifiers (e.g.
+  // "A1B2C3D4E5F6G7"). Reject anything that doesn't match before it's stored
+  // — defense-in-depth against a malformed or unexpected redirect, even
+  // though this value originates from Amazon's own redirect rather than
+  // arbitrary user input.
+  if (sellingPartnerId && !/^[A-Z0-9]{1,32}$/.test(sellingPartnerId)) {
+    return NextResponse.redirect(new URL('/dashboard/amazon?error=invalid_seller_id', req.url));
+  }
+
   const clientId     = process.env.LWA_CLIENT_ID;
   const clientSecret = process.env.LWA_CLIENT_SECRET;
   const baseUrl      = process.env.NEXTAUTH_URL ?? 'https://eallsource.com';

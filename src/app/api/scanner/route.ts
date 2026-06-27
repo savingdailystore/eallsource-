@@ -85,7 +85,8 @@ export async function POST(req: NextRequest) {
     const result = await runScanJob({ retailer, query: query ?? '', orgId, scanJobId: job.id });
     return NextResponse.json({ success: true, data: job, result });
   } catch (err) {
-    return NextResponse.json({ error: 'Scan failed', message: String(err) }, { status: 502 });
+    console.error(`[scanner] scan job ${job.id} failed:`, err);
+    return NextResponse.json({ error: 'Scan failed' }, { status: 502 });
   }
 }
 

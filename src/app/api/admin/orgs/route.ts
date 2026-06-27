@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isPlatformAdmin } from '@/lib/admin';
 
 export const dynamic = 'force-dynamic';
 
-const ADMIN_EMAILS = ['savingdailystore@gmail.com'];
-
 export async function GET() {
   const session = await auth();
-  if (!session?.user || !ADMIN_EMAILS.includes(session.user.email)) {
+  if (!isPlatformAdmin(session?.user?.email)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

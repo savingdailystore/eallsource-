@@ -1,5 +1,14 @@
-import { auth } from '@/lib/auth';
+import NextAuth from 'next-auth';
 import { NextResponse } from 'next/server';
+import { authConfig } from '@/lib/auth.config';
+
+// Use the Edge-safe config directly rather than importing `auth` from
+// @/lib/auth — that file pulls in Prisma, bcrypt, and the Redis-backed rate
+// limiter, none of which can run in the Edge runtime this middleware uses.
+// This instance only ever reads/validates the existing session JWT (via the
+// jwt/session callbacks in auth.config.ts); it never needs the credentials
+// provider, since middleware never calls signIn().
+const { auth } = NextAuth(authConfig);
 
 // Auth pages: visible only when signed out — an authed user is bounced to the
 // dashboard so they don't see the login/register screens again.

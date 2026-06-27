@@ -5,6 +5,12 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+// Bounds chosen to comfortably cover a real Amazon inventory export (tens of
+// thousands of SKUs) while preventing a multi-gigabyte payload from forcing
+// the serverless function to parse an unbounded string in memory.
+const MAX_CSV_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_ROWS       = 50_000;
+
 // Detect whether the file is tab-delimited (Amazon reports) or comma-delimited.
 function detectDelimiter(text: string): ',' | '\t' {
   const firstLine = text.split('\n').find((l) => l.trim() !== '') ?? '';
@@ -73,9 +79,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'No file content provided.' }, { status: 400 });
   }
 
+  if (Buffer.byteLength(csv, 'utf8') > MAX_CSV_BYTES) {
+    return NextResponse.json(
+      { error: `File is too large. Max size is ${MAX_CSV_BYTES / (1024 * 1024)}MB.` },
+      { status: 413 },
+    );
+  }
+
   const rows = parseDelimited(csv, detectDelimiter(csv));
   if (rows.length < 2) {
     return NextResponse.json({ error: 'File needs a header row and at least one data row.' }, { status: 400 });
+  }
+  if (rows.length > MAX_ROWS) {
+    return NextResponse.json(
+      { error: `File has too many rows (${rows.length}). Max is ${MAX_ROWS}.` },
+      { status: 400 },
+    );
   }
 
   const headerMap = mapHeaders(rows[0]);

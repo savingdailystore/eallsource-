@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createCheckoutSession, createStripeCustomer, PRICE_IDS } from '@/lib/stripe';
-import type { Plan } from '@/types';
+import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
+
+const planSchema = z.enum(['STARTER', 'PRO', 'ENTERPRISE']);
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -14,8 +16,13 @@ export async function POST(req: NextRequest) {
   }
 
   const formData = await req.formData();
-  const plan     = formData.get('plan') as Plan;
-  const priceId  = PRICE_IDS[plan];
+  const parsedPlan = planSchema.safeParse(formData.get('plan'));
+  if (!parsedPlan.success) {
+    return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
+  }
+
+  const plan    = parsedPlan.data;
+  const priceId = PRICE_IDS[plan];
 
   if (!priceId) {
     return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });

@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isPlatformAdmin } from '@/lib/admin';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
-
-const ADMIN_EMAILS = ['savingdailystore@gmail.com'];
 
 const patchSchema = z.object({
   scanEnabled:      z.boolean().optional(),
@@ -16,7 +15,7 @@ const patchSchema = z.object({
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
-  if (!session?.user || !ADMIN_EMAILS.includes(session.user.email)) {
+  if (!isPlatformAdmin(session?.user?.email)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -45,6 +44,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (Object.keys(subUpdate).length > 0) {
     await prisma.subscription.updateMany({ where: { orgId: id }, data: subUpdate }).catch(() => {});
   }
+
+  // Platform-admin changes affect billing/access for an org the admin
+  // doesn't belong to — record who made the change and what changed, same
+  // as every other mutating route in the app.
+  await prisma.auditLog.create({
+    data: {
+      orgId:    id,
+      action:   'ADMIN_ORG_UPDATE',
+      resource: 'Organization',
+      metadata: { adminEmail: session!.user.email, changes: parsed.data },
+    },
+  }).catch(() => {});
 
   return NextResponse.json({ ok: true, org });
 }

@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { generateOrgSlug } from '@/lib/utils';
 import { validatePassword } from '@/lib/password';
 import { backfillOrgFromSource } from '@/services/broadcast';
+import { isRateLimited, recordAttempt } from '@/lib/rate-limit';
+import { getClientIp } from '@/lib/request-ip';
 import { z } from 'zod';
 
 const schema = z.object({
@@ -12,8 +14,22 @@ const schema = z.object({
   password: z.string().max(100),
 });
 
+// Cheap to abuse otherwise: unlimited account creation from one source.
+const MAX_REGISTRATIONS_PER_IP = 5;
+const WINDOW_SECONDS            = 60 * 60;
+
 export async function POST(req: NextRequest) {
   try {
+    const ip      = getClientIp(req);
+    const ipKey   = `register:ip:${ip}`;
+    const limited = await isRateLimited(ipKey, MAX_REGISTRATIONS_PER_IP, WINDOW_SECONDS);
+    if (limited.limited) {
+      return NextResponse.json(
+        { error: 'Too many accounts created from this network. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(limited.retryAfterSeconds) } },
+      );
+    }
+
     const body   = await req.json();
     const parsed = schema.safeParse(body);
 
@@ -23,6 +39,8 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
+
+    await recordAttempt(ipKey, WINDOW_SECONDS);
 
     const { orgName, email, password } = parsed.data;
 

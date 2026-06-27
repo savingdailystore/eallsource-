@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
   try {
     products = (await plugin.search(kw)) as RetailerProduct[];
   } catch (e) {
-    return NextResponse.json({ error: `scrape failed: ${(e as Error).message}` }, { status: 502 });
+    console.error(`[amazon/dry-run] scrape failed for ${retailer}:`, e);
+    return NextResponse.json({ error: 'Scrape failed. Check server logs for detail.' }, { status: 502 });
   }
 
   const rows = [];

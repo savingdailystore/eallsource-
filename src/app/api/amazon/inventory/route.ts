@@ -105,14 +105,19 @@ export async function POST() {
 
   } catch (err: any) {
     const msg = err?.message ?? 'Unknown error';
+    console.error('[amazon/inventory] sync failed:', err);
 
+    // The error string can come straight from Amazon's SP-API response body
+    // or a scraper failure and may reference internal detail (token state,
+    // hostnames) — classify into a fixed set of client-safe error codes
+    // instead of forwarding the raw message.
     if (msg.includes('env vars not set')) {
-      return NextResponse.json({ error: 'missing_env', message: msg }, { status: 503 });
+      return NextResponse.json({ error: 'missing_env' }, { status: 503 });
     }
     if (msg.includes('not connected')) {
       return NextResponse.json({ error: 'not_connected' }, { status: 400 });
     }
 
-    return NextResponse.json({ error: 'sp_api_error', message: msg }, { status: 502 });
+    return NextResponse.json({ error: 'sp_api_error' }, { status: 502 });
   }
 }

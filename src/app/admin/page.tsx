@@ -1,16 +1,15 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isPlatformAdmin } from '@/lib/admin';
 import { AdminOrgsTable } from '@/components/admin/AdminOrgsTable';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Admin' };
 
-const ADMIN_EMAILS = ['savingdailystore@gmail.com'];
-
 export default async function AdminPage() {
   const session = await auth();
-  if (!session?.user || !ADMIN_EMAILS.includes(session.user.email)) redirect('/dashboard');
+  if (!isPlatformAdmin(session?.user?.email)) redirect('/dashboard');
 
   const orgs = await prisma.organization.findMany({
     select: {

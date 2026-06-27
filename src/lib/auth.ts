@@ -4,13 +4,29 @@ import bcrypt from 'bcryptjs';
 import { prisma } from './prisma';
 import { decrypt } from './encryption';
 import { verifyTotp } from './mfa';
+import { isRateLimited, recordAttempt, resetAttempts } from './rate-limit';
+import { authConfig } from './auth.config';
+
+// This file is Node-only (Prisma, bcrypt, the Redis-backed rate limiter) and
+// must never be imported from src/middleware.ts — that runs in the Edge
+// runtime, which can't bundle ioredis. Middleware builds its own NextAuth
+// instance from auth.config.ts (no providers, no Node-only imports) instead.
+// See the comment there for the full explanation.
+
+// Mirrors the limits in api/auth/mfa-check — this authorize() callback is the
+// actual credential check NextAuth runs, so it needs its own brute-force
+// guard rather than relying solely on the pre-check endpoint the login form
+// happens to call first. This is also the only place the real TOTP code is
+// verified during login (mfa-check only verifies the password), so the TOTP
+// limiter here is the actual protection for that step, not just defense in
+// depth.
+const LOGIN_MAX_ATTEMPTS   = 10;
+const LOGIN_WINDOW_SECONDS = 15 * 60;
+const TOTP_MAX_ATTEMPTS    = 5;
+const TOTP_WINDOW_SECONDS  = 10 * 60;
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  session: { strategy: 'jwt' },
-  pages: {
-    signIn: '/login',
-    error: '/login',
-  },
+  ...authConfig,
   providers: [
     CredentialsProvider({
       id: 'credentials',
@@ -23,25 +39,49 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
+        const email    = (credentials.email as string).toLowerCase();
+        const loginKey = `login:email:${email}`;
+
+        if ((await isRateLimited(loginKey, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_SECONDS)).limited) {
+          return null;
+        }
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email as string },
           include: { org: true },
         });
 
-        if (!user) return null;
+        if (!user) {
+          await recordAttempt(loginKey, LOGIN_WINDOW_SECONDS);
+          return null;
+        }
 
         const valid = await bcrypt.compare(
           credentials.password as string,
           user.password,
         );
-        if (!valid) return null;
+        if (!valid) {
+          await recordAttempt(loginKey, LOGIN_WINDOW_SECONDS);
+          return null;
+        }
+        await resetAttempts(loginKey);
 
-        // Enforce MFA when enabled.
+        // Enforce MFA when enabled, with its own brute-force guard — a TOTP
+        // code is only 6 digits, so unlimited guesses would be feasible.
         if (user.mfaEnabled && user.mfaSecret) {
+          const totpKey = `mfa-totp:${user.id}`;
+          if ((await isRateLimited(totpKey, TOTP_MAX_ATTEMPTS, TOTP_WINDOW_SECONDS)).limited) {
+            return null;
+          }
+
           const code = (credentials.totp as string) ?? '';
           if (!code) return null;
           const ok = verifyTotp(code, decrypt(user.mfaSecret));
-          if (!ok) return null;
+          if (!ok) {
+            await recordAttempt(totpKey, TOTP_WINDOW_SECONDS);
+            return null;
+          }
+          await resetAttempts(totpKey);
         }
 
         return {
@@ -56,30 +96,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.id      = user.id;
-        token.role    = (user as any).role;
-        token.orgId   = (user as any).orgId;
-        token.orgSlug = (user as any).orgSlug;
-        token.plan    = (user as any).plan;
-      }
-      // NOTE: do NOT call Prisma here. This callback runs inside the Edge
-      // middleware that guards protected routes, and PrismaClient cannot run
-      // in the Edge runtime — doing so throws JWTSessionError and logs every
-      // user out in a redirect loop. Out-of-band plan changes (Stripe
-      // upgrades) are refreshed in server components that read the DB
-      // directly, not from this token.
-      return token;
-    },
-    session({ session, token }) {
-      session.user.id      = token.id as string;
-      session.user.role    = token.role as any;
-      session.user.orgId   = token.orgId as string;
-      session.user.orgSlug = token.orgSlug as string;
-      session.user.plan    = token.plan as any;
-      return session;
-    },
-  },
 });

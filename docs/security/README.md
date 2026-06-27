@@ -16,6 +16,8 @@ Each document distinguishes between controls that are **in place today** and pla
 | [SecureDevelopmentPolicy.md](SecureDevelopmentPolicy.md) | Secure SDLC, code review, CI/CD, branch protection, deployment, security verification. |
 | [IncidentResponsePlan.md](IncidentResponsePlan.md) | Detecting, responding to, and recovering from security incidents, including Amazon notification. |
 | [BusinessContinuityPlan.md](BusinessContinuityPlan.md) | Critical systems, recovery priorities, vendor dependencies, disaster scenarios. |
+| [SecureDevelopmentAudit.md](SecureDevelopmentAudit.md) | Code-level security audit against these policies — findings, severities, SP-API readiness, score. |
+| [SecurityRemediationReport.md](SecurityRemediationReport.md) | What was fixed from the audit, how, and with what tests — read alongside the audit above. |
 
 ## Technology context
 

@@ -2,6 +2,8 @@
 
 **EALLsource — Production Security Readiness Review**
 
+> **Remediation status (2026-06-27):** all 3 High-severity and 6 of 7 Medium-severity findings below have been fixed, tested, and verified — see [SecurityRemediationReport.md](SecurityRemediationReport.md) for the full account of what changed, the tests added, and what remains open. Each resolved finding is marked **✅ RESOLVED** inline below. This audit document is otherwise left as originally written so the resolution can be read against the original finding.
+
 ---
 
 ## 0. Methodology and a Correction Made During This Audit
@@ -21,6 +23,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 ### 1.1 Authentication
 
 **F-01 — No brute-force protection on login or MFA verification**
+- **Status: ✅ RESOLVED** — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §1.
 - **Severity:** High
 - **Description:** Login (`mfa-check` + NextAuth `authorize()`) and TOTP verification have no attempt counter, lockout, or delay. An attacker can submit unlimited password or 6-digit TOTP guesses.
 - **Evidence:** [src/app/api/auth/mfa-check/route.ts](../../src/app/api/auth/mfa-check/route.ts) — no rate limiting; [src/lib/auth.ts:23-45](../../src/lib/auth.ts) `authorize()` — same; confirmed no rate-limiting code exists anywhere in `src/` (only a retry/backoff loop in `src/lib/amazon.ts` for SP-API calls, unrelated to login).
@@ -35,6 +38,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 - **Blocks SP-API approval?** No.
 
 **F-03 — No explicit session expiry (`maxAge`) configured**
+- **Status: ✅ RESOLVED** — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §3.
 - **Severity:** Medium
 - **Description:** `auth.ts` sets `session: { strategy: 'jwt' }` with no `maxAge`, so NextAuth's 30-day default applies to every session, including admin sessions.
 - **Evidence:** [src/lib/auth.ts:8-9](../../src/lib/auth.ts) — verified: no `maxAge` key present anywhere in the file.
@@ -51,6 +55,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 - **Blocks SP-API approval?** No — this is exactly what Amazon's reviewer wants to see for seller-data isolation.
 
 **F-05 — Platform admin access is a hardcoded email allowlist, duplicated three times**
+- **Status: ✅ RESOLVED** (consolidated into a single source of truth; not yet moved to a DB-backed role, which remains a Future Improvement) — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §4.
 - **Severity:** Medium
 - **Description:** "Platform admin" (cross-org access) is determined by a literal email string, not a database role, and the same constant is copy-pasted in three files.
 - **Evidence:** `const ADMIN_EMAILS = ['savingdailystore@gmail.com'];` in [src/app/admin/page.tsx:9](../../src/app/admin/page.tsx), [src/app/api/admin/orgs/route.ts:7](../../src/app/api/admin/orgs/route.ts), and [src/app/api/admin/orgs/[id]/route.ts:8](../../src/app/api/admin/orgs/%5Bid%5D/route.ts) — confirmed by direct grep and read.
@@ -58,6 +63,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 - **Blocks SP-API approval?** No, but flagged in [AccessControlPolicy.md](AccessControlPolicy.md) as a known gap against the "role-based access" principle it describes.
 
 **F-06 — Admin `PATCH` operations are not written to the audit log**
+- **Status: ✅ RESOLVED** — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §4.
 - **Severity:** Low
 - **Description:** Platform-admin changes to an organization (plan, scan access, trial dates) are not recorded in `AuditLog`, unlike most other mutating routes in the app.
 - **Evidence:** [src/app/api/admin/orgs/[id]/route.ts](../../src/app/api/admin/orgs/%5Bid%5D/route.ts) — `PATCH` handler updates `prisma.organization` with no corresponding `auditLog.create()` call.
@@ -81,6 +87,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 - **Blocks SP-API approval?** No.
 
 **F-09 — `selling_partner_id` from the OAuth callback is stored without format validation**
+- **Status: ✅ RESOLVED** — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §5.
 - **Severity:** Low
 - **Description:** The seller ID returned by Amazon is written straight into `AmazonCredential.sellerId` with no format check.
 - **Evidence:** [src/app/api/amazon/callback/route.ts:15,63](../../src/app/api/amazon/callback/route.ts).
@@ -145,6 +152,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 ### 1.7 Input Validation
 
 **F-17 — Input validation is inconsistent: roughly half of routes use Zod, several mutating routes parse `req.json()`/`formData()` with no schema**
+- **Status: ✅ RESOLVED for the three routes named below** (`/api/inventory/add`, `/api/inventory/bulk-delete`, `/api/billing/checkout`) — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §6. The broader claim ("roughly half of routes use Zod") is a statement about the rest of the API surface, not a single bug — routes outside this list were not re-audited in this pass.
 - **Severity:** High
 - **Description:** 22 of 47 API routes import `zod`. Several routes that accept and persist user-controlled data validate only ad hoc (manual `if (!x)` checks or raw type casts), not a schema. Most concretely:
   - `/api/inventory/add` — destructures `body` from `req.json()` with no schema; numeric fields go through a permissive `toInt()` coercion with no upper bound or type assertion beyond `parseInt(...) || 0`.
@@ -171,6 +179,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 - **Blocks SP-API approval?** No.
 
 **F-20 — CSV import has no file-size or row-count bound**
+- **Status: ✅ RESOLVED** — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §7.
 - **Severity:** Medium
 - **Description:** `/api/inventory/import` accepts the CSV content as a plain JSON string field and parses it character-by-character with no maximum length, row count, or field-length check before processing. A very large payload could consume significant memory/CPU in the serverless function (bounded only by Vercel's `maxDuration = 60` timeout, which fails the request but doesn't prevent the resource spike during the attempt).
 - **Evidence:** [src/app/api/inventory/import/route.ts](../../src/app/api/inventory/import/route.ts) — custom delimiter-aware parser with no size guard before parsing begins.
@@ -180,6 +189,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 ### 1.9 Error Handling
 
 **F-21 — A few routes return raw exception messages to the client**
+- **Status: ✅ RESOLVED** for the three routes named below — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §8.
 - **Severity:** Medium
 - **Description:** Most routes return a generic error string and log the real exception server-side (correct pattern). A handful instead include the live error message in the JSON response, which can leak internal detail (e.g., a scraper's raw failure string, or an SP-API error body that may reference a token or seller identifier).
 - **Evidence:** [src/app/api/amazon/dry-run/route.ts](../../src/app/api/amazon/dry-run/route.ts) — `{ error: \`scrape failed: ${(e as Error).message}\` }`; [src/app/api/amazon/inventory/route.ts](../../src/app/api/amazon/inventory/route.ts) — returns `message: msg` (the raw caught error string) across multiple branches; [src/app/api/scanner/route.ts](../../src/app/api/scanner/route.ts) — `{ error: 'Scan failed', message: String(err) }`.
@@ -189,6 +199,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 ### 1.10 HTTP Security Headers, CSP, Cookies
 
 **F-22 — No security headers or CSP configured at the application layer that actually serves production traffic**
+- **Status: ✅ RESOLVED** — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §2.
 - **Severity:** High
 - **Description:** `next.config.ts` has no `headers()` function (verified — the file only configures image remote patterns), and `middleware.ts` sets no headers. The `infra/nginx/nginx.conf` file does configure `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, and rate-limit zones — **but this is unused, dead infrastructure** (see Section 0); production runs on Vercel directly, with no nginx in front of it. The live site therefore ships with **none** of these headers beyond whatever Vercel applies by default (Vercel does not add CSP, X-Frame-Options, or rate limiting automatically).
 - **Evidence:** [next.config.ts](../../next.config.ts) (full file — no `headers()`); [src/middleware.ts](../../src/middleware.ts) (no header-setting logic); `infra/nginx/nginx.conf` confirmed unused per Section 0.
@@ -205,6 +216,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 ### 1.11 Rate Limiting
 
 **F-24 — No application-level rate limiting exists anywhere in production**
+- **Status: ✅ RESOLVED** for login, MFA verification/enable, registration, and password-reset request — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §1. Other unauthenticated/public endpoints were not in scope for this pass.
 - **Severity:** High
 - **Description:** Confirmed by direct grep of `src/` for any rate-limiting logic: none exists. The only "rate" related code is the SP-API outbound retry/backoff in `src/lib/amazon.ts`, which throttles EALLsource's own calls *to* Amazon — it does nothing to limit *inbound* requests to EALLsource's own login, registration, password-reset, or MFA endpoints. (The `infra/nginx/nginx.conf` rate-limit zones do not apply — see Section 0.)
 - **Evidence:** Repository-wide grep for rate-limiting patterns in `src/`; confirmed `ioredis`/`bullmq` are present as dependencies but used only for job queues and caching, not request throttling.
@@ -295,6 +307,18 @@ Items 1–3 are realistic to complete before the next SP-API submission attempt 
 The core security architecture is genuinely strong — encryption, OAuth/CSRF, multi-tenant isolation, SQL/XSS/SSRF safety, and secret hygiene all check out under direct code review with no exceptions found. Those are the categories where a mistake would be catastrophic (cross-tenant data leakage, a committed secret, a SQL injection, a broken OAuth flow), and none of them turned up broken. That's the foundation a score in the 70s sits on rather than the 40s.
 
 The score is held below 85 by a cluster of **production-hardening gaps that are real but bounded**: no rate limiting or brute-force protection anywhere in the app, no security headers/CSP on the actual production path (the nginx config that would have provided this is dead code), a few routes that under-validate input or leak raw error text, and a maintenance-risk pattern (triplicated hardcoded admin check) rather than an active exploit. None of these require architectural rework — they're a focused punch list, not a redesign — which is why the score isn't lower. It isn't higher because "no rate limiting on login, in production, on an app handling Amazon seller credentials and payment data" is the kind of gap that matters in practice, not just on paper.
+
+---
+
+## Post-Remediation Update (2026-06-27)
+
+The findings above are left as originally written so the fix can be read against the original problem (see the inline **✅ RESOLVED** markers and [SecurityRemediationReport.md](SecurityRemediationReport.md) for what actually changed). This section updates the three time-sensitive conclusions — readiness, remediation order, and score — to reflect the post-fix state.
+
+**Updated SP-API readiness:** F-22 (headers/CSP) and F-21 (error leakage) — the two items this audit called out as most relevant to an Amazon reviewer — are both resolved. F-01/F-24 (brute-force/rate limiting) are resolved for the authentication surface. **F-25 (the unused `infra/` directory) is still open** — it's the one item from the original "fix before submitting" list that remains, and it's a documentation cleanup, not a code change, so there's no reason to let it block a submission attempt.
+
+**Updated remediation order:** items 1, 2, 4, 5, 6, 7, 8, 9 from the original Section 5 list are done. Items 3 (F-25) and 10 (F-12/F-13) remain open — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §10 for why they were deliberately deferred rather than overlooked.
+
+**Updated score: 85 / 100** (was 72/100). The production-hardening cluster that held the original score down — no rate limiting, no security headers, inconsistent input validation on a few routes, raw error leakage, and the triplicated admin check — is now addressed, each with a regression test. The score isn't higher than 85 because three items remain genuinely open: F-25 (documentation hygiene, trivial but real), F-12 (no key-rotation mechanism, a real gap if `ENCRYPTION_KEY` ever needs to rotate under pressure), and F-13 (silent failure on a couple of optional integration keys). None of these are urgent, but none are fully resolved either, which is why this isn't a 95+.
 
 ---
 

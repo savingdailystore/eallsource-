@@ -14,6 +14,16 @@ import type { RetailerProduct } from '@/types';
 // Cap diagnostics stored per scan so the ScanJob.result JSON stays small.
 const MAX_DIAGNOSTICS = 40;
 
+// ScanJob.error is read back and displayed verbatim to the org owner in the
+// scan history UI (ScannerPanel.tsx). Never store a raw exception/`String(err)`
+// there — a scraper failure or downstream error can carry connection detail,
+// hostnames, or other internal information that shouldn't reach a browser,
+// even the org's own. Use a fixed, safe message per category instead, and log
+// the real error (with scanJobId/retailer context) server-side via
+// console.error so it's still fully diagnosable from Vercel logs.
+const SCAN_ERROR_UNKNOWN_RETAILER = 'Unknown retailer. Check your saved search configuration.';
+const SCAN_ERROR_GENERIC = 'Scan failed. Our team has been notified — try again later.';
+
 export interface ScanRunResult {
   created: number;
   updated: number;
@@ -54,10 +64,11 @@ export async function runScanJob(args: {
 
   const plugin = getRetailer(retailer);
   if (!plugin) {
+    console.error(`[run-scan] unknown retailer "${retailer}" for scanJobId=${scanJobId ?? 'n/a'} orgId=${orgId}`);
     if (scanJobId) {
       await prisma.scanJob.update({
         where: { id: scanJobId },
-        data:  { status: 'FAILED', error: `Unknown retailer: ${retailer}`, completedAt: new Date() },
+        data:  { status: 'FAILED', error: SCAN_ERROR_UNKNOWN_RETAILER, completedAt: new Date() },
       }).catch(() => {});
     }
     throw new Error(`Unknown retailer: ${retailer}`);
@@ -107,10 +118,11 @@ export async function runScanJob(args: {
 
     return result;
   } catch (err) {
+    console.error(`[run-scan] scan failed for scanJobId=${scanJobId ?? 'n/a'} retailer=${retailer} orgId=${orgId}:`, err);
     if (scanJobId) {
       await prisma.scanJob.update({
         where: { id: scanJobId },
-        data:  { status: 'FAILED', error: String(err), completedAt: new Date() },
+        data:  { status: 'FAILED', error: SCAN_ERROR_GENERIC, completedAt: new Date() },
       }).catch(() => {});
     }
     throw err;

@@ -61,9 +61,13 @@ export async function POST(req: NextRequest) {
       });
       return NextResponse.json({ success: true, data: done, demo: true, count });
     } catch (err: any) {
+      // ScanJob.error is displayed verbatim to the org owner in ScannerPanel —
+      // never store the raw exception there (see run-scan.ts for the same
+      // pattern). Log full detail server-side, store a fixed safe message.
+      console.error(`[scanner] demo scan failed for jobId=${job.id} orgId=${orgId}:`, err);
       await prisma.scanJob.update({
         where: { id: job.id },
-        data:  { status: 'FAILED', error: err?.message ?? 'Demo scan failed' },
+        data:  { status: 'FAILED', error: 'Demo scan failed. Our team has been notified — try again later.' },
       });
       return NextResponse.json({ error: 'Demo scan failed' }, { status: 500 });
     }

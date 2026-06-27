@@ -16,8 +16,8 @@ Each document distinguishes between controls that are **in place today** and pla
 | [SecureDevelopmentPolicy.md](SecureDevelopmentPolicy.md) | Secure SDLC, code review, CI/CD, branch protection, deployment, security verification. |
 | [IncidentResponsePlan.md](IncidentResponsePlan.md) | Detecting, responding to, and recovering from security incidents, including Amazon notification. |
 | [BusinessContinuityPlan.md](BusinessContinuityPlan.md) | Critical systems, recovery priorities, vendor dependencies, disaster scenarios. |
-| [SecureDevelopmentAudit.md](SecureDevelopmentAudit.md) | Code-level security audit against these policies — findings, severities, SP-API readiness, score. |
-| [SecurityRemediationReport.md](SecurityRemediationReport.md) | What was fixed from the audit, how, and with what tests — read alongside the audit above. |
+| [SecureDevelopmentAudit.md](SecureDevelopmentAudit.md) | Code-level security audit (Version 2.1, post-remediation re-audit with NF-1 resolved) — findings, severities, SP-API readiness, score (86/100). |
+| [SecurityRemediationReport.md](SecurityRemediationReport.md) | What was fixed from the Round 1 audit, how, and with what tests — read alongside the audit above. |
 
 ## Technology context
 
@@ -32,4 +32,4 @@ These policies are grounded in EALLsource's actual stack:
 
 ## Status
 
-All documents are at **Version 1.0** and carry placeholder approval/review dates in their Document Control sections, to be completed on formal approval by the owner.
+Most documents are at **Version 1.0** and carry placeholder approval/review dates in their Document Control sections, to be completed on formal approval by the owner. `SecureDevelopmentAudit.md` is at **Version 2.1** following an independent post-remediation re-audit (Round 2) that verified the fixes in `SecurityRemediationReport.md`, found one new finding (NF-1, Medium — raw error text in `ScanJob.error`), and has since had that finding fixed and independently re-verified within the same document.

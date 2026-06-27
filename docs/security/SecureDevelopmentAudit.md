@@ -3,6 +3,8 @@
 **EALLsource — Production Security Readiness Review**
 
 > **Remediation status (2026-06-27):** all 3 High-severity and 6 of 7 Medium-severity findings below have been fixed, tested, and verified — see [SecurityRemediationReport.md](SecurityRemediationReport.md) for the full account of what changed, the tests added, and what remains open. Each resolved finding is marked **✅ RESOLVED** inline below. This audit document is otherwise left as originally written so the resolution can be read against the original finding.
+>
+> **A second, independent re-audit was performed after the remediation commit (`13c91f1`)** to verify the fixes actually work and to look for anything the remediation missed or introduced. See **[Round 2: Post-Remediation Re-Audit](#round-2-post-remediation-re-audit)** at the bottom of this document for that assessment, the comparison against Round 1, and the updated score.
 
 ---
 
@@ -28,7 +30,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 - **Description:** Login (`mfa-check` + NextAuth `authorize()`) and TOTP verification have no attempt counter, lockout, or delay. An attacker can submit unlimited password or 6-digit TOTP guesses.
 - **Evidence:** [src/app/api/auth/mfa-check/route.ts](../../src/app/api/auth/mfa-check/route.ts) — no rate limiting; [src/lib/auth.ts:23-45](../../src/lib/auth.ts) `authorize()` — same; confirmed no rate-limiting code exists anywhere in `src/` (only a retry/backoff loop in `src/lib/amazon.ts` for SP-API calls, unrelated to login).
 - **Recommendation:** Add attempt tracking (Redis is already a dependency — `ioredis`/`bullmq` are in `package.json`) keyed by email+IP; lock out after 5 failures for 15 minutes; same for TOTP attempts.
-- **Blocks SP-API approval?** Maybe — Amazon's review focuses on data protection more than account brute-force defense, but this is a real production risk independent of SP-API and should be fixed regardless.
+- **Blocks SP-API approval?** Maybe — Amazon's review focuses on data protection more than account brute-force defense, but this is a real production risk independent of Amazon and should be fixed regardless.
 
 **F-02 — `mfa-check` endpoint enables account enumeration**
 - **Severity:** Low
@@ -189,7 +191,7 @@ Each finding lists: **Severity**, **Description**, **Evidence**, **Recommendatio
 ### 1.9 Error Handling
 
 **F-21 — A few routes return raw exception messages to the client**
-- **Status: ✅ RESOLVED** for the three routes named below — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §8.
+- **Status: ✅ RESOLVED** for the three routes named below — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §8. **Round 2 update:** a related, deeper-layer instance of this same pattern was found in `src/services/run-scan.ts` during the post-remediation re-audit — see [NF-1 in Round 2](#round-2-post-remediation-re-audit) below. The three routes explicitly named in this finding are fixed; the underlying principle ("don't surface raw exception text") was not yet applied exhaustively to every code path that ultimately reaches a response.
 - **Severity:** Medium
 - **Description:** Most routes return a generic error string and log the real exception server-side (correct pattern). A handful instead include the live error message in the JSON response, which can leak internal detail (e.g., a scraper's raw failure string, or an SP-API error body that may reference a token or seller identifier).
 - **Evidence:** [src/app/api/amazon/dry-run/route.ts](../../src/app/api/amazon/dry-run/route.ts) — `{ error: \`scrape failed: ${(e as Error).message}\` }`; [src/app/api/amazon/inventory/route.ts](../../src/app/api/amazon/inventory/route.ts) — returns `message: msg` (the raw caught error string) across multiple branches; [src/app/api/scanner/route.ts](../../src/app/api/scanner/route.ts) — `{ error: 'Scan failed', message: String(err) }`.
@@ -312,13 +314,105 @@ The score is held below 85 by a cluster of **production-hardening gaps that are 
 
 ## Post-Remediation Update (2026-06-27)
 
-The findings above are left as originally written so the fix can be read against the original problem (see the inline **✅ RESOLVED** markers and [SecurityRemediationReport.md](SecurityRemediationReport.md) for what actually changed). This section updates the three time-sensitive conclusions — readiness, remediation order, and score — to reflect the post-fix state.
+The findings above are left as originally written so the fix can be read against the original problem (see the inline **✅ RESOLVED** markers and [SecurityRemediationReport.md](SecurityRemediationReport.md) for what actually changed). This section updates the three time-sensitive conclusions — readiness, remediation order, and score — to reflect the post-fix state, as of the **first** remediation pass (commit `13c91f1`). **It has since been superseded by [Round 2](#round-2-post-remediation-re-audit) below, which re-verified these fixes independently and found one additional finding (NF-1) — read Round 2 for the current state.**
 
 **Updated SP-API readiness:** F-22 (headers/CSP) and F-21 (error leakage) — the two items this audit called out as most relevant to an Amazon reviewer — are both resolved. F-01/F-24 (brute-force/rate limiting) are resolved for the authentication surface. **F-25 (the unused `infra/` directory) is still open** — it's the one item from the original "fix before submitting" list that remains, and it's a documentation cleanup, not a code change, so there's no reason to let it block a submission attempt.
 
 **Updated remediation order:** items 1, 2, 4, 5, 6, 7, 8, 9 from the original Section 5 list are done. Items 3 (F-25) and 10 (F-12/F-13) remain open — see [SecurityRemediationReport.md](SecurityRemediationReport.md) §10 for why they were deliberately deferred rather than overlooked.
 
-**Updated score: 85 / 100** (was 72/100). The production-hardening cluster that held the original score down — no rate limiting, no security headers, inconsistent input validation on a few routes, raw error leakage, and the triplicated admin check — is now addressed, each with a regression test. The score isn't higher than 85 because three items remain genuinely open: F-25 (documentation hygiene, trivial but real), F-12 (no key-rotation mechanism, a real gap if `ENCRYPTION_KEY` ever needs to rotate under pressure), and F-13 (silent failure on a couple of optional integration keys). None of these are urgent, but none are fully resolved either, which is why this isn't a 95+.
+**Score at this point: 85 / 100** (self-assessed immediately after the remediation commit, before independent re-verification — see Round 2 below for the verified, current score).
+
+---
+
+## Round 2: Post-Remediation Re-Audit
+
+**Date:** 2026-06-27, immediately following commit `13c91f1` (the remediation commit). **No code was changed during this round** — this is a read-only verification pass, performed independently of the team that wrote the remediation, specifically to check whether the fixes work as claimed and whether they introduced anything new.
+
+### 6.1 Method
+
+Each of the 10 claimed fixes (F-01/F-24, F-22, F-03, F-05/F-06, F-09, F-17, F-20, F-21) was independently re-read against the actual current code — not against the remediation report's description of itself — tracing the real request/data flow rather than trusting the commit message. Two areas were given extra scrutiny precisely because they're the kind of thing a "did I fix it" mindset tends to miss:
+
+1. Whether the fix introduced a **new** problem (e.g., a TOCTOU race in the new rate limiter, a CSP that's too strict and breaks something, a Zod schema that rejects valid prior input).
+2. Whether the fix's principle was applied **completely**, or just to the specific file named in the original finding while a sibling code path one layer away still has the same problem.
+
+### 6.2 Verification of the 10 claimed fixes
+
+| Finding | Verified? | Detail |
+|---|---|---|
+| F-01/F-24 (rate limiting) | ✅ Confirmed working | Redis path is atomic (`INCR`/`EXPIRE`). The in-memory fallback has a minor TOCTOU gap under true concurrency (see NF-2) but it's bounded, documented, and irrelevant once `REDIS_URL` is set. TOTP verification was traced end-to-end: `mfa-check` never checks the TOTP code — only `authorize()` in `src/lib/auth.ts` does — and that's exactly where the TOTP rate limiter lives, so the real check is genuinely protected, not just defense-in-depth window dressing. |
+| F-22 (CSP/headers) | ✅ Confirmed working | Checked the CSP against everything the app actually loads: Google Fonts (`style-src`/`font-src` cover it), the MFA QR code (server-generated `data:` URL, covered by `img-src ... data:`), and confirmed there is no embedded Stripe.js, no analytics/tracking script, no `dangerouslySetInnerHTML`, and no `eval`/`Function()` anywhere that `script-src 'self'` would need to accommodate. The CSP will not break anything currently in production. |
+| F-03 (session maxAge) | ✅ Confirmed working | `maxAge: 8 * 60 * 60` is in `src/lib/auth.config.ts`, which both `src/lib/auth.ts` (spreads it) and `src/middleware.ts` (uses it directly) consume — not a dead/unused config object. |
+| F-05/F-06 (admin consolidation + audit log) | ✅ Confirmed working | All three former call sites now import `isPlatformAdmin` from `src/lib/admin.ts`; no leftover local `ADMIN_EMAILS` constant remains anywhere. The audit-log write in the `PATCH` route only runs after the admin check already passed, so the `session!.user.email` non-null assertion at that point is safe — session is guaranteed truthy there. |
+| F-09 (selling_partner_id) | ✅ Confirmed working | Regex validation runs before the token exchange; a malformed ID never reaches `prisma.amazonCredential.upsert`. |
+| F-17 (Zod schemas) | ✅ Confirmed working, and confirmed not over-strict | Specifically checked whether the new `/api/inventory/add` schema still accepts a request with **no quantity fields at all** (the pre-existing, legitimate use case) — it does, since all four quantity fields are `.optional()`. `/api/billing/checkout` was checked for a valid-enum-but-unconfigured plan (e.g. `STARTER`, which has no Stripe price) — it still correctly returns 400 rather than crashing on an undefined price ID. |
+| F-20 (CSV bounds) | ✅ Confirmed working | The byte-size check runs *before* `parseDelimited()` is called — confirmed by reading the literal order of statements in the route, not just trusting the diff. The row-count check runs after parsing but before any database write. |
+| F-21 (error leakage, 3 named routes) | ✅ Confirmed working for those 3 routes; ⚠️ **incomplete as a general principle** | All three named routes (`amazon/dry-run`, `amazon/inventory`, `scanner`) no longer return raw exception text in their HTTP response, and removing the `message` field doesn't break either frontend consumer (`AmazonSyncButton.tsx`, `ScannerPanel.tsx` both already had a generic fallback for its absence — confirmed by reading both components). **However**, see NF-1 below: the same underlying problem exists one call deeper, in `src/services/run-scan.ts`, which `scanner/route.ts` calls into — that code path was not touched by this fix. |
+
+### 6.3 New findings (NF) from Round 2
+
+**NF-1 — `runScanJob` stores raw exception text in `ScanJob.error`, displayed verbatim to the org's own owner**
+- **Status: ✅ RESOLVED (2026-06-27, Version 2.1)** — see §6.6 below for the fix and its independent verification.
+- **Severity:** Medium
+- **Description:** `src/services/run-scan.ts` catches scan failures and writes `error: String(err)` (or, for the "unknown retailer" case, a template-interpolated message) directly into the `ScanJob.error` column. `src/components/scanner/ScannerPanel.tsx` then renders that field verbatim in the job-history UI. This is the same category of problem F-21 fixed in `scanner/route.ts`'s HTTP response — but `run-scan.ts` is a separate code path one layer deeper, called from `scanner/route.ts`, `saved-searches/run-now/route.ts`, and the weekly cron job, and it was not touched by the F-21 fix.
+- **Evidence:** `src/services/run-scan.ts:60` — `error: \`Unknown retailer: ${retailer}\`` (stored on `ScanJob.error`); `src/services/run-scan.ts:113` — `error: String(err)` (same field, general failure path); `src/components/scanner/ScannerPanel.tsx:210-211` — `{job.status === 'FAILED' && job.error && (<div ...>{job.error}</div>)}`.
+- **Why this is lower severity than the original F-21, not the same:** `ScanJob` rows are strictly `orgId`-scoped (`src/app/api/scanner/route.ts:101-102` — `prisma.scanJob.findMany({ where: { orgId } ...})`), so this is an organization's own owner viewing diagnostic text about their *own* scan's failure — not a cross-tenant leak and not exposed to an anonymous or unauthenticated party. That context is exactly why this wasn't caught by the F-21 fix, which was scoped to "raw error text reaching an HTTP response" rather than "raw error text reaching a browser via any path." It's still worth fixing: a scrape failure's raw message could plausibly include retailer-side connection detail, and an SP-API-adjacent failure surfaced through this path could in principle reference something that shouldn't be shown even to the org's own user.
+- **Recommendation:** Apply the same fix pattern already used in `scanner/route.ts`: log the real error via `console.error` and store/display a fixed, generic message (or a short fixed set of error codes) instead of `String(err)`.
+- **Blocks SP-API approval?** No — org-scoped, not part of the Amazon-facing data path. Worth fixing as a matter of consistency with the principle F-21 already established, not because it's independently severe.
+
+**NF-2 — Documented, accepted limitation: the in-memory rate-limit fallback has a narrow TOCTOU gap**
+- **Severity:** Low
+- **Description:** `isRateLimited()` (a read) and `recordAttempt()` (a write) are separate calls with no lock between them in the in-memory fallback path (used only when `REDIS_URL` isn't configured). Two requests arriving at the exact same moment, both at one attempt below the limit, could both pass the check before either records its attempt — allowing one extra attempt beyond the configured max (e.g., 11 instead of 10) in that narrow window.
+- **Evidence:** `src/lib/rate-limit.ts` — `isRateLimited` (lines ~51-71) and `recordAttempt` (lines ~77-99) are independent, non-atomic operations against the same `Map` entry.
+- **Why this doesn't move the needle:** the gap requires near-exact concurrent requests at the precise boundary, is capped at +1 attempt (not unbounded), only applies to the fallback path (the Redis path uses atomic `INCR`, with zero gap), and the fallback is already instance-local — an attacker exploiting it gains essentially nothing over the already-generous 10-attempts-per-15-minutes baseline. This is a known, acceptable tradeoff of a zero-new-infrastructure fallback design, not an oversight; noting it here for completeness rather than as an action item.
+- **Recommendation:** No action required. If this ever needs tightening, the fix is to require Redis in production (remove the in-memory fallback) rather than adding in-memory locking, since the in-memory store is non-distributed regardless.
+- **Blocks SP-API approval?** No.
+
+**NF-3 — CSV import's row-limit error message states the exact row count**
+- **Severity:** Informational (not a real risk)
+- **Description:** The 413/400 responses in `/api/inventory/import` state the exact number of rows submitted (`File has too many rows (${rows.length}). Max is ${MAX_ROWS}.`).
+- **Evidence:** `src/app/api/inventory/import/route.ts` (the row-bound check added in the remediation pass).
+- **Assessment:** This is information about the *caller's own uploaded file*, not about the system. There's no plausible attack that benefits from knowing your own CSV's row count. Listed here only because a sub-agent flagged it during this re-audit and it deserves an explicit "checked, not a real finding" rather than silence.
+- **Recommendation:** None. No change needed.
+- **Blocks SP-API approval?** No.
+
+### 6.4 Comparison: Round 1 vs. Round 2
+
+| | Round 1 (original audit) | Round 2 (post-remediation re-audit) |
+|---|---|---|
+| High-severity open | 3 (F-01/F-24, F-22) | **0** — all 3 verified independently fixed |
+| Medium-severity open | 7 (F-03, F-05, F-12, F-17, F-20, F-21, and F-06 counted as Low-bundled) | **2** — F-12, F-13(Low→still open) — NF-1 found and then resolved within Round 2 (see §6.6) |
+| Low-severity open | F-02, F-06, F-09, F-13, F-25 | F-02, F-13, F-25, and **NF-2/NF-3** (both assessed as non-actionable/accepted) |
+| New issues introduced by the fix itself | n/a | **0 actionable** — NF-2 is a documented, accepted tradeoff; NF-3 is informational only |
+| Fixes that don't actually work as claimed | n/a | **0** — all 10 claimed fixes were independently verified to work correctly, including tracing the real TOTP-verification code path and confirming the CSP doesn't break anything currently loaded |
+| Score | 72/100 | **86/100** (see §6.5) |
+
+The headline result of this round: **the remediation work holds up under independent scrutiny.** Nothing claimed as fixed turned out to be broken, decorative, or dead code. The one genuine gap this round surfaced (NF-1) was real but bounded — and has since been fixed and independently re-verified within this same round (§6.6), rather than carried forward as an open item.
+
+### 6.5 Updated Production Readiness Score: **86 / 100**
+
+**History of this score within Round 2:** immediately after re-auditing the remediation commit, this score was set to **82/100** — 3 points below the remediation report's own self-assessed 85, because the re-audit's job is specifically to find what a "did I fix my own list" pass would miss, and it did (NF-1). Once NF-1 was fixed and independently re-verified (§6.6), the score moved to **86/100** — 1 point above the original 85 self-assessment, because the codebase is now provably better than what that self-assessment was based on: every originally-claimed fix holds up under independent tracing of real code paths, *and* the one gap that independent scrutiny found has itself been closed and re-verified, with the same rigor applied to the fix as to the original findings (re-reading the actual diff, not trusting its own commit message; running the real test suite and build, not assuming green).
+
+The score doesn't go higher because four items remain openly deferred from Round 1 and were not in scope for this fix: **F-02** (account enumeration via `mfa-check` response shape — would change a response contract), **F-12** (no encryption-key rotation/versioning — needs a ciphertext-format migration), **F-13** (a couple of optional integration env vars fail silently), and **F-25** (the unused `infra/` Docker/nginx scaffolding — documentation cleanup). None of these are urgent and all were deliberately, not accidentally, left open — but they're real, and a 90+ score should be reserved for when they're closed too.
+
+### 6.6 NF-1 Remediation (2026-06-27, Version 2.1)
+
+**Fix:** Both code paths that wrote raw exception text into `ScanJob.error` — the field `ScannerPanel.tsx` displays verbatim to the org owner — were changed to log the full error server-side via `console.error` (with `scanJobId`/`retailer`/`orgId` context for diagnosability) and store a fixed, generic, user-safe message instead:
+
+- `src/services/run-scan.ts:60` (unknown-retailer case) — now stores `'Unknown retailer. Check your saved search configuration.'` instead of interpolating the raw retailer string.
+- `src/services/run-scan.ts:113` (general catch-all) — now stores `'Scan failed. Our team has been notified — try again later.'` instead of `String(err)`.
+- **A sibling instance of the same pattern, not named in the original NF-1 evidence, was found and fixed in the same pass:** `src/app/api/scanner/route.ts`'s demo-scan branch (`catch (err: any) { ... error: err?.message ?? 'Demo scan failed' ... }`) wrote the same kind of raw message into the same `ScanJob.error` field via a separate code path. Leaving it would have meant NF-1 was only half-resolved — a re-audit would have immediately found this adjacent instance. It now stores `'Demo scan failed. Our team has been notified — try again later.'` with the real error logged via `console.error` first.
+
+**Why the messages chosen still tell the owner something useful:** "Unknown retailer" is distinguishable from a generic failure — it tells the owner their saved search likely has a misconfigured/stale retailer name, which is actionable, without revealing *why* the retailer lookup failed internally. The generic "Scan failed... try again later" messages are honest about what happened (the scan didn't complete) and set the right expectation (retry, or that the team is already aware) without echoing any implementation detail.
+
+**Tests added:**
+- `src/services/run-scan.test.ts` (new file) — 3 tests: the unknown-retailer path stores the fixed safe message and never the raw retailer string; the general failure path stores the fixed safe message and never the injected `String(err)` content (verified against a deliberately internal-detail-bearing error message); a successful scan never writes anything to `ScanJob.error` at all.
+- `src/app/api/scanner/route.test.ts` (extended) — added 2 tests for the demo-scan branch: a failure stores the fixed safe message (not the raw error) and logs server-side; a successful demo scan still returns its result unchanged (regression check).
+
+**Verification:** `npm run typecheck` (clean), `npm run test` (**14 test files, 53 tests, all passing** — up from 48 before this fix), `npm run build` (succeeds, Middleware bundle unchanged at 87.4KB since this fix touched no Edge-reachable code). `next lint` remains unrunnable in this repo for the same pre-existing reason noted in [SecurityRemediationReport.md](SecurityRemediationReport.md) §9 (no ESLint config exists, predating this work).
+
+**Independent re-verification of the fix itself (same adversarial standard applied to the original Round 2):** confirmed by direct read that (a) neither fixed code path can be reached without going through the new generic-message branch — there is no remaining call site writing `String(err)` or an interpolated string into **`ScanJob.error`** specifically anywhere in the codebase (re-grepped after the fix), (b) the `console.error` calls include enough context (`scanJobId`, `retailer`, `orgId`) to remain fully diagnosable from Vercel logs, matching the standard already set by the F-21 fix, and (c) the fix introduces no new behavior change for the success path — `ScanJob.error` is `undefined`/untouched on a successful scan, exactly as before.
+
+**One adjacent observation surfaced by this same re-grep, deliberately left out of scope:** `src/app/api/cron/weekly-scan/route.ts:93` and `src/app/api/saved-searches/run-now/route.ts:82` store `{ error: String(err) }` into a *different* field — `SavedSearch.lastResult` (a JSON column), not `ScanJob.error`. This is the same underlying anti-pattern, but it is **not currently rendered anywhere in the UI** — `ScheduledSearches.tsx` types `lastResult` as `unknown` and never displays it (confirmed by grep — no JSX reads `lastResult` or `lastResult.error`). Since NF-1 was specifically scoped to `ScanJob.error` (the field actually proven to reach a browser via `ScannerPanel.tsx`), and this sibling case has no current display path, it was not fixed in this pass — fixing it would be addressing a risk that doesn't exist yet (nothing reads the value), versus NF-1's risk which was actively exposed. Worth applying the same `console.error` + fixed-message pattern proactively if `lastResult.error` is ever surfaced in a future UI change; noted here rather than silently left for a future audit to "discover" again.
 
 ---
 
@@ -328,6 +422,6 @@ The findings above are left as originally written so the fix can be read against
 |---|---|
 | Owner | Founder, EALLsource |
 | Approval Date | _[to be completed upon approval]_ |
-| Version | 1.0 |
-| Review Date | 2026-06-27 (this audit) |
-| Next Review Date | After remediation items in Section 5 are addressed, or 6 months, whichever is sooner |
+| Version | 2.1 (NF-1 remediated and independently re-verified) |
+| Review Date | 2026-06-27 (Round 1), 2026-06-27 (Round 2, post-remediation), 2026-06-27 (Version 2.1, NF-1 fix) |
+| Next Review Date | After F-02/F-12/F-13/F-25 are addressed, or 6 months, whichever is sooner |

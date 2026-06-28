@@ -17,7 +17,16 @@ describe('next.config security headers', () => {
     expect(byKey['X-Frame-Options']).toBe('SAMEORIGIN');
     expect(byKey['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
     expect(byKey['Strict-Transport-Security']).toContain('max-age=31536000');
-    expect(byKey['Content-Security-Policy']).toContain("default-src 'self'");
-    expect(byKey['Content-Security-Policy']).toContain("frame-ancestors 'self'");
+  });
+
+  it('does NOT set a static Content-Security-Policy here', async () => {
+    // CSP needs a fresh nonce per request to allow Next.js App Router's
+    // inline hydration scripts to run — a static CSP here with no nonce
+    // blocks them and renders every page blank (this happened in
+    // production once already). It must come from src/middleware.ts
+    // instead, generated per-request — see src/middleware.test.ts.
+    const rules = await config.headers!();
+    const keys  = rules[0].headers.map((h) => h.key);
+    expect(keys).not.toContain('Content-Security-Policy');
   });
 });

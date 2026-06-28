@@ -1,24 +1,13 @@
 import type { NextConfig } from 'next';
 
-// Baseline security headers + CSP for the production site. Scoped to what
-// the app actually loads today: self-hosted scripts/styles, Google Fonts
-// (globals.css @imports fonts.googleapis.com/gstatic.com), data: URIs for
-// the MFA setup QR code (generated server-side as a data URL), and the
-// retailer/Amazon image hosts already allowlisted in `images.remotePatterns`
-// below. Stripe Checkout is a server-side redirect to a Stripe-hosted page,
-// not embedded Stripe.js, so no stripe.com script/frame allowance is needed.
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com",
-  "img-src 'self' data: https:",
-  "connect-src 'self'",
-  "frame-ancestors 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-].join('; ');
-
+// Baseline security headers for the production site. Content-Security-Policy
+// is intentionally NOT set here — it's generated per-request in
+// src/middleware.ts instead, because it needs a fresh nonce on every request
+// to allow Next.js App Router's own inline hydration scripts to run (a
+// static CSP with no nonce blocks them and renders the page blank — this
+// broke production once already; see the comment in middleware.ts for the
+// full explanation). The headers below don't vary per request, so they're
+// fine here.
 const config: NextConfig = {
   images: {
     remotePatterns: [
@@ -40,7 +29,6 @@ const config: NextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
-          { key: 'Content-Security-Policy', value: CSP },
         ],
       },
     ];

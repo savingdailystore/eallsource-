@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { authConfig } from '@/lib/auth.config';
+import { buildCsp } from '@/lib/csp';
 
 // Use the Edge-safe config directly rather than importing `auth` from
 // @/lib/auth — that file pulls in Prisma, bcrypt, and the Redis-backed rate
@@ -18,7 +19,28 @@ const AUTH_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'
 // SP-API review and Stripe both require these to be publicly reachable.
 const OPEN_PATHS = ['/privacy', '/terms', '/contact'];
 
+// CSP must be generated here (not in next.config.ts) with a per-request
+// nonce — see src/lib/csp.ts for why. A static CSP with no nonce took the
+// live site down once already (the page never hydrates and renders blank).
+function withCsp(res: NextResponse, csp: string): NextResponse {
+  res.headers.set('Content-Security-Policy', csp);
+  return res;
+}
+
 export default auth((req) => {
+  // crypto.getRandomValues is a standard Web Crypto API, available in the
+  // Edge runtime — Buffer is NOT, so a hex string (not base64) is used here.
+  // The CSP spec doesn't require base64 for a nonce value, only that it be
+  // unguessable and match between the header and the script tag.
+  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+  const csp   = buildCsp(nonce);
+
+  const requestHeaders = new Headers((req as NextRequest).headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', csp);
+
+  const next = () => withCsp(NextResponse.next({ request: { headers: requestHeaders } }), csp);
+
   const { pathname } = req.nextUrl;
   const isAuthed = !!req.auth;
 
@@ -27,33 +49,33 @@ export default auth((req) => {
   // a 307 and returns HTML — that broke the login mfa-check, surfacing as a
   // bogus "Invalid email or password." Let every /api request through.
   if (pathname.startsWith('/api')) {
-    return NextResponse.next();
+    return next();
   }
 
   // The landing page (root) is public; it redirects authed users to the
   // dashboard itself, in the page component.
   if (pathname === '/') {
-    return NextResponse.next();
+    return next();
   }
 
   // Always-public pages — never redirect, regardless of auth state.
   if (OPEN_PATHS.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+    return next();
   }
 
   const isAuthPage = AUTH_PATHS.some((p) => pathname.startsWith(p));
 
   if (isAuthPage && isAuthed) {
-    return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+    return withCsp(NextResponse.redirect(new URL('/dashboard', req.nextUrl)), csp);
   }
 
   if (!isAuthPage && !isAuthed) {
     const url = new URL('/login', req.nextUrl);
     url.searchParams.set('callbackUrl', pathname);
-    return NextResponse.redirect(url);
+    return withCsp(NextResponse.redirect(url), csp);
   }
 
-  return NextResponse.next();
+  return next();
 });
 
 export const config = {

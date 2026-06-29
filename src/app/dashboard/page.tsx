@@ -2,11 +2,15 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatCurrency, formatPercent, relativeTime } from '@/lib/utils';
 import { scoreLabel } from '@/engines/scoring';
+import { RoiGauge } from '@/components/dashboard/RoiGauge';
+import { WeeklyLeadsChart } from '@/components/dashboard/WeeklyLeadsChart';
 import {
   TrendingUp, Package, DollarSign, BarChart3,
   ArrowUpRight, Flame, CheckCircle2, Clock,
 } from 'lucide-react';
 import Link from 'next/link';
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Dashboard' };
@@ -16,7 +20,7 @@ export default async function DashboardPage() {
   const orgId   = session!.user.orgId;
   const isOwner = session!.user.role === 'OWNER';
 
-  const [leadStats, topLeads, recentJobs, inventoryStats] = await Promise.all([
+  const [leadStats, weeklyLeads, topLeads, recentJobs, inventoryStats] = await Promise.all([
     prisma.$queryRaw<{ total: bigint; avg_roi: number; avg_score: number; new_today: bigint }[]>`
       SELECT
         COUNT(*) as total,
@@ -28,6 +32,14 @@ export default async function DashboardPage() {
       WHERE l."orgId" = ${orgId}
         AND l.status != 'REJECTED'
         AND l.status != 'EXPIRED'
+    `,
+    prisma.$queryRaw<{ day: Date; count: bigint }[]>`
+      SELECT DATE_TRUNC('day', "createdAt") as day, COUNT(*) as count
+      FROM leads
+      WHERE "orgId" = ${orgId}
+        AND "createdAt" >= NOW() - INTERVAL '7 days'
+      GROUP BY day
+      ORDER BY day
     `,
     prisma.lead.findMany({
       where: { orgId, status: { in: ['NEW', 'SAVED'] } },
@@ -49,6 +61,16 @@ export default async function DashboardPage() {
   const stats         = leadStats[0] ?? { total: 0n, avg_roi: 0, avg_score: 0, new_today: 0n };
   const totalUnits    = inventoryStats._sum.totalQuantity ?? 0;
   const availableUnits = inventoryStats._sum.availableQuantity ?? 0;
+
+  const countsByDay = new Map(weeklyLeads.map((d) => [d.day.toDateString(), Number(d.count)]));
+  const weeklyData  = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - i));
+    return {
+      label: DAY_LABELS[date.getDay()],
+      count: countsByDay.get(date.toDateString()) ?? 0,
+    };
+  });
 
   const STAT_CARDS = [
     { label: 'Active Leads',     value: Number(stats.total).toLocaleString(), sub: `+${Number(stats.new_today)} today`,   icon: TrendingUp, color: 'text-blue-600',    bg: 'bg-blue-500/10',    href: '/dashboard/leads'     },
@@ -96,6 +118,18 @@ export default async function DashboardPage() {
             <div key={s.label} className="card p-5">{inner}</div>
           );
         })}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold text-slate-50 mb-2">Avg ROI</h2>
+          <RoiGauge avgRoi={stats.avg_roi ?? 0} />
+        </div>
+        <div className="card p-5">
+          <h2 className="text-sm font-semibold text-slate-50 mb-2">Active Leads — Last 7 Days</h2>
+          <WeeklyLeadsChart data={weeklyData} />
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

@@ -140,8 +140,11 @@ export async function processRetailerProduct(
     const bsr            = sp?.bsr      ?? keepa?.bsr;
     const buyBoxPrice    = sp?.buyBoxPrice   ?? keepa?.buyBoxPrice;
     const lowestFbaPrice = sp?.lowestFbaPrice ?? keepa?.lowestNewPrice;
-    const fbaSellers     = sp?.fbaSellers    ?? keepa?.fbaSellers    ?? 0;
-    const totalSellers   = sp?.totalSellers  ?? keepa?.totalSellers  ?? 0;
+    // SP-API returns explicit 0 for seller counts when it has no offer data
+    // (not undefined) — so ?? would silently discard Keepa's real non-zero
+    // value. Treat SP-API 0 as "no data" and fall through to Keepa.
+    const fbaSellers   = (sp?.fbaSellers   || null) ?? keepa?.fbaSellers   ?? 0;
+    const totalSellers = (sp?.totalSellers || null) ?? keepa?.totalSellers ?? 0;
     const amazonIsSeller = sp?.amazonIsSeller ?? keepa?.amazonIsSeller ?? false;
     const monthlySales   = keepa?.monthlySales; // velocity signal (Keepa only)
     const isVariation    = sp?.isVariation ?? keepa?.isVariation ?? false;

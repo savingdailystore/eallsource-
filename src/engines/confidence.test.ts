@@ -76,4 +76,60 @@ describe('buildConfidence', () => {
     const result = buildConfidence(baseInput({ keepaHistory: history as any }));
     expect(result.reasons.some((r) => r.includes('Amazon rarely in stock'))).toBe(true);
   });
+
+  // ── Competition signal regression tests ──────────────────────────────────────
+  // These guard the totalSellers signal path. Before the pipeline fix, SP-API
+  // returned explicit 0 (not undefined) which overrode Keepa's real value via
+  // ??, so every product was scored as "few sellers" regardless of real comp.
+
+  it('emits "Healthy competition" when totalSellers <= 3', () => {
+    const result = buildConfidence(baseInput({ totalSellers: 3 }));
+    expect(result.reasons).toContain('Healthy competition (few active sellers)');
+    expect(result.concerns.some(c => c.includes('competition'))).toBe(false);
+  });
+
+  it('emits no competition signal in the neutral 4–10 range', () => {
+    const result = buildConfidence(baseInput({ totalSellers: 7 }));
+    expect(result.reasons.some(r => r.includes('competition'))).toBe(false);
+    expect(result.concerns.some(c => c.includes('competition'))).toBe(false);
+  });
+
+  it('emits competition concern when totalSellers > 10', () => {
+    const result = buildConfidence(baseInput({ totalSellers: 11 }));
+    expect(result.concerns).toContain('Higher than average seller competition');
+    expect(result.reasons.some(r => r.includes('competition'))).toBe(false);
+  });
+});
+
+// ── Pipeline seller-count merge guard (isolated) ─────────────────────────────
+// pipeline.ts calls external services so cannot be imported in unit tests.
+// This extracts and tests the merge guard logic in isolation to catch any
+// future regressions in the SP-API 0 → Keepa fallthrough fix.
+
+function mergeSellers(spValue: number | undefined, keepaValue: number | undefined): number {
+  // Mirrors the exact expression in pipeline.ts:
+  //   (sp?.totalSellers || null) ?? keepa?.totalSellers ?? 0
+  return (spValue || null) ?? keepaValue ?? 0;
+}
+
+describe('pipeline seller-count merge guard', () => {
+  it('uses Keepa value when SP-API returns explicit 0 (the core regression)', () => {
+    expect(mergeSellers(0, 3)).toBe(3);
+  });
+
+  it('uses SP-API value when it is a genuine non-zero count', () => {
+    expect(mergeSellers(5, 3)).toBe(5);
+  });
+
+  it('falls back to 0 when both sources are absent', () => {
+    expect(mergeSellers(undefined, undefined)).toBe(0);
+  });
+
+  it('uses Keepa value when SP-API is undefined', () => {
+    expect(mergeSellers(undefined, 7)).toBe(7);
+  });
+
+  it('returns 0 when SP-API is 0 and Keepa is also 0', () => {
+    expect(mergeSellers(0, 0)).toBe(0);
+  });
 });

@@ -23,7 +23,7 @@ function riskScore(risk: string): number {
   return risk === 'LOW' ? 100 : risk === 'MEDIUM' ? 50 : 0;
 }
 
-function stabilityScore(stability: string): number {
+export function stabilityScore(stability: string): number {
   return stability === 'STABLE' ? 100 : stability === 'VOLATILE' ? 20 : 50;
 }
 

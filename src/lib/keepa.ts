@@ -9,6 +9,11 @@ const KEEPA_EPOCH = 1293840000000;
 const keepaToDate = (k: number) => new Date(KEEPA_EPOCH + k * 60000);
 const keepaPrice  = (raw: number) => raw < 0 ? null : raw / 100; // Keepa stores cents
 
+// How much history to retain in the persisted snapshot. Bounds storage growth
+// while still covering a full year for seasonal comparisons (Phase 1, Feature 3
+// & 5 — see KeepaHistorySnapshot below).
+export const KEEPA_HISTORY_WINDOW_DAYS = 400;
+
 export interface KeepaProductData {
   asin:            string;
   title?:          string;
@@ -36,6 +41,38 @@ export interface KeepaProductData {
   priceTrend?:     'RISING' | 'FLAT' | 'DECLINING' | 'UNKNOWN';
   priceTrendPct?:  number; // % change recent vs. earlier window (negative = falling)
   keepaLink:       string;
+  // Canonical historical snapshot — see KeepaHistorySnapshot for field meanings.
+  // This is what gets persisted to Product.keepaHistory; everything else on
+  // this interface is a derived scalar for the current scan only.
+  history?:        KeepaHistorySnapshot;
+}
+
+// One time series: parallel arrays of unix-ms timestamps and values. `v[i]`
+// corresponds to `t[i]`. A `null` value means Keepa recorded "no data" at that
+// timestamp (e.g. raw -1) — for amazonPrice specifically, null means Amazon
+// was not selling the item at that point in time, which is the basis for the
+// Opportunity Timeline's "Amazon entered/exited listing" events.
+export interface KeepaSeries {
+  t: number[];
+  v: (number | null)[];
+}
+
+// Canonical, reusable historical snapshot persisted on Product.keepaHistory.
+// Each series below maps to a documented Keepa CSV index — nothing here is
+// guessed or undocumented. Future phases (forecasting, BI, reimbursement
+// analysis) should derive new insights from this shape rather than adding
+// parallel history columns.
+export interface KeepaHistorySnapshot {
+  fetchedAt:     string; // ISO timestamp this snapshot was captured
+  windowDays:    number; // how many trailing days of history this covers
+  amazonPrice:   KeepaSeries; // csv[0]  — Amazon's own price; null = Amazon not selling
+  newPrice:      KeepaSeries; // csv[1]  — lowest third-party New price
+  usedPrice?:    KeepaSeries; // csv[2]  — lowest Used price (optional, not all products have one)
+  salesRank:     KeepaSeries; // csv[3]  — BSR history
+  offerCountNew?: KeepaSeries; // csv[11] — count of third-party New offers (competition over time)
+  rating?:       KeepaSeries; // csv[16] — average star rating ×10 in raw Keepa data, already ÷10 here
+  reviewCount?:  KeepaSeries; // csv[17] — total ratings/reviews
+  buyBoxPrice:   KeepaSeries; // csv[18] — Buy Box price history
 }
 
 export async function getKeepaData(asin: string): Promise<KeepaProductData | null> {
@@ -69,14 +106,22 @@ export async function getKeepaData(asin: string): Promise<KeepaProductData | nul
     const buyBoxHistory = parsePriceHistory(p.csv?.[18] ?? []);
     const newHistory    = parsePriceHistory(p.csv?.[1]  ?? []);
 
-    // BSR: p.csv[3] = sales rank history
-    const bsrHistory = parsePriceHistory(p.csv?.[3] ?? []);
-    const bsr        = bsrHistory.length > 0 ? bsrHistory[bsrHistory.length - 1] : undefined;
+    // BSR: p.csv[3] = sales rank history. This is a plain integer rank, NOT a
+    // price — must use lastCsvValue (no /100), not parsePriceHistory. (Found
+    // via Phase 1.1 production validation: parsePriceHistory was wrongly
+    // applied here, silently dividing every real BSR by 100 — e.g. a true
+    // rank of 800 was being stored as 8.)
+    const bsrRaw = lastCsvValue(p.csv?.[3]);
+    const bsr    = bsrRaw != null ? bsrRaw : undefined;
 
-    // Seller counts from stats
+    // Seller counts from stats. Keepa's actual field name is `totalOfferCount`,
+    // not `offerCountTotal` — the latter doesn't exist on the stats object, so
+    // this was silently defaulting to 0 for every product (also found via
+    // Phase 1.1 validation; confirmed against a real product with 3 actual
+    // offers that was reporting totalSellers: 0).
     const stats      = p.stats ?? {};
     const fbaSellers = p.offerCountFBA  ?? stats.offerCountFBA  ?? 0;
-    const allSellers = p.offerCountTotal ?? stats.offerCountTotal ?? 0;
+    const allSellers = p.offerCountTotal ?? stats.totalOfferCount ?? 0;
 
     // Sales velocity: Amazon's "X+ bought in past month" is the cleanest signal
     // when present; otherwise the 30-day sales-rank-drop count is the standard
@@ -124,6 +169,22 @@ export async function getKeepaData(asin: string): Promise<KeepaProductData | nul
     // Recent price array for the product
     const priceHistoryFormatted = buyBoxHistory.slice(-90);
 
+    // Canonical history snapshot — reuses the same csv arrays already read
+    // above instead of re-fetching or re-deriving anything.
+    const cutoff = Date.now() - KEEPA_HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const history: KeepaHistorySnapshot = {
+      fetchedAt:  new Date().toISOString(),
+      windowDays: KEEPA_HISTORY_WINDOW_DAYS,
+      amazonPrice:   parseSeries(p.csv?.[0],  keepaPrice, cutoff),
+      newPrice:      parseSeries(p.csv?.[1],  keepaPrice, cutoff),
+      usedPrice:     parseSeries(p.csv?.[2],  keepaPrice, cutoff),
+      salesRank:     parseSeries(p.csv?.[3],  rawOrNull, cutoff),
+      offerCountNew: parseSeries(p.csv?.[11], rawOrNull, cutoff),
+      rating:        parseSeries(p.csv?.[16], (raw) => raw < 0 ? null : raw / 10, cutoff),
+      reviewCount:   parseSeries(p.csv?.[17], rawOrNull, cutoff),
+      buyBoxPrice:   parseSeries(p.csv?.[18], keepaPrice, cutoff),
+    };
+
     return {
       asin,
       title:           p.title,
@@ -147,6 +208,7 @@ export async function getKeepaData(asin: string): Promise<KeepaProductData | nul
       priceTrend,
       priceTrendPct,
       keepaLink:       `https://keepa.com/#!product/1-${asin}`,
+      history,
     };
   } catch (err) {
     console.error('[keepa] error:', err);
@@ -155,6 +217,25 @@ export async function getKeepaData(asin: string): Promise<KeepaProductData | nul
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Generic Keepa csv series → { t, v } parser, used for the persisted history
+// snapshot. `transform` maps a raw csv value to either a real number or null
+// (Keepa's "no data at this point" sentinel, typically raw < 0).
+function parseSeries(csv: number[] | undefined, transform: (raw: number) => number | null, cutoffMs: number): KeepaSeries {
+  const t: number[] = [];
+  const v: (number | null)[] = [];
+  if (!csv) return { t, v };
+
+  for (let i = 0; i < csv.length; i += 2) {
+    const time = keepaToDate(csv[i]).getTime();
+    if (time < cutoffMs) continue;
+    t.push(time);
+    v.push(transform(csv[i + 1]));
+  }
+  return { t, v };
+}
+
+const rawOrNull = (raw: number): number | null => (raw < 0 ? null : raw);
 
 function parsePriceHistory(csv: number[]): number[] {
   const prices: number[] = [];
@@ -176,7 +257,7 @@ function lastCsvValue(csv?: number[]): number | null {
   return null;
 }
 
-function computeStability(prices: number[]): 'STABLE' | 'VOLATILE' | 'UNKNOWN' {
+export function computeStability(prices: number[]): 'STABLE' | 'VOLATILE' | 'UNKNOWN' {
   if (prices.length < 5) return 'UNKNOWN';
   const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
   if (avg === 0) return 'UNKNOWN';
@@ -190,7 +271,7 @@ function computeStability(prices: number[]): 'STABLE' | 'VOLATILE' | 'UNKNOWN' {
 // smooths out noise so a genuinely declining price isn't masked by day-to-day
 // swings (and vice versa: volatile-but-flat isn't mistaken for a decline).
 const TREND_THRESHOLD = 0.08; // ±8% between windows to count as a real move
-function computeTrend(prices: number[]): { trend: 'RISING' | 'FLAT' | 'DECLINING' | 'UNKNOWN'; pct?: number } {
+export function computeTrend(prices: number[]): { trend: 'RISING' | 'FLAT' | 'DECLINING' | 'UNKNOWN'; pct?: number } {
   if (prices.length < 12) return { trend: 'UNKNOWN' };
   const third  = Math.floor(prices.length / 3);
   const early  = prices.slice(0, third);

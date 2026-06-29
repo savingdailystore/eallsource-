@@ -15,6 +15,17 @@ import { LeadNotes } from '@/components/leads/LeadNotes';
 import { IpHistoryFlag } from '@/components/leads/IpHistoryFlag';
 import { ProductHero } from '@/components/leads/ProductHero';
 import { ungatingOutlook } from '@/engines/gating';
+import { buildConfidence } from '@/engines/confidence';
+import { buildTimeline } from '@/engines/timeline';
+import { buildRiskBreakdown } from '@/engines/riskPresentation';
+import { buildHistoricalInsights } from '@/engines/historicalInsights';
+import { amazonPresence } from '@/engines/keepaHistoryMetrics';
+import type { KeepaHistorySnapshot } from '@/lib/keepa';
+import { ConfidencePanel } from '@/components/leads/ConfidencePanel';
+import { ExplanationPanel } from '@/components/leads/ExplanationPanel';
+import { OpportunityTimeline } from '@/components/leads/OpportunityTimeline';
+import { RiskBreakdownPanel } from '@/components/leads/RiskBreakdownPanel';
+import { HistoricalInsights } from '@/components/leads/HistoricalInsights';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +45,49 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const discounts = (p.availableDiscounts as Discount[] | null) ?? [];
   const amazonUrl = p.amazonUrl ?? buildAmazonUrl(p.asin);
   const keepaUrl  = p.keepaLink ?? buildKeepaUrl(p.asin);
+
+  // ─── Phase 1: AI Sourcing Experience ───────────────────────────────────────
+  // Every value below is derived deterministically from already-persisted
+  // Product fields (and keepaHistory) by the engines in src/engines/ — see
+  // confidence.ts, timeline.ts, riskPresentation.ts, historicalInsights.ts.
+  const history: KeepaHistorySnapshot | null = (p.keepaHistory as KeepaHistorySnapshot | null) ?? null;
+
+  const confidence = buildConfidence({
+    score:            lead.score,
+    roi:              p.roi,
+    demandLevel:      p.demandLevel,
+    gatingRisk:       p.gatingRisk,
+    priceStability:   (p.priceStability as 'STABLE' | 'VOLATILE' | 'UNKNOWN') ?? 'UNKNOWN',
+    priceTrend:       p.priceTrend as 'RISING' | 'FLAT' | 'DECLINING' | 'UNKNOWN' | null,
+    totalSellers:     p.totalSellers ?? 0,
+    fbaSellers:       p.fbaSellers ?? 0,
+    amazonIsSeller:   p.amazonIsSeller,
+    buyBoxSuppressed: p.buyBoxSuppressed,
+    rating:           p.rating,
+    reviewCount:      p.reviewCount,
+    lowReviews:        p.lowReviews,
+    monthlySales:     p.monthlySales,
+    keepaHistory:     history,
+  });
+
+  const timeline = buildTimeline(history);
+
+  const riskBreakdown = buildRiskBreakdown({
+    priceStability:    (p.priceStability as 'STABLE' | 'VOLATILE' | 'UNKNOWN') ?? 'UNKNOWN',
+    priceTrend:        p.priceTrend as 'RISING' | 'FLAT' | 'DECLINING' | 'UNKNOWN' | null,
+    totalSellers:      p.totalSellers ?? 0,
+    amazonIsSeller:    p.amazonIsSeller,
+    buyBoxSuppressed:  p.buyBoxSuppressed,
+    ipRiskScore:       p.ipRiskScore,
+    isPrivateLabel:    p.isPrivateLabel,
+    isBrandRestricted: p.isBrandRestricted,
+    isGenericBrand:    p.isGenericBrand,
+    hasHazmat:         p.hasHazmat,
+    isMeltable:        p.isMeltable,
+    amazonAbsentPct:   history ? amazonPresence(history)?.absentPct : undefined,
+  });
+
+  const historicalInsights = buildHistoricalInsights(history);
 
   function ScoreRow({ label, value, pass }: { label: string; value?: number | null; pass?: boolean }) {
     const pct = value ?? 0;
@@ -98,6 +152,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <div className={`text-sm font-bold ${color}`}>{label}</div>
           <div className="text-xs text-slate-500 mt-1">Lead Score</div>
         </div>
+      </div>
+
+      <div className="mb-6">
+        <ConfidencePanel result={confidence} />
       </div>
 
       <IpHistoryFlag
@@ -249,6 +307,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               ))}
             </div>
           </div>
+
+          <ExplanationPanel result={confidence} />
+          <OpportunityTimeline events={timeline} currentLabel={confidence.recommendation} />
+          <HistoricalInsights insights={historicalInsights} />
         </div>
 
         {/* Sidebar — Validation & Risk */}
@@ -297,6 +359,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </div>
               );
             })()}
+
+            <RiskBreakdownPanel breakdown={riskBreakdown} />
 
             <div className="space-y-2">
               {[

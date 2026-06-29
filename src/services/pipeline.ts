@@ -15,6 +15,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { getKeepaData } from '@/lib/keepa';
 import { getProductData, searchCatalogByUpc, searchCatalogByEan, searchCatalogByKeywords, getFeeEstimate } from '@/lib/amazon';
 import { calculateProfitability } from '@/engines/profitability';
@@ -415,6 +416,7 @@ export async function processRetailerProduct(
       reviewCount:      reviewCount ?? null,
       lowReviews,
       keepaLink,
+      keepaHistory:     (keepa?.history as Prisma.InputJsonValue | undefined) ?? undefined,
       notes:            opts.notes?.trim() || null,
       score,
     };

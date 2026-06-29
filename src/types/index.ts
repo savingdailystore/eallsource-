@@ -189,6 +189,97 @@ export interface GatingResult {
   reasons: string[];
 }
 
+// ─── Confidence engine (Phase 1, Features 1 & 2) ────────────────────────────
+// Confidence is NOT a renamed lead score — it's a separate "should I buy
+// this?" judgment layered on top of the score, reinforced (or undermined) by
+// historical evidence the score formula doesn't see (Amazon's presence
+// pattern, Buy Box stability duration, review depth). One signal evaluator
+// produces both the "primary reasons" (Feature 1, capped list) and the full
+// reasons/concerns breakdown (Feature 2) — see engines/confidence.ts.
+
+import type { KeepaHistorySnapshot } from '@/lib/keepa';
+
+export interface ConfidenceInput {
+  score:           number; // existing 0–100 lead score
+  roi:             number;
+  demandLevel:     DemandLevel;
+  gatingRisk:       GatingRisk;
+  priceStability:  'STABLE' | 'VOLATILE' | 'UNKNOWN';
+  priceTrend:      'RISING' | 'FLAT' | 'DECLINING' | 'UNKNOWN' | null;
+  totalSellers:    number;
+  fbaSellers:      number;
+  amazonIsSeller:  boolean;
+  buyBoxSuppressed: boolean;
+  rating?:         number | null;
+  reviewCount?:    number | null;
+  lowReviews:      boolean;
+  monthlySales?:   number | null;
+  keepaHistory?:   KeepaHistorySnapshot | null;
+}
+
+// A single deterministic, data-backed observation. `weight` ranks signals
+// for Feature 1's capped "primary reasons" list — it has no other meaning.
+export interface ConfidenceSignal {
+  label:  string;
+  weight: number;
+}
+
+export interface ConfidenceResult {
+  confidence:      number; // 0–100
+  stars:           number; // 1–5, derived from confidence
+  recommendation:  'Excellent Buy' | 'Strong Buy' | 'Good Buy' | 'Risky' | 'Avoid';
+  primaryReasons:  string[]; // Feature 1 — top positive signals only, capped
+  reasons:         string[]; // Feature 2 — all positive signals
+  concerns:        string[]; // Feature 2 — all negative signals
+}
+
+// ─── Risk presentation (Phase 1, Feature 4) ─────────────────────────────────
+
+export type RiskLevel = 'VERY_LOW' | 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface RiskCategory {
+  category: 'Pricing' | 'Competition' | 'Amazon' | 'IP' | 'Storage';
+  level:    RiskLevel;
+  reason:   string; // why this level, in plain language, from real fields
+}
+
+export interface RiskBreakdown {
+  overall:    RiskLevel;
+  categories: RiskCategory[];
+}
+
+// Input to engines/riskPresentation.ts — purely a categorization/explanation
+// layer over fields already computed by the gating engine and pipeline. It
+// does not recompute risk; isPrivateLabel/isBrandRestricted/etc. come
+// straight from GatingResult, persisted on Product.
+export interface RiskPresentationInput {
+  priceStability:    'STABLE' | 'VOLATILE' | 'UNKNOWN';
+  priceTrend:        'RISING' | 'FLAT' | 'DECLINING' | 'UNKNOWN' | null;
+  totalSellers:      number;
+  amazonIsSeller:    boolean;
+  buyBoxSuppressed:  boolean;
+  ipRiskScore:       string;
+  isPrivateLabel:    boolean;
+  isBrandRestricted: boolean;
+  isGenericBrand:    boolean;
+  hasHazmat:         boolean;
+  isMeltable:        boolean;
+  amazonAbsentPct?:  number; // from keepaHistoryMetrics.amazonPresence, when available
+}
+
+// ─── Opportunity timeline (Phase 1, Feature 3) ──────────────────────────────
+
+export interface TimelineEvent {
+  at:    number; // unix ms
+  label: string; // e.g. "Amazon exited listing"
+}
+
+// ─── Historical sales intelligence (Phase 1, Feature 5) ────────────────────
+
+export interface HistoricalInsight {
+  text: string; // plain-language, fully derived from stored history — never fabricated
+}
+
 // ─── Repricing engine ───────────────────────────────────────────────────────
 
 export interface RepricingInput {

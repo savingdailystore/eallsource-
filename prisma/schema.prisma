@@ -249,6 +249,15 @@ model Product {
   priceTrend     String?  // RISING | FLAT | DECLINING | UNKNOWN
   priceTrendPct  Float?   // % change recent vs earlier window (negative = falling)
 
+  // Canonical Keepa historical snapshot — raw time series (Amazon price/presence,
+  // Buy Box price, sales rank, new offer count, etc; see KeepaHistorySnapshot in
+  // src/lib/keepa.ts). Overwritten wholesale on each scan, not merged — Keepa
+  // always returns the full available window itself. This is the single source
+  // of historical truth that the confidence/timeline/historical-insight engines
+  // (and future forecasting/BI phases) derive from; do not add parallel
+  // per-feature history columns — extend this snapshot's shape instead.
+  keepaHistory Json?
+
   // External links
   keepaLink String?
 

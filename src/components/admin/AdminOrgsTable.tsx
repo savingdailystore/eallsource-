@@ -21,6 +21,7 @@ interface Org {
   createdAt:         string | Date;
   subscription:      Subscription | null;
   _count:            { users: number; leads: number };
+  users:             { email: string }[];
 }
 
 function fmtDate(d: string | Date | null | undefined) {
@@ -82,7 +83,7 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-800 bg-slate-800/40">
-            {['Organization', 'Plan', 'Users', 'Leads', 'Trial Ends', 'Scan Access', 'Receives Leads', 'Joined', ''].map((h) => (
+            {['Organization', 'Email', 'Plan', 'Users', 'Leads', 'Trial Ends', 'Scan Access', 'Receives Leads', 'Joined', ''].map((h) => (
               <th key={h} className="table-th">{h}</th>
             ))}
           </tr>
@@ -104,6 +105,11 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                       {org.name}
                     </div>
                     <div className="text-xs text-slate-500">{org.slug}</div>
+                  </td>
+
+                  {/* User email(s) */}
+                  <td className="table-td text-slate-300 text-xs">
+                    {org.users.length > 0 ? org.users.map((u) => u.email).join(', ') : <span className="text-slate-600">—</span>}
                   </td>
 
                   {/* Plan */}
@@ -179,7 +185,7 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                 {/* Inline edit row */}
                 {isExpanded && (
                   <tr key={`${org.id}-edit`} className="bg-slate-800/60">
-                    <td colSpan={9} className="px-4 py-4">
+                    <td colSpan={10} className="px-4 py-4">
                       <div className="flex items-end gap-4 flex-wrap">
                         <div>
                           <label className="block text-xs text-slate-400 mb-1">Plan</label>

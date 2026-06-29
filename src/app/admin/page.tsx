@@ -25,6 +25,10 @@ export default async function AdminPage() {
       subscription: {
         select: { status: true, trialEndsAt: true, currentPeriodEnd: true },
       },
+      users: {
+        select: { email: true },
+        orderBy: { createdAt: 'asc' },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });

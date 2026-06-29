@@ -5,7 +5,7 @@ import { scoreLabel } from '@/engines/scoring';
 import { RoiGauge } from '@/components/dashboard/RoiGauge';
 import { WeeklyLeadsChart } from '@/components/dashboard/WeeklyLeadsChart';
 import {
-  TrendingUp, Package, DollarSign, BarChart3,
+  TrendingUp, Package, DollarSign, Wallet,
   ArrowUpRight, Flame, CheckCircle2, Clock,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -20,7 +20,7 @@ export default async function DashboardPage() {
   const orgId   = session!.user.orgId;
   const isOwner = session!.user.role === 'OWNER';
 
-  const [leadStats, weeklyLeads, topLeads, recentJobs, inventoryStats] = await Promise.all([
+  const [leadStats, weeklyLeads, topLeads, recentJobs, inventoryStats, inventoryItems, unitCosts] = await Promise.all([
     prisma.$queryRaw<{ total: bigint; avg_roi: number; avg_score: number; new_today: bigint }[]>`
       SELECT
         COUNT(*) as total,
@@ -56,11 +56,26 @@ export default async function DashboardPage() {
       _count: { id: true },
       _sum: { availableQuantity: true, totalQuantity: true },
     }),
+    prisma.inventoryItem.findMany({
+      where: { orgId },
+      select: { asin: true, totalQuantity: true },
+    }),
+    // Unit cost per ASIN, as entered on the Repricer tab (RepricingRule.costBasis).
+    prisma.repricingRule.findMany({
+      where: { orgId, costBasis: { not: null } },
+      select: { asin: true, costBasis: true },
+    }),
   ]);
 
   const stats         = leadStats[0] ?? { total: 0n, avg_roi: 0, avg_score: 0, new_today: 0n };
   const totalUnits    = inventoryStats._sum.totalQuantity ?? 0;
   const availableUnits = inventoryStats._sum.availableQuantity ?? 0;
+
+  const costByAsin     = new Map(unitCosts.map((r) => [r.asin, r.costBasis!]));
+  const inventoryValue = inventoryItems.reduce(
+    (sum, item) => sum + (costByAsin.get(item.asin) ?? 0) * item.totalQuantity,
+    0,
+  );
 
   const countsByDay = new Map(weeklyLeads.map((d) => [d.day.toDateString(), Number(d.count)]));
   const weeklyData  = Array.from({ length: 7 }, (_, i) => {
@@ -74,7 +89,7 @@ export default async function DashboardPage() {
 
   const STAT_CARDS = [
     { label: 'Active Leads',     value: Number(stats.total).toLocaleString(), sub: `+${Number(stats.new_today)} today`,   icon: TrendingUp, color: 'text-blue-600',    bg: 'bg-blue-500/10',    href: '/dashboard/leads'     },
-    { label: 'Avg ROI',          value: formatPercent(stats.avg_roi ?? 0),    sub: 'Across active leads',                 icon: BarChart3,  color: 'text-green-400',   bg: 'bg-green-500/10',   href: null                   },
+    { label: 'Inventory Value',  value: formatCurrency(inventoryValue),       sub: 'Based on unit cost from Repricer',    icon: Wallet,     color: 'text-green-400',   bg: 'bg-green-500/10',   href: '/dashboard/repricing' },
     { label: 'Inventory SKUs',   value: inventoryStats._count.id.toLocaleString(), sub: `${availableUnits.toLocaleString()} available`, icon: Package, color: 'text-slate-300', bg: 'bg-slate-800', href: '/dashboard/inventory' },
     { label: 'Total Units',      value: totalUnits.toLocaleString(),          sub: 'Across all FBA inventory',            icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/10', href: '/dashboard/inventory' },
   ];

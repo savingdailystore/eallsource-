@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { validatePassword } from '@/lib/password';
+import { PLAN_LIMITS } from '@/types';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,19 @@ export async function POST(req: Request) {
 
   if (!['OWNER', 'ADMIN'].includes(session.user.role)) {
     return NextResponse.json({ error: 'Only owners and admins can invite users.' }, { status: 403 });
+  }
+
+  // Enforce plan user limit before doing any other work.
+  const orgData = await prisma.organization.findUnique({
+    where:  { id: session.user.orgId },
+    select: { plan: true, _count: { select: { users: true } } },
+  });
+  const limit = PLAN_LIMITS[orgData!.plan as keyof typeof PLAN_LIMITS].maxUsers;
+  if ((orgData?._count.users ?? 0) >= limit) {
+    return NextResponse.json(
+      { error: `Your ${orgData!.plan} plan allows ${limit} user${limit === 1 ? '' : 's'}. Upgrade your plan to add more team members.` },
+      { status: 403 },
+    );
   }
 
   const body   = await req.json();

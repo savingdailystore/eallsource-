@@ -96,12 +96,17 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
 
   async function changeRole(orgId: string, userId: string, role: string) {
     setRoleLoading(userId);
-    await fetch(`/api/admin/orgs/${orgId}/members/${userId}`, {
+    const res = await fetch(`/api/admin/orgs/${orgId}/members/${userId}`, {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ role }),
     });
     setRoleLoading(null);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? 'Failed to update role.');
+      return;
+    }
     router.refresh();
   }
 
@@ -285,35 +290,26 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                           <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Members</div>
                           <div className="divide-y divide-slate-700/60">
                             {org.users.map((u) => {
-                              const isOwner = u.role === 'OWNER';
-                              const busy    = roleLoading === u.id;
+                              const busy = roleLoading === u.id;
                               return (
                                 <div key={u.id} className="flex items-center justify-between py-2 gap-3">
                                   <div className="text-xs text-slate-300 truncate">{u.email}</div>
                                   <div className="flex items-center gap-2 flex-shrink-0">
-                                    {isOwner ? (
-                                      // Owner role is immutable — show badge only, no dropdown
-                                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${ROLE_BADGE.OWNER}`}>
-                                        OWNER
-                                      </span>
+                                    {busy ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
                                     ) : (
-                                      <>
-                                        {busy
-                                          ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                                          : (
-                                            <select
-                                              value={u.role}
-                                              onChange={(e) => changeRole(org.id, u.id, e.target.value)}
-                                              disabled={busy}
-                                              className="text-xs bg-slate-700 border border-slate-600 rounded-md px-2 py-1 text-slate-200 focus:outline-none focus:border-blue-500"
-                                            >
-                                              {ASSIGNABLE_ROLES.map((r) => (
-                                                <option key={r} value={r}>{r}</option>
-                                              ))}
-                                            </select>
-                                          )
-                                        }
-                                      </>
+                                      <select
+                                        value={u.role}
+                                        onChange={(e) => changeRole(org.id, u.id, e.target.value)}
+                                        className="text-xs bg-slate-700 border border-slate-600 rounded-md px-2 py-1 text-slate-200 focus:outline-none focus:border-blue-500"
+                                      >
+                                        {/* Show OWNER as a disabled placeholder if user currently has it;
+                                            the server enforces that the platform owner's role is immutable. */}
+                                        {u.role === 'OWNER' && <option value="OWNER" disabled>OWNER</option>}
+                                        {ASSIGNABLE_ROLES.map((r) => (
+                                          <option key={r} value={r}>{r}</option>
+                                        ))}
+                                      </select>
                                     )}
                                   </div>
                                 </div>

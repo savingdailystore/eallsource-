@@ -1,5 +1,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { PLAN_LIMITS } from '@/types';
+import type { Plan } from '@/types';
 import { OrgForm } from '@/components/settings/OrgForm';
 import { PasswordForm } from '@/components/settings/PasswordForm';
 import { TeamMembers } from '@/components/settings/TeamMembers';
@@ -30,6 +32,8 @@ export default async function SettingsPage() {
   ]);
 
   const canManageUsers = ['OWNER', 'ADMIN'].includes(session!.user.role);
+  const plan           = (org?.plan ?? 'STARTER') as Plan;
+  const maxUsers       = PLAN_LIMITS[plan].maxUsers;
 
   return (
     <div className="p-6 lg:p-8 max-w-3xl space-y-6">
@@ -63,6 +67,8 @@ export default async function SettingsPage() {
           currentUserId={session!.user.id}
           canManage={canManageUsers}
           canInvite={canManageUsers}
+          plan={plan}
+          maxUsers={maxUsers}
         />
       </div>
 

@@ -321,7 +321,7 @@ export interface ApiResponse<T = null> {
 
 export const PLAN_LIMITS: Record<Plan, { leadsPerWeek: number; repricing: boolean; spApi: boolean; apiAccess: boolean; maxUsers: number }> = {
   STARTER:    { leadsPerWeek: 3,    repricing: false, spApi: false, apiAccess: false, maxUsers: 1  },
-  PRO:        { leadsPerWeek: 20,   repricing: true,  spApi: true,  apiAccess: false, maxUsers: 2  },
+  PRO:        { leadsPerWeek: 20,   repricing: true,  spApi: true,  apiAccess: false, maxUsers: 1  },
   ENTERPRISE: { leadsPerWeek: 9999, repricing: true,  spApi: true,  apiAccess: true,  maxUsers: 99 },
 };
 

@@ -17,6 +17,8 @@ interface Props {
   currentUserId:   string;
   canManage:       boolean;
   canInvite:       boolean;
+  plan:            string;
+  maxUsers:        number;
 }
 
 const ROLE_BADGE: Record<string, string> = {
@@ -46,10 +48,11 @@ function randomPassword() {
   return base.join('');
 }
 
-export function TeamMembers({ members, currentUserId, canManage, canInvite }: Props) {
+export function TeamMembers({ members, currentUserId, canManage, canInvite, plan, maxUsers }: Props) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [open, setOpen]     = useState(false);
+  const atLimit = members.length >= maxUsers;
 
   async function changeRole(id: string, role: string) {
     setBusyId(id);
@@ -78,17 +81,23 @@ export function TeamMembers({ members, currentUserId, canManage, canInvite }: Pr
           <span className="text-xs text-slate-500">({members.length})</span>
         </div>
         {canInvite && (
-          <button onClick={() => setOpen(true)} className="btn-secondary text-xs py-1.5">
-            <UserPlus className="w-3.5 h-3.5" />Invite user
-          </button>
+          atLimit ? (
+            <span className="text-xs text-slate-500">
+              {plan} plan · {maxUsers} user{maxUsers === 1 ? '' : 's'} max
+            </span>
+          ) : (
+            <button onClick={() => setOpen(true)} className="btn-secondary text-xs py-1.5">
+              <UserPlus className="w-3.5 h-3.5" />Invite user
+            </button>
+          )
         )}
       </div>
 
       <div className="divide-y divide-slate-800">
         {members.map((u) => {
-          const isOwner = u.role === 'OWNER';
-          const isSelf  = u.id === currentUserId;
-          const editable = canManage && !isOwner;
+          const isOwner  = u.role === 'OWNER';
+          const isSelf   = u.id === currentUserId;
+          const editable = canManage && !isOwner && !isSelf;
           return (
             <div key={u.id} className="flex items-center justify-between py-3 gap-3">
               <div className="min-w-0">

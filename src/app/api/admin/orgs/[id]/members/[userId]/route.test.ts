@@ -1,10 +1,12 @@
 // Tests for PATCH /api/admin/orgs/[id]/members/[userId]
 //
-// Four required cases per spec:
-//   1. Successful role update
+// Cases:
+//   1. Successful role update (ANALYST → ADMIN)
 //   2. Invalid role rejected (not in ADMIN|ANALYST|VIEWER)
-//   3. Last owner cannot be downgraded (OWNER role blocked)
-//   4. Unauthorized user cannot update roles (non-platform-admin)
+//   3. Platform owner's role is immutable (isPlatformAdmin guard)
+//   4. Unauthorized caller blocked (non-platform-admin → 403)
+//   5. User not in target org → 404
+//   6. Customer OWNER can be transitioned to ADMIN by platform admin
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -55,9 +57,10 @@ const params = Promise.resolve({ id: 'org1', userId: 'user1' });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Default: caller is a platform admin
   mockAuth.mockResolvedValue({ user: { email: 'savingdailystore@gmail.com' } });
-  mockIsPlatformAdmin.mockReturnValue(true);
+  // Default: only the platform owner email returns true.
+  // This means the caller passes the auth guard but a non-platform target is not protected.
+  mockIsPlatformAdmin.mockImplementation((email: string) => email === 'savingdailystore@gmail.com');
 });
 
 // ── Test 1: Successful role update ───────────────────────────────────────────
@@ -96,17 +99,40 @@ describe('PATCH /api/admin/orgs/[id]/members/[userId]', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  // ── Test 3: Last owner cannot be downgraded ────────────────────────────────
+  // ── Test 3: Platform owner's role is immutable ────────────────────────────
 
-  it("returns 400 and does not update when the target user's role is OWNER", async () => {
-    mockFindFirst.mockResolvedValue({ id: 'user1', email: 'owner@org.com', role: 'OWNER' });
+  it("returns 400 and does not update when the target is the platform owner", async () => {
+    // isPlatformAdmin returns true for the TARGET user's email (platform owner trying to be demoted)
+    mockFindFirst.mockResolvedValue({ id: 'user1', email: 'savingdailystore@gmail.com', role: 'OWNER' });
+    // Override: the target email is a platform admin
+    mockIsPlatformAdmin.mockImplementation((email: string) => email === 'savingdailystore@gmail.com');
 
     const res = await PATCH(makeReq({ role: 'ADMIN' }), { params });
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.error).toMatch(/owner/i);
+    expect(body.error).toMatch(/platform owner/i);
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  // ── Test 6: Customer OWNER can be transitioned to ADMIN ───────────────────
+
+  it('transitions a customer OWNER to ADMIN when they are not the platform owner', async () => {
+    // Target is a customer with OWNER role (legacy registration), not a platform admin
+    mockFindFirst.mockResolvedValue({ id: 'user1', email: 'customer@example.com', role: 'OWNER' });
+    mockUpdate.mockResolvedValue({ id: 'user1', email: 'customer@example.com', role: 'ADMIN' });
+    // caller is platform admin; target is NOT a platform admin
+    mockIsPlatformAdmin.mockImplementation((email: string) => email === 'savingdailystore@gmail.com');
+
+    const res = await PATCH(makeReq({ role: 'ADMIN' }), { params });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.user.role).toBe('ADMIN');
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { role: 'ADMIN' } }),
+    );
   });
 
   // ── Test 4: Unauthorized user cannot update roles ──────────────────────────

@@ -17,15 +17,15 @@ const PLANS: { key: Plan; name: string; price: number; icon: any; color: string;
   },
   {
     key: 'PRO', name: 'Pro', price: 50, icon: Crown, color: 'text-blue-600',
-    features: ['20 leads/week', 'Everything in Starter', 'Inventory management', 'Repricing engine', 'Amazon SP-API', '2 users'],
+    features: ['20 leads/week', 'Everything in Starter', 'Inventory management', 'Repricing engine', 'Amazon SP-API', '1 user'],
   },
 ];
 
 export default async function BillingPage() {
   const session = await auth();
 
-  // Billing is restricted to the organization Owner for now.
-  if (session!.user.role !== 'OWNER') redirect('/dashboard');
+  // Billing is accessible to OWNER and ADMIN (OWNER = platform owner, ADMIN = customer primary user).
+  if (!['OWNER', 'ADMIN'].includes(session!.user.role)) redirect('/dashboard');
 
   const orgId   = session!.user.orgId;
   const currentPlan = session!.user.plan;

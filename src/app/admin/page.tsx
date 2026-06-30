@@ -39,6 +39,25 @@ export default async function AdminPage() {
         <h1 className="text-2xl font-bold text-slate-50">Admin — Organizations</h1>
         <p className="text-slate-400 text-sm mt-1">Manage plans, trial dates, and scan access per org.</p>
       </div>
+
+      {/* Role legend */}
+      <div className="card p-4 mb-5 bg-slate-800/30 border-slate-700/50">
+        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Role Model</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          {[
+            { role: 'OWNER',   color: 'text-white',       desc: 'Platform owner only — never assigned to customers' },
+            { role: 'ADMIN',   color: 'text-blue-400',    desc: "Customer org's primary user — billing, team, full access" },
+            { role: 'ANALYST', color: 'text-slate-300',   desc: 'Power user — all tools, no team management' },
+            { role: 'VIEWER',  color: 'text-slate-400',   desc: 'Read-only — can view leads, no actions' },
+          ].map(({ role, color, desc }) => (
+            <div key={role} className="flex flex-col gap-1">
+              <span className={`font-semibold ${color}`}>{role}</span>
+              <span className="text-slate-500 leading-tight">{desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <AdminOrgsTable orgs={orgs} />
     </div>
   );

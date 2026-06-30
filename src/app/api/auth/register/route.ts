@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       });
 
       await tx.user.create({
-        data: { email, password: hashed, role: 'OWNER', orgId: org.id },
+        data: { email, password: hashed, role: 'ADMIN', orgId: org.id },
       });
 
       await tx.subscription.create({

@@ -6,8 +6,9 @@ import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
-// Valid roles an admin can assign. OWNER is excluded — the owner role is set
-// at account creation and is never reassignable (see invite flow in /api/team).
+// Valid roles a platform admin can assign. OWNER is never assignable — it
+// belongs exclusively to the platform owner. Customer OWNERs (legacy
+// registrations) can be transitioned to ADMIN/ANALYST/VIEWER via this endpoint.
 const roleSchema = z.object({
   role: z.enum(['ADMIN', 'ANALYST', 'VIEWER']),
 });
@@ -28,11 +29,10 @@ export async function PATCH(
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  // Guard: OWNER role is immutable. Because the invite flow only allows
-  // ADMIN/ANALYST/VIEWER, there is exactly one OWNER per org — blocking any
-  // change to their role is equivalent to protecting the last owner.
-  if (target.role === 'OWNER') {
-    return NextResponse.json({ error: "The owner's role cannot be changed." }, { status: 400 });
+  // Guard: the platform owner's role is immutable (protects savingdailystore@gmail.com).
+  // Customer org users with OWNER role (legacy registrations) can be transitioned down.
+  if (isPlatformAdmin(target.email)) {
+    return NextResponse.json({ error: "The platform owner's role cannot be changed." }, { status: 400 });
   }
 
   const body = await req.json();

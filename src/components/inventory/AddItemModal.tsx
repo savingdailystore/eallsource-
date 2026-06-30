@@ -13,6 +13,7 @@ export function AddItemModal() {
   const [form, setForm] = useState({
     sku: '', fnsku: '', asin: '', productName: '',
     availableQuantity: '0', reservedQuantity: '0', inboundQuantity: '0', totalQuantity: '0',
+    purchasedAt: '', unitCost: '',
   });
 
   function set(field: keyof typeof form) {
@@ -29,7 +30,11 @@ export function AddItemModal() {
     const res = await fetch('/api/inventory/add', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        purchasedAt: form.purchasedAt ? new Date(form.purchasedAt).toISOString() : null,
+        unitCost:    form.unitCost.trim() !== '' ? parseFloat(form.unitCost) : null,
+      }),
     });
 
     setLoading(false);
@@ -39,7 +44,7 @@ export function AddItemModal() {
       setError(data.error ?? 'Failed to add item.');
     } else {
       close();
-      setForm({ sku: '', fnsku: '', asin: '', productName: '', availableQuantity: '0', reservedQuantity: '0', inboundQuantity: '0', totalQuantity: '0' });
+      setForm({ sku: '', fnsku: '', asin: '', productName: '', availableQuantity: '0', reservedQuantity: '0', inboundQuantity: '0', totalQuantity: '0', purchasedAt: '', unitCost: '' });
       router.refresh();
     }
   }
@@ -100,6 +105,31 @@ export function AddItemModal() {
                 <div>
                   <label className="label">Inbound</label>
                   <input value={form.inboundQuantity} onChange={set('inboundQuantity')} type="number" min="0" className="input" />
+                </div>
+              </div>
+
+              {/* Phase 2.1: Cost & date fields — both optional */}
+              <div className="grid grid-cols-2 gap-4 pt-1 border-t border-slate-800">
+                <div>
+                  <label className="label">Purchase Date</label>
+                  <input
+                    value={form.purchasedAt}
+                    onChange={set('purchasedAt')}
+                    type="date"
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Unit Cost ($)</label>
+                  <input
+                    value={form.unitCost}
+                    onChange={set('unitCost')}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="input"
+                    placeholder="0.00"
+                  />
                 </div>
               </div>
 

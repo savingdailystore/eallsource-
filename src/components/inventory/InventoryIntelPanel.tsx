@@ -44,7 +44,9 @@ export function InventoryIntelPanel({ health }: { health: InventoryHealthResult 
           </div>
           <span className={`text-xs font-semibold ${restock.color}`}>{restock.label}</span>
           <div className="text-[10px] text-slate-500 mt-1">
-            Tracked {health.daysSinceTracked} day{health.daysSinceTracked !== 1 ? 's' : ''}
+            {health.agingSource === 'purchased'
+              ? `Purchased ${health.agingDays} day${health.agingDays !== 1 ? 's' : ''} ago`
+              : `Tracked ${health.agingDays} day${health.agingDays !== 1 ? 's' : ''}`}
             {' '}· bucket {health.agingBucket}d
           </div>
         </div>
@@ -71,9 +73,22 @@ export function InventoryIntelPanel({ health }: { health: InventoryHealthResult 
               <div className="text-slate-500">
                 Sell price ${health.profitSummary.price.toFixed(2)}
               </div>
-              {health.profitSummary.costBasis != null && (
+              {health.profitSummary.unitCost != null && (
                 <div className="text-slate-500">
-                  Cost basis ${health.profitSummary.costBasis.toFixed(2)}
+                  Unit cost ${health.profitSummary.unitCost.toFixed(2)}
+                  {health.profitSummary.unitCostSource === 'repricing' && (
+                    <span className="text-slate-600"> (from repricing)</span>
+                  )}
+                </div>
+              )}
+              {health.profitSummary.inventoryValue != null && (
+                <div className="text-slate-400">
+                  In-stock value ${health.profitSummary.inventoryValue.toFixed(2)}
+                </div>
+              )}
+              {health.profitSummary.unitCost == null && (
+                <div className="text-slate-600 text-[10px] mt-1">
+                  Add unit cost to track inventory value
                 </div>
               )}
             </div>

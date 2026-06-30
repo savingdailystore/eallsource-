@@ -2,7 +2,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import {
   TrendingUp, ShoppingCart, Package, Boxes,
-  AlertTriangle, CheckCircle2, RefreshCcw, HelpCircle,
+  AlertTriangle, CheckCircle2, RefreshCcw, HelpCircle, DollarSign,
 } from 'lucide-react';
 import { AddItemModal } from '@/components/inventory/AddItemModal';
 import { ImportCsvModal } from '@/components/inventory/ImportCsvModal';
@@ -133,12 +133,17 @@ export default async function InventoryPage() {
       reservedQuantity:  item.reservedQuantity,
       inboundQuantity:   item.inboundQuantity,
       totalQuantity:     item.totalQuantity,
+      // Serialise Date to ISO string so the client receives a plain string (Date is not serialisable).
+      purchasedAt:       item.purchasedAt ? item.purchasedAt.toISOString() : null,
+      unitCost:          item.unitCost,
       health: evaluateInventoryHealth({
         availableQuantity: item.availableQuantity,
         reservedQuantity:  item.reservedQuantity,
         inboundQuantity:   item.inboundQuantity,
         totalQuantity:     item.totalQuantity,
         createdAt:         item.createdAt,
+        purchasedAt:       item.purchasedAt,
+        unitCost:          item.unitCost,
         product:           productSnapshot,
         repricing:         repricingSnapshot,
       }),
@@ -156,6 +161,17 @@ export default async function InventoryPage() {
   const watchCount     = (statusCounts['AGING']       ?? 0) + (statusCounts['OVERSTOCKED'] ?? 0);
   const healthyCount   =  statusCounts['HEALTHY']     ?? 0;
   const unknownCount   =  statusCounts['UNKNOWN']     ?? 0;
+
+  // Inventory value — only summed when unit cost is known (never estimated).
+  let knownInventoryValue = 0;
+  let itemsWithCost       = 0;
+  for (const item of enrichedItems) {
+    const iv = item.health?.profitSummary?.inventoryValue;
+    if (iv != null) {
+      knownInventoryValue += iv;
+      itemsWithCost++;
+    }
+  }
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -241,6 +257,24 @@ export default async function InventoryPage() {
               <HelpCircle className="w-3.5 h-3.5 flex-shrink-0" />
               {unknownCount} item{unknownCount !== 1 ? 's' : ''} {unknownCount !== 1 ? 'have' : 'has'} no scan data — health cannot be assessed.
               Run a scanner search for those ASINs to unlock insights.
+            </div>
+          )}
+
+          {knownInventoryValue > 0 && (
+            <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-400">
+              <DollarSign className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+              <span>
+                Known inventory value:{' '}
+                <span className="font-semibold text-slate-200">
+                  ${knownInventoryValue.toFixed(2)}
+                </span>
+                {itemsWithCost < items.length && (
+                  <span className="text-slate-500">
+                    {' '}({itemsWithCost} of {items.length} item{items.length !== 1 ? 's' : ''} have cost data
+                    {' '}— add unit cost in the edit modal to improve this figure)
+                  </span>
+                )}
+              </span>
             </div>
           )}
         </div>

@@ -19,6 +19,8 @@ export interface InventoryRow {
   reservedQuantity:  number;
   inboundQuantity:   number;
   totalQuantity:     number;
+  purchasedAt?:      string | null; // ISO string serialised from Date server-side
+  unitCost?:         number | null;
   health?:           InventoryHealthResult;
 }
 

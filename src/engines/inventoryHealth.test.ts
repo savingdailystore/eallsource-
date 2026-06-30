@@ -304,6 +304,159 @@ describe('data honesty — no fabricated metrics', () => {
     expect(result.recommendation.toLowerCase()).not.toContain('purchased');
     expect(result.recommendation.toLowerCase()).not.toContain('age');
   });
+
+  it('AGING with purchasedAt uses "purchased X days ago" language', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      availableQuantity: 5,
+      createdAt:         daysAgo(5),   // recently tracked
+      purchasedAt:       daysAgo(120), // but truly old
+    }));
+    expect(result.status).toBe('AGING');
+    expect(result.recommendation.toLowerCase()).toContain('purchased');
+    expect(result.recommendation.toLowerCase()).not.toContain('tracked for');
+  });
+
+  it('does not fabricate unitCost or inventoryValue when no cost data is available', () => {
+    const result = evaluateInventoryHealth(baseInput({ repricing: undefined, unitCost: null }));
+    expect(result.profitSummary?.unitCost).toBeUndefined();
+    expect(result.profitSummary?.inventoryValue).toBeUndefined();
+  });
+});
+
+// ─── Phase 2.1: purchasedAt aging source ───────────────────────────────────
+
+describe('purchasedAt — aging source', () => {
+  it('agingSource is "tracked" when purchasedAt is absent', () => {
+    const result = evaluateInventoryHealth(baseInput({ createdAt: daysAgo(10) }));
+    expect(result.agingSource).toBe('tracked');
+    expect(result.agingDays).toBe(result.daysSinceTracked);
+  });
+
+  it('agingSource is "purchased" when purchasedAt is provided', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      createdAt:   daysAgo(5),
+      purchasedAt: daysAgo(30),
+    }));
+    expect(result.agingSource).toBe('purchased');
+    expect(result.agingDays).toBeGreaterThanOrEqual(29);
+  });
+
+  it('agingDays uses purchasedAt, not createdAt, when purchasedAt is present', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      createdAt:   daysAgo(5),    // short tracking window
+      purchasedAt: daysAgo(120),  // long true age
+    }));
+    expect(result.agingDays).toBeGreaterThan(90);
+    expect(result.daysSinceTracked).toBeLessThan(10);
+  });
+
+  it('AGING triggers on purchasedAt age, not createdAt, when purchasedAt is set', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      availableQuantity: 5,
+      createdAt:         daysAgo(5),   // recently added to system
+      purchasedAt:       daysAgo(120), // but truly old purchase
+    }));
+    expect(result.status).toBe('AGING');
+  });
+
+  it('item recently tracked without purchasedAt does NOT become AGING', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      availableQuantity: 5,
+      createdAt:         daysAgo(5),
+    }));
+    expect(result.status).not.toBe('AGING');
+  });
+
+  it('AGING reason says "Purchased X days ago" when purchasedAt is set', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      availableQuantity: 5,
+      createdAt:         daysAgo(5),
+      purchasedAt:       daysAgo(120),
+    }));
+    expect(result.reasons.some(r => r.toLowerCase().includes('purchased'))).toBe(true);
+    expect(result.reasons.some(r => r.toLowerCase().includes('tracked for'))).toBe(false);
+  });
+
+  it('AGING reason says "Tracked for X days" when no purchasedAt', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      availableQuantity: 5,
+      createdAt:         daysAgo(100),
+    }));
+    expect(result.reasons.some(r => r.toLowerCase().includes('tracked for'))).toBe(true);
+    expect(result.reasons.some(r => r.toLowerCase().includes('purchased'))).toBe(false);
+  });
+
+  it('null purchasedAt falls back to createdAt (same as absent)', () => {
+    const tracked = evaluateInventoryHealth(baseInput({ createdAt: daysAgo(10) }));
+    const withNull = evaluateInventoryHealth(baseInput({ createdAt: daysAgo(10), purchasedAt: null }));
+    expect(withNull.agingSource).toBe('tracked');
+    expect(withNull.agingDays).toBe(tracked.agingDays);
+  });
+});
+
+// ─── Phase 2.1: unitCost and inventoryValue ─────────────────────────────────
+
+describe('unitCost and inventoryValue', () => {
+  it('resolves unitCost from item when provided', () => {
+    const result = evaluateInventoryHealth(baseInput({ unitCost: 12.50 }));
+    expect(result.profitSummary?.unitCost).toBe(12.50);
+    expect(result.profitSummary?.unitCostSource).toBe('item');
+  });
+
+  it('resolves unitCost from repricing.costBasis when item unitCost is absent', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      unitCost:  null,
+      repricing: { costBasis: 9.99, isActive: true },
+    }));
+    expect(result.profitSummary?.unitCost).toBe(9.99);
+    expect(result.profitSummary?.unitCostSource).toBe('repricing');
+  });
+
+  it('item unitCost takes priority over repricing.costBasis', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      unitCost:  14.00,
+      repricing: { costBasis: 9.99, isActive: true },
+    }));
+    expect(result.profitSummary?.unitCost).toBe(14.00);
+    expect(result.profitSummary?.unitCostSource).toBe('item');
+  });
+
+  it('inventoryValue = availableQuantity × resolvedUnitCost', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      availableQuantity: 20,
+      unitCost:          5.00,
+    }));
+    expect(result.profitSummary?.inventoryValue).toBe(100.00);
+  });
+
+  it('inventoryValue is undefined when no cost data', () => {
+    const result = evaluateInventoryHealth(baseInput({ unitCost: null, repricing: undefined }));
+    expect(result.profitSummary?.inventoryValue).toBeUndefined();
+  });
+
+  it('inventoryValue uses fallback costBasis when no item unitCost', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      availableQuantity: 10,
+      unitCost:          null,
+      repricing:         { costBasis: 8.00, isActive: true },
+    }));
+    expect(result.profitSummary?.inventoryValue).toBe(80.00);
+  });
+
+  it('inventoryValue is 0 when availableQuantity is 0 but cost is known', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      availableQuantity: 0,
+      unitCost:          10.00,
+    }));
+    expect(result.profitSummary?.inventoryValue).toBe(0);
+  });
+
+  it('costBasis is still present for backward compat when repricing provides it', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      repricing: { costBasis: 15.99, isActive: true },
+    }));
+    expect(result.profitSummary?.costBasis).toBe(15.99);
+  });
 });
 
 // ─── Risk factors surfacing ─────────────────────────────────────────────────

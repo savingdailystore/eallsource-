@@ -14,6 +14,8 @@ interface Item {
   reservedQuantity:  number;
   inboundQuantity:   number;
   totalQuantity:     number;
+  purchasedAt?:      string | null;
+  unitCost?:         number | null;
 }
 
 export function EditItemModal({ item }: { item: Item }) {
@@ -31,6 +33,9 @@ export function EditItemModal({ item }: { item: Item }) {
     reservedQuantity:  String(item.reservedQuantity),
     inboundQuantity:   String(item.inboundQuantity),
     totalQuantity:     String(item.totalQuantity),
+    // purchasedAt stored as YYYY-MM-DD for <input type="date">
+    purchasedAt:       item.purchasedAt ? item.purchasedAt.slice(0, 10) : '',
+    unitCost:          item.unitCost != null ? String(item.unitCost) : '',
   });
 
   function set(field: keyof typeof form) {
@@ -56,6 +61,13 @@ export function EditItemModal({ item }: { item: Item }) {
         reservedQuantity:  parseInt(form.reservedQuantity, 10) || 0,
         inboundQuantity:   parseInt(form.inboundQuantity, 10) || 0,
         totalQuantity:     parseInt(form.totalQuantity, 10) || 0,
+        // Send ISO datetime string or null; empty field clears the date.
+        purchasedAt: form.purchasedAt
+          ? new Date(form.purchasedAt).toISOString()
+          : null,
+        unitCost: form.unitCost.trim() !== ''
+          ? parseFloat(form.unitCost)
+          : null,
       }),
     });
 
@@ -126,6 +138,31 @@ export function EditItemModal({ item }: { item: Item }) {
                 <div>
                   <label className="label">Inbound</label>
                   <input value={form.inboundQuantity} onChange={set('inboundQuantity')} type="number" min="0" className="input" />
+                </div>
+              </div>
+
+              {/* Phase 2.1: Cost & date fields — both optional */}
+              <div className="grid grid-cols-2 gap-4 pt-1 border-t border-slate-800">
+                <div>
+                  <label className="label">Purchase Date</label>
+                  <input
+                    value={form.purchasedAt}
+                    onChange={set('purchasedAt')}
+                    type="date"
+                    className="input"
+                  />
+                </div>
+                <div>
+                  <label className="label">Unit Cost ($)</label>
+                  <input
+                    value={form.unitCost}
+                    onChange={set('unitCost')}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="input"
+                    placeholder="0.00"
+                  />
                 </div>
               </div>
 

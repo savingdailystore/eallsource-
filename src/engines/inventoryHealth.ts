@@ -2,9 +2,12 @@
 // All inputs come from InventoryItem + optional Product + optional RepricingRule.
 //
 // DATA HONESTY RULES (enforced here):
-//  - createdAt is used only as a "tracked since" proxy, NOT as a purchase date.
+//  - purchasedAt, when user-supplied, is used for true aging (labeled "purchased X days ago").
+//  - createdAt is used only as a "tracked since" proxy when purchasedAt is absent.
 //  - Sales velocity, days-remaining, and reorder dates are NOT computed.
 //  - If Product is absent, status is UNKNOWN — we never fabricate insights.
+//  - Unit cost: InventoryItem.unitCost takes priority; RepricingRule.costBasis is a fallback.
+//  - inventoryValue is only computed when a unit cost is known; never estimated.
 
 export type HealthStatus =
   | 'HEALTHY'
@@ -22,8 +25,6 @@ export type RestockSignal =
   | 'DO_NOT_REORDER'
   | 'UNKNOWN';
 
-// Derived from createdAt vs. now — clearly labeled as "tracked for X days",
-// never as "age" or "days since purchased".
 export type AgingBucket = '0-30' | '31-60' | '61-90' | '90+';
 
 // ─── Input types ───────────────────────────────────────────────────────────
@@ -62,6 +63,8 @@ export interface InventoryHealthInput {
   inboundQuantity:   number;
   totalQuantity:     number;
   createdAt:         Date;
+  purchasedAt?:      Date | null; // User-supplied true acquisition date; absent = fall back to createdAt
+  unitCost?:         number | null; // Cost per unit; takes priority over repricing.costBasis
   product?:          InventoryProductSnapshot;
   repricing?:        InventoryRepricingSnapshot;
 }
@@ -69,19 +72,25 @@ export interface InventoryHealthInput {
 // ─── Result type ───────────────────────────────────────────────────────────
 
 export interface InventoryHealthResult {
-  status:          HealthStatus;
-  restockSignal:   RestockSignal;
-  reasons:         string[];
-  riskFactors:     string[];
-  recommendation:  string;
-  agingBucket:     AgingBucket;
-  daysSinceTracked: number;
+  status:           HealthStatus;
+  restockSignal:    RestockSignal;
+  reasons:          string[];
+  riskFactors:      string[];
+  recommendation:   string;
+  agingBucket:      AgingBucket;
+  agingDays:        number; // Days used for aging: purchasedAt-based when available, else createdAt-based
+  agingSource:      'purchased' | 'tracked'; // Which date was used — controls display wording
+  daysSinceTracked: number; // Always createdAt-based (kept for diagnostics)
   // null when no Product is linked (UNKNOWN status)
   profitSummary: {
-    roi:       number;
-    profit:    number;
-    price:     number;
-    costBasis?: number;
+    roi:              number;
+    profit:           number;
+    price:            number;
+    unitCost?:        number;             // Resolved: item.unitCost ?? repricing.costBasis
+    unitCostSource?:  'item' | 'repricing'; // Which source was used
+    inventoryValue?:  number;             // availableQty × unitCost — omitted when cost unknown
+    // Kept for backward compatibility in tests and callers that already reference it
+    costBasis?:       number;
   } | null;
   demandSummary: {
     level:         string;
@@ -95,7 +104,7 @@ export interface InventoryHealthResult {
 
 const LOW_MARGIN_ROI_PCT    = 15;   // ROI below this → LOW_MARGIN
 const LOW_MARGIN_PROFIT_USD = 3;    // Profit below this → LOW_MARGIN
-const AGING_DAYS            = 90;   // Days tracked before AGING status (proxy, not purchase date)
+const AGING_DAYS            = 90;   // Days before AGING status (uses purchasedAt when available)
 const OVERSTOCKED_QTY       = 30;   // Units in stock where low demand triggers OVERSTOCKED
 const LOW_STOCK_QTY         = 3;    // Available units at which REORDER_SOON fires
 const HEALTHY_ROI_FLOOR     = 20;   // Min ROI for REORDER_SOON / REORDER_NOW signals
@@ -155,18 +164,23 @@ export function computeRestockSignal(
 // ─── Recommendation text ───────────────────────────────────────────────────
 
 function buildRecommendation(
-  status:          HealthStatus,
-  daysSinceTracked: number,
-  available:       number,
-  demandLevel:     string,
+  status:     HealthStatus,
+  agingDays:  number,
+  agingSource: 'purchased' | 'tracked',
+  available:  number,
+  demandLevel: string,
 ): string {
   switch (status) {
     case 'AT_RISK':
       return 'Review immediately — this item has active risk factors that may prevent sales.';
     case 'LOW_MARGIN':
       return 'Review pricing or avoid reordering — margin is below viable threshold.';
-    case 'AGING':
-      return `Consider reducing price to improve sell-through — tracked for ${daysSinceTracked} days.`;
+    case 'AGING': {
+      const ageLabel = agingSource === 'purchased'
+        ? `purchased ${agingDays} days ago`
+        : `tracked for ${agingDays} days`;
+      return `Consider reducing price to improve sell-through — ${ageLabel}.`;
+    }
     case 'OVERSTOCKED':
       return `${available} units in stock with ${demandLevel} demand — monitor sell-through carefully before reordering.`;
     case 'REORDER_SOON':
@@ -181,25 +195,41 @@ function buildRecommendation(
 // ─── Main engine ───────────────────────────────────────────────────────────
 
 export function evaluateInventoryHealth(input: InventoryHealthInput): InventoryHealthResult {
-  const { availableQuantity, inboundQuantity, product, repricing, createdAt } = input;
+  const { availableQuantity, inboundQuantity, product, repricing, createdAt, purchasedAt, unitCost } = input;
 
   const now              = new Date();
   const daysSinceTracked = daysBetween(createdAt, now);
-  const agingBucket      = getAgingBucket(daysSinceTracked);
-  const restockSignal    = computeRestockSignal(availableQuantity, inboundQuantity, product);
+
+  // Aging: prefer true purchase date over tracking date when user has supplied it.
+  const hasPurchaseDate = purchasedAt != null;
+  const agingDays       = hasPurchaseDate ? daysBetween(purchasedAt!, now) : daysSinceTracked;
+  const agingSource     = hasPurchaseDate ? 'purchased' : 'tracked' as const;
+  const agingBucket     = getAgingBucket(agingDays);
+
+  // Unit cost resolution: item-level first, repricing fallback, then null.
+  const resolvedUnitCost  = unitCost ?? repricing?.costBasis ?? null;
+  const unitCostSource: 'item' | 'repricing' | null =
+    unitCost != null      ? 'item'      :
+    repricing?.costBasis != null ? 'repricing' : null;
+  const inventoryValue =
+    resolvedUnitCost != null ? availableQuantity * resolvedUnitCost : undefined;
+
+  const restockSignal = computeRestockSignal(availableQuantity, inboundQuantity, product);
 
   // No scan data — return UNKNOWN without fabricating any signals.
   if (!product) {
     return {
-      status:          'UNKNOWN',
-      restockSignal:   'UNKNOWN',
-      reasons:         ['No scan data linked to this ASIN — market intelligence unavailable.'],
-      riskFactors:     [],
-      recommendation:  buildRecommendation('UNKNOWN', daysSinceTracked, availableQuantity, ''),
+      status:           'UNKNOWN',
+      restockSignal:    'UNKNOWN',
+      reasons:          ['No scan data linked to this ASIN — market intelligence unavailable.'],
+      riskFactors:      [],
+      recommendation:   buildRecommendation('UNKNOWN', agingDays, agingSource, availableQuantity, ''),
       agingBucket,
+      agingDays,
+      agingSource,
       daysSinceTracked,
-      profitSummary:   null,
-      demandSummary:   null,
+      profitSummary:    null,
+      demandSummary:    null,
     };
   }
 
@@ -228,7 +258,6 @@ export function evaluateInventoryHealth(input: InventoryHealthInput): InventoryH
 
   if (isAtRisk) {
     status = 'AT_RISK';
-    // Surface the top AT_RISK reasons
     if (product.hasIpComplaintHistory)
       reasons.push('IP complaint history on record for this ASIN');
     if (product.gatingRisk === 'HIGH' && product.isBrandRestricted)
@@ -261,11 +290,13 @@ export function evaluateInventoryHealth(input: InventoryHealthInput): InventoryH
     if (product.fbaSellers != null)
       reasons.push(`${product.fbaSellers} FBA seller${product.fbaSellers !== 1 ? 's' : ''} competing`);
 
-  } else if (daysSinceTracked > AGING_DAYS && availableQuantity > 0) {
+  } else if (agingDays > AGING_DAYS && availableQuantity > 0) {
     status = 'AGING';
-    reasons.push(
-      `Tracked for ${daysSinceTracked} days — inventory may be moving slowly`,
-    );
+    if (hasPurchaseDate) {
+      reasons.push(`Purchased ${agingDays} days ago — inventory may be moving slowly`);
+    } else {
+      reasons.push(`Tracked for ${agingDays} days — inventory may be moving slowly`);
+    }
     reasons.push(`${availableQuantity} unit${availableQuantity !== 1 ? 's' : ''} still available`);
 
   } else {
@@ -275,21 +306,36 @@ export function evaluateInventoryHealth(input: InventoryHealthInput): InventoryH
       reasons.push(`${inboundQuantity} unit${inboundQuantity !== 1 ? 's' : ''} inbound`);
   }
 
+  // Build profitSummary with resolved cost data.
+  const profitSummaryExtra = resolvedUnitCost != null
+    ? {
+        unitCost:       resolvedUnitCost,
+        unitCostSource: unitCostSource as 'item' | 'repricing',
+        inventoryValue,
+        // costBasis kept for backward compat
+        ...(repricing?.costBasis != null ? { costBasis: repricing.costBasis } : {}),
+      }
+    : repricing?.costBasis != null
+      ? { costBasis: repricing.costBasis }
+      : {};
+
   return {
     status,
     restockSignal,
     reasons,
     riskFactors,
     recommendation: buildRecommendation(
-      status, daysSinceTracked, availableQuantity, product.demandLevel,
+      status, agingDays, agingSource, availableQuantity, product.demandLevel,
     ),
     agingBucket,
+    agingDays,
+    agingSource,
     daysSinceTracked,
     profitSummary: {
-      roi:       product.roi,
-      profit:    product.profit,
-      price:     product.price,
-      ...(repricing?.costBasis != null ? { costBasis: repricing.costBasis } : {}),
+      roi:    product.roi,
+      profit: product.profit,
+      price:  product.price,
+      ...profitSummaryExtra,
     },
     demandSummary: {
       level:        product.demandLevel,

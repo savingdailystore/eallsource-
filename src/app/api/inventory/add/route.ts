@@ -9,6 +9,16 @@ import { z } from 'zod';
 // an explicit upper bound instead of accepting any integer parseInt returns.
 const quantity = z.coerce.number().int().min(0).max(999_999).catch(0);
 
+// purchasedAt: accept null (clear) or a date/datetime string; reject invalid dates.
+const purchasedAtField = z.preprocess(
+  (v) => {
+    if (v == null || v === '') return null;
+    const d = new Date(v as string);
+    return isNaN(d.getTime()) ? v : d;
+  },
+  z.date().nullable().optional()
+);
+
 const schema = z.object({
   sku:               z.string().trim().max(100).nullish(),
   fnsku:             z.string().trim().max(100).nullish(),
@@ -18,6 +28,8 @@ const schema = z.object({
   reservedQuantity:  quantity.optional(),
   inboundQuantity:   quantity.optional(),
   totalQuantity:     quantity.optional(),
+  purchasedAt:       purchasedAtField,
+  unitCost:          z.number().min(0).nullable().optional(),
 });
 
 export async function POST(req: Request) {
@@ -31,7 +43,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'ASIN and Product Name are required.' }, { status: 400 });
   }
 
-  const { sku, fnsku, asin, productName, availableQuantity, reservedQuantity, inboundQuantity, totalQuantity } = parsed.data;
+  const {
+    sku, fnsku, asin, productName,
+    availableQuantity, reservedQuantity, inboundQuantity, totalQuantity,
+    purchasedAt, unitCost,
+  } = parsed.data;
   const asinUpper = asin.toUpperCase();
 
   const data = {
@@ -42,6 +58,8 @@ export async function POST(req: Request) {
     reservedQuantity:  reservedQuantity ?? 0,
     inboundQuantity:   inboundQuantity ?? 0,
     totalQuantity:     totalQuantity ?? 0,
+    purchasedAt:       purchasedAt ?? null,
+    unitCost:          unitCost ?? null,
   };
 
   const item = await prisma.inventoryItem.upsert({

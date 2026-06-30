@@ -24,11 +24,12 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     jwt({ token, user }) {
       if (user) {
-        token.id      = user.id;
-        token.role    = (user as any).role;
-        token.orgId   = (user as any).orgId;
-        token.orgSlug = (user as any).orgSlug;
-        token.plan    = (user as any).plan;
+        token.id            = user.id;
+        token.role          = (user as any).role;
+        token.orgId         = (user as any).orgId;
+        token.orgSlug       = (user as any).orgSlug;
+        token.plan          = (user as any).plan;
+        token.canManualLead = (user as any).canManualLead ?? false;
       }
       // NOTE: do NOT call Prisma here. This callback runs inside the Edge
       // middleware that guards protected routes, and PrismaClient cannot run
@@ -39,11 +40,12 @@ export const authConfig: NextAuthConfig = {
       return token;
     },
     session({ session, token }) {
-      session.user.id      = token.id as string;
-      session.user.role    = token.role as any;
-      session.user.orgId   = token.orgId as string;
-      session.user.orgSlug = token.orgSlug as string;
-      session.user.plan    = token.plan as any;
+      session.user.id            = token.id as string;
+      session.user.role          = token.role as any;
+      session.user.orgId         = token.orgId as string;
+      session.user.orgSlug       = token.orgSlug as string;
+      session.user.plan          = token.plan as any;
+      (session.user as any).canManualLead = token.canManualLead as boolean;
       return session;
     },
   },

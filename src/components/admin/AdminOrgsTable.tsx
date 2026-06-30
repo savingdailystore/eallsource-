@@ -11,9 +11,10 @@ interface Subscription {
 }
 
 interface OrgUser {
-  id:    string;
-  email: string;
-  role:  string;
+  id:            string;
+  email:         string;
+  role:          string;
+  canManualLead: boolean;
 }
 
 interface Org {
@@ -92,6 +93,22 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
       trialEndsAt: e.trialEndsAt ? new Date(e.trialEndsAt).toISOString() : null,
     });
     setExpanded(null);
+  }
+
+  async function toggleManualLead(orgId: string, userId: string, canManualLead: boolean) {
+    setRoleLoading(userId);
+    const res = await fetch(`/api/admin/orgs/${orgId}/members/${userId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ canManualLead }),
+    });
+    setRoleLoading(null);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? 'Failed to update permission.');
+      return;
+    }
+    router.refresh();
   }
 
   async function changeRole(orgId: string, userId: string, role: string) {
@@ -294,7 +311,22 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                               return (
                                 <div key={u.id} className="flex items-center justify-between py-2 gap-3">
                                   <div className="text-xs text-slate-300 truncate">{u.email}</div>
-                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                  <div className="flex items-center gap-3 flex-shrink-0">
+                                    {/* Manual lead permission toggle */}
+                                    <button
+                                      onClick={() => !busy && toggleManualLead(org.id, u.id, !u.canManualLead)}
+                                      disabled={busy}
+                                      title={u.canManualLead ? 'Revoke manual lead access' : 'Grant manual lead access'}
+                                      className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${
+                                        u.canManualLead
+                                          ? 'border-blue-500/50 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
+                                          : 'border-slate-600 text-slate-500 hover:text-slate-300 hover:border-slate-500'
+                                      }`}
+                                    >
+                                      Manual Lead
+                                    </button>
+
+                                    {/* Role dropdown */}
                                     {busy ? (
                                       <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
                                     ) : (

@@ -30,6 +30,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         role={session.user.role}
         orgName={org?.name ?? 'My Organization'}
         userEmail={session.user.email}
+        canManualLead={!!(session.user as any).canManualLead}
       />
       <main
         className="flex-1 overflow-auto"

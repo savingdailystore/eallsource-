@@ -84,6 +84,11 @@ model User {
   mfaEnabled        Boolean  @default(false)
   mfaSecret         String?  // AES-256-GCM encrypted TOTP secret
 
+  // Granular feature permission: allows a non-OWNER user to use the
+  // "Add a lead manually" form on /dashboard/scanner. All other scanner
+  // features (scheduled scans, scan history) remain OWNER-only.
+  canManualLead     Boolean  @default(false)
+
   passwordResetTokens PasswordResetToken[]
 
   createdAt DateTime @default(now())

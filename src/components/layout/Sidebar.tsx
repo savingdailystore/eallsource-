@@ -16,12 +16,14 @@ interface NavItem {
   href:  string;
   icon:  React.ComponentType<{ className?: string }>;
   plan?: Plan;
-  ownerOnly?: boolean;
+  ownerOnly?:          boolean; // visible only to OWNER (and canManualLead users when allowManualLead is true)
+  ownerOrAdminOnly?:   boolean; // visible to OWNER and ADMIN
+  allowManualLead?:    boolean; // also visible when canManualLead is true (combined with ownerOnly)
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',  href: '/dashboard',           icon: LayoutDashboard },
-  { label: 'Scanner',    href: '/dashboard/scanner',   icon: Radar, ownerOnly: true },
+  { label: 'Scanner',    href: '/dashboard/scanner',   icon: Radar, ownerOnly: true, allowManualLead: true },
   { label: 'Lead Feed',  href: '/dashboard/leads',     icon: TrendingUp },
   { label: 'Products',   href: '/dashboard/products',  icon: Package },
   { label: 'Inventory',  href: '/dashboard/inventory', icon: BarChart3 },
@@ -30,7 +32,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const BOTTOM_NAV: NavItem[] = [
   { label: 'Amazon SP-API', href: '/dashboard/amazon',   icon: Link2 },
-  { label: 'Billing',       href: '/dashboard/billing',  icon: CreditCard, ownerOnly: true },
+  { label: 'Billing',       href: '/dashboard/billing',  icon: CreditCard, ownerOrAdminOnly: true },
   { label: 'Settings',      href: '/dashboard/settings', icon: Settings },
 ];
 
@@ -41,10 +43,11 @@ const PLAN_COLORS: Record<Plan, string> = {
 };
 
 interface SidebarProps {
-  plan:      Plan;
-  role:      Role;
-  orgName:   string;
-  userEmail: string;
+  plan:          Plan;
+  role:          Role;
+  orgName:       string;
+  userEmail:     string;
+  canManualLead: boolean;
 }
 
 function BrandIcon() {
@@ -69,10 +72,16 @@ function BrandIcon() {
   );
 }
 
-export function Sidebar({ plan, role, orgName, userEmail }: SidebarProps) {
+export function Sidebar({ plan, role, orgName, userEmail, canManualLead }: SidebarProps) {
   const pathname = usePathname();
-  const visibleNav    = NAV_ITEMS.filter((item) => !item.ownerOnly || role === 'OWNER');
-  const visibleBottom = BOTTOM_NAV.filter((item) => !item.ownerOnly || role === 'OWNER');
+  const visibleNav = NAV_ITEMS.filter((item) => {
+    if (item.ownerOnly) return role === 'OWNER' || (item.allowManualLead && canManualLead);
+    return true;
+  });
+  const visibleBottom = BOTTOM_NAV.filter((item) => {
+    if (item.ownerOrAdminOnly) return role === 'OWNER' || role === 'ADMIN';
+    return true;
+  });
 
   function NavLink({ item }: { item: NavItem }) {
     const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));

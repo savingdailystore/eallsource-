@@ -26,7 +26,7 @@ export default async function AdminPage() {
         select: { status: true, trialEndsAt: true, currentPeriodEnd: true },
       },
       users: {
-        select: { id: true, email: true, role: true },
+        select: { id: true, email: true, role: true, canManualLead: true },
         orderBy: { createdAt: 'asc' },
       },
     },

@@ -33,13 +33,17 @@ function extractAsin(url: string): string | null {
   return null;
 }
 
-// Owner-only: manually add a product to the lead feed from an Amazon + retailer
-// link. The pipeline auto-fills all market data, fees, gating, and profitability;
+// Manually add a product to the lead feed from an Amazon + retailer link.
+// Accessible to OWNER and users with the canManualLead permission.
+// The pipeline auto-fills all market data, fees, gating, and profitability;
 // `force` means the deliberately-chosen product is never rejected by the gates.
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (session.user.role !== 'OWNER') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const canManualLead = !!(session.user as any).canManualLead;
+  if (session.user.role !== 'OWNER' && !canManualLead) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   const parsed = schema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });

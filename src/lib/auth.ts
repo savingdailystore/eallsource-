@@ -85,13 +85,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         return {
-          id:      user.id,
-          email:   user.email,
-          name:    user.name ?? undefined,
-          role:    user.role,
-          orgId:   user.orgId,
-          orgSlug: user.org.slug,
-          plan:    user.org.plan,
+          id:            user.id,
+          email:         user.email,
+          name:          user.name ?? undefined,
+          role:          user.role,
+          orgId:         user.orgId,
+          orgSlug:       user.org.slug,
+          plan:          user.org.plan,
+          canManualLead: user.canManualLead,
         };
       },
     }),

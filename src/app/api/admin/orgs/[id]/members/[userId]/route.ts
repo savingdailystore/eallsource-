@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { isPlatformAdmin } from '@/lib/admin';
+import { Role } from '@prisma/client';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
-// Valid roles a platform admin can assign. OWNER is never assignable — it
-// belongs exclusively to the platform owner. Customer OWNERs (legacy
-// registrations) can be transitioned to ADMIN/ANALYST/VIEWER via this endpoint.
-const roleSchema = z.object({
-  role: z.enum(['ADMIN', 'ANALYST', 'VIEWER']),
-});
+// Accepts either a role update, a canManualLead toggle, or both.
+const updateSchema = z.object({
+  role:          z.enum(['ADMIN', 'ANALYST', 'VIEWER']).optional(),
+  canManualLead: z.boolean().optional(),
+}).refine(
+  (d) => d.role !== undefined || d.canManualLead !== undefined,
+  { message: 'Provide at least role or canManualLead.' },
+);
 
 export async function PATCH(
   req: NextRequest,
@@ -29,37 +32,37 @@ export async function PATCH(
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  // Guard: the platform owner's role is immutable (protects savingdailystore@gmail.com).
-  // Customer org users with OWNER role (legacy registrations) can be transitioned down.
-  if (isPlatformAdmin(target.email)) {
-    return NextResponse.json({ error: "The platform owner's role cannot be changed." }, { status: 400 });
-  }
-
   const body = await req.json();
-  const parsed = roleSchema.safeParse(body);
+  const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
   }
 
+  // Guard: the platform owner's role is immutable. canManualLead can be toggled freely.
+  if (parsed.data.role !== undefined && isPlatformAdmin(target.email)) {
+    return NextResponse.json({ error: "The platform owner's role cannot be changed." }, { status: 400 });
+  }
+
+  const data: { role?: Role; canManualLead?: boolean } = {};
+  if (parsed.data.role          !== undefined) data.role          = parsed.data.role as Role;
+  if (parsed.data.canManualLead !== undefined) data.canManualLead = parsed.data.canManualLead;
+
   const updated = await prisma.user.update({
     where:  { id: userId },
-    data:   { role: parsed.data.role },
-    select: { id: true, email: true, role: true },
+    data,
+    select: { id: true, email: true, role: true, canManualLead: true },
   });
 
-  // Reuse the existing audit pattern — same table, same shape as other role
-  // mutations (see /api/team/[id] PATCH and /api/admin/orgs/[id] PATCH).
   await prisma.auditLog.create({
     data: {
       orgId,
-      action:   'ADMIN_UPDATE_USER_ROLE',
+      action:   parsed.data.role ? 'ADMIN_UPDATE_USER_ROLE' : 'ADMIN_UPDATE_USER_PERMISSION',
       resource: 'User',
       metadata: {
         adminEmail: session!.user.email,
         targetId:   userId,
         targetEmail: target.email,
-        fromRole:   target.role,
-        toRole:     parsed.data.role,
+        changes:    data,
       },
     },
   }).catch(() => {});

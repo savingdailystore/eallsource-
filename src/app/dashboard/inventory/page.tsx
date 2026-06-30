@@ -239,7 +239,7 @@ export default async function InventoryPage() {
           {unknownCount > 0 && (
             <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500">
               <HelpCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              {unknownCount} item{unknownCount !== 1 ? 's' : ''} have no scan data — health cannot be assessed.
+              {unknownCount} item{unknownCount !== 1 ? 's' : ''} {unknownCount !== 1 ? 'have' : 'has'} no scan data — health cannot be assessed.
               Run a scanner search for those ASINs to unlock insights.
             </div>
           )}

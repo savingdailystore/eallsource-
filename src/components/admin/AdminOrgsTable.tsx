@@ -5,9 +5,15 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2, XCircle, Loader2, Radio, ChevronDown, ChevronUp, Save } from 'lucide-react';
 
 interface Subscription {
-  status:         string;
-  trialEndsAt:    string | Date | null;
+  status:           string;
+  trialEndsAt:      string | Date | null;
   currentPeriodEnd: string | Date | null;
+}
+
+interface OrgUser {
+  id:    string;
+  email: string;
+  role:  string;
 }
 
 interface Org {
@@ -21,8 +27,18 @@ interface Org {
   createdAt:         string | Date;
   subscription:      Subscription | null;
   _count:            { users: number; leads: number };
-  users:             { email: string }[];
+  users:             OrgUser[];
 }
+
+// Must match the assignable set in /api/team and /api/admin/orgs/[id]/members/[userId].
+const ASSIGNABLE_ROLES = ['ADMIN', 'ANALYST', 'VIEWER'] as const;
+
+const ROLE_BADGE: Record<string, string> = {
+  OWNER:   'bg-slate-700 text-white',
+  ADMIN:   'bg-blue-500/15 text-blue-400',
+  ANALYST: 'bg-slate-700 text-slate-300',
+  VIEWER:  'bg-slate-700 text-slate-400',
+};
 
 function fmtDate(d: string | Date | null | undefined) {
   if (!d) return '—';
@@ -36,9 +52,9 @@ function toInputDate(d: string | Date | null | undefined) {
 
 export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
   const router  = useRouter();
-  const [loading, setLoading]   = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  // per-org edit state
+  const [loading, setLoading]     = useState<string | null>(null);   // orgId for org-level ops
+  const [roleLoading, setRoleLoading] = useState<string | null>(null); // userId for role updates
+  const [expanded, setExpanded]   = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, { plan: string; trialEndsAt: string }>>({});
 
   function getEdit(org: Org) {
@@ -78,12 +94,25 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
     setExpanded(null);
   }
 
+  async function changeRole(orgId: string, userId: string, role: string) {
+    setRoleLoading(userId);
+    await fetch(`/api/admin/orgs/${orgId}/members/${userId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ role }),
+    });
+    setRoleLoading(null);
+    router.refresh();
+  }
+
+  const COL_COUNT = 11; // Organization, Email, Plan, Role, Users, Leads, Trial Ends, Scan Access, Receives Leads, Joined, expand
+
   return (
     <div className="card overflow-hidden">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-800 bg-slate-800/40">
-            {['Organization', 'Email', 'Plan', 'Users', 'Leads', 'Trial Ends', 'Scan Access', 'Receives Leads', 'Joined', ''].map((h) => (
+            {['Organization', 'Email', 'Plan', 'Role', 'Users', 'Leads', 'Trial Ends', 'Scan Access', 'Receives Leads', 'Joined', ''].map((h) => (
               <th key={h} className="table-th">{h}</th>
             ))}
           </tr>
@@ -94,6 +123,9 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
             const isExpanded = expanded === org.id;
             const isLoading  = loading === org.id;
             const sub        = org.subscription;
+            // Primary user is the first created (OWNER). Show their role in the
+            // inline column; full member list is in the expanded row.
+            const primaryUser = org.users[0];
 
             return (
               <>
@@ -109,14 +141,34 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
 
                   {/* User email(s) */}
                   <td className="table-td text-slate-300 text-xs">
-                    {org.users.length > 0 ? org.users.map((u) => u.email).join(', ') : <span className="text-slate-600">—</span>}
+                    {org.users.length > 0
+                      ? org.users.map((u) => u.email).join(', ')
+                      : <span className="text-slate-600">—</span>}
                   </td>
 
                   {/* Plan */}
                   <td className="table-td">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${org.plan === 'PRO' ? 'bg-blue-500/20 text-blue-400' : org.plan === 'ENTERPRISE' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-700 text-slate-300'}`}>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
+                      org.plan === 'PRO'        ? 'bg-blue-500/20 text-blue-400' :
+                      org.plan === 'ENTERPRISE' ? 'bg-purple-500/20 text-purple-400' :
+                                                   'bg-slate-700 text-slate-300'
+                    }`}>
                       {org.plan}
                     </span>
+                  </td>
+
+                  {/* Role — primary user's role; expand for full list */}
+                  <td className="table-td">
+                    {primaryUser ? (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${ROLE_BADGE[primaryUser.role] ?? 'bg-slate-700 text-slate-300'}`}>
+                        {primaryUser.role}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600 text-xs">—</span>
+                    )}
+                    {org.users.length > 1 && (
+                      <span className="text-xs text-slate-500 ml-1.5">+{org.users.length - 1}</span>
+                    )}
                   </td>
 
                   <td className="table-td text-slate-300">{org._count.users}</td>
@@ -171,21 +223,24 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
 
                   <td className="table-td text-slate-400 text-xs">{new Date(org.createdAt).toLocaleDateString()}</td>
 
-                  {/* Expand edit row */}
+                  {/* Expand row */}
                   <td className="table-td">
                     <button
                       onClick={() => setExpanded(isExpanded ? null : org.id)}
                       className="text-slate-500 hover:text-slate-300 transition-colors"
+                      aria-label={isExpanded ? 'Collapse' : 'Expand'}
                     >
                       {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
                   </td>
                 </tr>
 
-                {/* Inline edit row */}
+                {/* Expanded edit row */}
                 {isExpanded && (
                   <tr key={`${org.id}-edit`} className="bg-slate-800/60">
-                    <td colSpan={10} className="px-4 py-4">
+                    <td colSpan={COL_COUNT} className="px-4 py-4 space-y-5">
+
+                      {/* Plan + trial date editors */}
                       <div className="flex items-end gap-4 flex-wrap">
                         <div>
                           <label className="block text-xs text-slate-400 mb-1">Plan</label>
@@ -223,6 +278,51 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                           Cancel
                         </button>
                       </div>
+
+                      {/* Member role management */}
+                      {org.users.length > 0 && (
+                        <div>
+                          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Members</div>
+                          <div className="divide-y divide-slate-700/60">
+                            {org.users.map((u) => {
+                              const isOwner = u.role === 'OWNER';
+                              const busy    = roleLoading === u.id;
+                              return (
+                                <div key={u.id} className="flex items-center justify-between py-2 gap-3">
+                                  <div className="text-xs text-slate-300 truncate">{u.email}</div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    {isOwner ? (
+                                      // Owner role is immutable — show badge only, no dropdown
+                                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${ROLE_BADGE.OWNER}`}>
+                                        OWNER
+                                      </span>
+                                    ) : (
+                                      <>
+                                        {busy
+                                          ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                                          : (
+                                            <select
+                                              value={u.role}
+                                              onChange={(e) => changeRole(org.id, u.id, e.target.value)}
+                                              disabled={busy}
+                                              className="text-xs bg-slate-700 border border-slate-600 rounded-md px-2 py-1 text-slate-200 focus:outline-none focus:border-blue-500"
+                                            >
+                                              {ASSIGNABLE_ROLES.map((r) => (
+                                                <option key={r} value={r}>{r}</option>
+                                              ))}
+                                            </select>
+                                          )
+                                        }
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                     </td>
                   </tr>
                 )}

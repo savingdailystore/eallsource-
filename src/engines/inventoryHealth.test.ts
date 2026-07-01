@@ -318,8 +318,7 @@ describe('data honesty — no fabricated metrics', () => {
 
   it('does not fabricate unitCost or inventoryValue when no cost data is available', () => {
     const result = evaluateInventoryHealth(baseInput({ repricing: undefined, unitCost: null }));
-    expect(result.profitSummary?.unitCost).toBeUndefined();
-    expect(result.profitSummary?.inventoryValue).toBeUndefined();
+    expect(result.costSummary).toBeNull();
   });
 });
 
@@ -394,13 +393,18 @@ describe('purchasedAt — aging source', () => {
   });
 });
 
-// ─── Phase 2.1: unitCost and inventoryValue ─────────────────────────────────
+// ─── Phase 2.1: costSummary (independent of Product scan data) ──────────────
 
-describe('unitCost and inventoryValue', () => {
+describe('costSummary', () => {
+  it('is null when no cost data is available', () => {
+    const result = evaluateInventoryHealth(baseInput({ unitCost: null, repricing: undefined }));
+    expect(result.costSummary).toBeNull();
+  });
+
   it('resolves unitCost from item when provided', () => {
     const result = evaluateInventoryHealth(baseInput({ unitCost: 12.50 }));
-    expect(result.profitSummary?.unitCost).toBe(12.50);
-    expect(result.profitSummary?.unitCostSource).toBe('item');
+    expect(result.costSummary?.unitCost).toBe(12.50);
+    expect(result.costSummary?.unitCostSource).toBe('item');
   });
 
   it('resolves unitCost from repricing.costBasis when item unitCost is absent', () => {
@@ -408,8 +412,8 @@ describe('unitCost and inventoryValue', () => {
       unitCost:  null,
       repricing: { costBasis: 9.99, isActive: true },
     }));
-    expect(result.profitSummary?.unitCost).toBe(9.99);
-    expect(result.profitSummary?.unitCostSource).toBe('repricing');
+    expect(result.costSummary?.unitCost).toBe(9.99);
+    expect(result.costSummary?.unitCostSource).toBe('repricing');
   });
 
   it('item unitCost takes priority over repricing.costBasis', () => {
@@ -417,8 +421,8 @@ describe('unitCost and inventoryValue', () => {
       unitCost:  14.00,
       repricing: { costBasis: 9.99, isActive: true },
     }));
-    expect(result.profitSummary?.unitCost).toBe(14.00);
-    expect(result.profitSummary?.unitCostSource).toBe('item');
+    expect(result.costSummary?.unitCost).toBe(14.00);
+    expect(result.costSummary?.unitCostSource).toBe('item');
   });
 
   it('inventoryValue = availableQuantity × resolvedUnitCost', () => {
@@ -426,12 +430,7 @@ describe('unitCost and inventoryValue', () => {
       availableQuantity: 20,
       unitCost:          5.00,
     }));
-    expect(result.profitSummary?.inventoryValue).toBe(100.00);
-  });
-
-  it('inventoryValue is undefined when no cost data', () => {
-    const result = evaluateInventoryHealth(baseInput({ unitCost: null, repricing: undefined }));
-    expect(result.profitSummary?.inventoryValue).toBeUndefined();
+    expect(result.costSummary?.inventoryValue).toBe(100.00);
   });
 
   it('inventoryValue uses fallback costBasis when no item unitCost', () => {
@@ -440,7 +439,7 @@ describe('unitCost and inventoryValue', () => {
       unitCost:          null,
       repricing:         { costBasis: 8.00, isActive: true },
     }));
-    expect(result.profitSummary?.inventoryValue).toBe(80.00);
+    expect(result.costSummary?.inventoryValue).toBe(80.00);
   });
 
   it('inventoryValue is 0 when availableQuantity is 0 but cost is known', () => {
@@ -448,10 +447,27 @@ describe('unitCost and inventoryValue', () => {
       availableQuantity: 0,
       unitCost:          10.00,
     }));
-    expect(result.profitSummary?.inventoryValue).toBe(0);
+    expect(result.costSummary?.inventoryValue).toBe(0);
   });
 
-  it('costBasis is still present for backward compat when repricing provides it', () => {
+  it('is populated even when Product is absent (UNKNOWN status)', () => {
+    const result = evaluateInventoryHealth(baseInput({
+      product:  undefined,
+      unitCost: 12.50,
+    }));
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.profitSummary).toBeNull();       // scan data still absent
+    expect(result.costSummary?.unitCost).toBe(12.50);
+    expect(result.costSummary?.unitCostSource).toBe('item');
+  });
+
+  it('is null on UNKNOWN status when no cost data', () => {
+    const result = evaluateInventoryHealth(baseInput({ product: undefined, unitCost: null }));
+    expect(result.status).toBe('UNKNOWN');
+    expect(result.costSummary).toBeNull();
+  });
+
+  it('costBasis is still present on profitSummary for backward compat when repricing provides it', () => {
     const result = evaluateInventoryHealth(baseInput({
       repricing: { costBasis: 15.99, isActive: true },
     }));

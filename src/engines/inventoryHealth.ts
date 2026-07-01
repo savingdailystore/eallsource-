@@ -83,14 +83,18 @@ export interface InventoryHealthResult {
   daysSinceTracked: number; // Always createdAt-based (kept for diagnostics)
   // null when no Product is linked (UNKNOWN status)
   profitSummary: {
-    roi:              number;
-    profit:           number;
-    price:            number;
-    unitCost?:        number;             // Resolved: item.unitCost ?? repricing.costBasis
-    unitCostSource?:  'item' | 'repricing'; // Which source was used
-    inventoryValue?:  number;             // availableQty × unitCost — omitted when cost unknown
-    // Kept for backward compatibility in tests and callers that already reference it
-    costBasis?:       number;
+    roi:       number;
+    profit:    number;
+    price:     number;
+    // costBasis kept for backward compat (raw repricing value, not the resolved unit cost)
+    costBasis?: number;
+  } | null;
+  // Independent of scan data — populated whenever unit cost is known (item or repricing fallback).
+  // null only when no cost data is available at all.
+  costSummary: {
+    unitCost:       number;
+    unitCostSource: 'item' | 'repricing';
+    inventoryValue: number; // availableQty × unitCost; 0 when qty is 0
   } | null;
   demandSummary: {
     level:         string;
@@ -209,12 +213,19 @@ export function evaluateInventoryHealth(input: InventoryHealthInput): InventoryH
   // Unit cost resolution: item-level first, repricing fallback, then null.
   const resolvedUnitCost  = unitCost ?? repricing?.costBasis ?? null;
   const unitCostSource: 'item' | 'repricing' | null =
-    unitCost != null      ? 'item'      :
+    unitCost != null             ? 'item'      :
     repricing?.costBasis != null ? 'repricing' : null;
-  const inventoryValue =
-    resolvedUnitCost != null ? availableQuantity * resolvedUnitCost : undefined;
 
   const restockSignal = computeRestockSignal(availableQuantity, inboundQuantity, product);
+
+  // costSummary is independent of Product scan data — computed once, used in both branches.
+  const costSummary = resolvedUnitCost != null
+    ? {
+        unitCost:       resolvedUnitCost,
+        unitCostSource: unitCostSource as 'item' | 'repricing',
+        inventoryValue: availableQuantity * resolvedUnitCost,
+      }
+    : null;
 
   // No scan data — return UNKNOWN without fabricating any signals.
   if (!product) {
@@ -229,6 +240,7 @@ export function evaluateInventoryHealth(input: InventoryHealthInput): InventoryH
       agingSource,
       daysSinceTracked,
       profitSummary:    null,
+      costSummary,
       demandSummary:    null,
     };
   }
@@ -306,19 +318,6 @@ export function evaluateInventoryHealth(input: InventoryHealthInput): InventoryH
       reasons.push(`${inboundQuantity} unit${inboundQuantity !== 1 ? 's' : ''} inbound`);
   }
 
-  // Build profitSummary with resolved cost data.
-  const profitSummaryExtra = resolvedUnitCost != null
-    ? {
-        unitCost:       resolvedUnitCost,
-        unitCostSource: unitCostSource as 'item' | 'repricing',
-        inventoryValue,
-        // costBasis kept for backward compat
-        ...(repricing?.costBasis != null ? { costBasis: repricing.costBasis } : {}),
-      }
-    : repricing?.costBasis != null
-      ? { costBasis: repricing.costBasis }
-      : {};
-
   return {
     status,
     restockSignal,
@@ -335,8 +334,10 @@ export function evaluateInventoryHealth(input: InventoryHealthInput): InventoryH
       roi:    product.roi,
       profit: product.profit,
       price:  product.price,
-      ...profitSummaryExtra,
+      // costBasis kept for backward compat
+      ...(repricing?.costBasis != null ? { costBasis: repricing.costBasis } : {}),
     },
+    costSummary,
     demandSummary: {
       level:        product.demandLevel,
       monthlySales: product.monthlySales ?? null,

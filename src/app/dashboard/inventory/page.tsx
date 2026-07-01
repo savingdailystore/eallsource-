@@ -162,13 +162,13 @@ export default async function InventoryPage() {
   const healthyCount   =  statusCounts['HEALTHY']     ?? 0;
   const unknownCount   =  statusCounts['UNKNOWN']     ?? 0;
 
-  // Inventory value — only summed when unit cost is known (never estimated).
+  // Inventory value — costSummary is independent of scan data, always populated when cost is known.
   let knownInventoryValue = 0;
   let itemsWithCost       = 0;
   for (const item of enrichedItems) {
-    const iv = item.health?.profitSummary?.inventoryValue;
-    if (iv != null) {
-      knownInventoryValue += iv;
+    const cs = item.health?.costSummary;
+    if (cs != null) {
+      knownInventoryValue += cs.inventoryValue;
       itemsWithCost++;
     }
   }

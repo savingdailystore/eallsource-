@@ -103,5 +103,102 @@ export async function getSpApiClient(orgId: string) {
       if (!res.ok) throw new Error(`SP-API ${path} → ${res.status}: ${text}`);
       return text ? JSON.parse(text) : {};
     },
+
+    async post(path: string, body: unknown) {
+      const url = `${endpoint}${path}`;
+
+      const res = await fetch(url, {
+        method:  'POST',
+        headers: {
+          'x-amz-access-token': accessToken,
+          'content-type':       'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      const text = await res.text();
+      if (!res.ok) throw new Error(`SP-API POST ${path} → ${res.status}: ${text}`);
+      return text ? JSON.parse(text) : {};
+    },
+
+    // ─── Reports API helpers ─────────────────────────────────────────────────
+    // Amazon Reports API v2021-06-30
+    // Requires the report type to be enabled in the SP-API application role.
+    // Docs: https://developer-docs.amazon.com/sp-api/docs/reports-api-v2021-06-30-reference
+
+    /** Request a new report. Returns the reportId. */
+    async createReport(reportType: string, options: {
+      dataStartTime?: string;
+      dataEndTime?:   string;
+      marketplaceIds?: string[];
+    } = {}): Promise<string> {
+      const body = {
+        reportType,
+        marketplaceIds: options.marketplaceIds ?? [cred.marketplaceId],
+        ...(options.dataStartTime ? { dataStartTime: options.dataStartTime } : {}),
+        ...(options.dataEndTime   ? { dataEndTime:   options.dataEndTime   } : {}),
+      };
+      const data = await this.post('/reports/2021-06-30/reports', body);
+      if (!data?.reportId) throw new Error(`createReport: no reportId in response: ${JSON.stringify(data)}`);
+      return data.reportId as string;
+    },
+
+    /** Poll report status. Returns processingStatus and reportDocumentId when DONE. */
+    async getReport(reportId: string): Promise<{
+      processingStatus: 'IN_QUEUE' | 'IN_PROGRESS' | 'DONE' | 'FATAL' | 'CANCELLED';
+      reportDocumentId?: string;
+    }> {
+      const data = await this.get(`/reports/2021-06-30/reports/${reportId}`);
+      return {
+        processingStatus: data?.processingStatus,
+        reportDocumentId: data?.reportDocumentId,
+      };
+    },
+
+    /** Get the document metadata (download URL + optional compression). */
+    async getReportDocument(reportDocumentId: string): Promise<{
+      url: string;
+      compressionAlgorithm?: string;
+    }> {
+      const data = await this.get(`/reports/2021-06-30/documents/${reportDocumentId}`);
+      return {
+        url:                  data?.url,
+        compressionAlgorithm: data?.compressionAlgorithm,
+      };
+    },
+
+    /** Download and decompress the report document. Returns raw string content. */
+    async downloadReportDocument(reportDocumentId: string): Promise<string> {
+      const { url, compressionAlgorithm } = await this.getReportDocument(reportDocumentId);
+      if (!url) throw new Error(`getReportDocument: no URL returned for ${reportDocumentId}`);
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Report document download failed: ${res.status}`);
+
+      if (compressionAlgorithm === 'GZIP') {
+        // Decompress GZIP — available in Node.js 18+ via CompressionStream
+        const buffer     = await res.arrayBuffer();
+        const compressed = new Uint8Array(buffer);
+        const ds         = new DecompressionStream('gzip');
+        const writer     = ds.writable.getWriter();
+        writer.write(compressed);
+        writer.close();
+        const chunks: Uint8Array[] = [];
+        const reader = ds.readable.getReader();
+        let done = false;
+        while (!done) {
+          const { value, done: d } = await reader.read();
+          if (value) chunks.push(value);
+          done = d;
+        }
+        const total  = chunks.reduce((sum, c) => sum + c.length, 0);
+        const merged = new Uint8Array(total);
+        let offset   = 0;
+        for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+        return new TextDecoder().decode(merged);
+      }
+
+      return res.text();
+    },
   };
 }

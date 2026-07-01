@@ -6,7 +6,7 @@ import { signOutAction } from '@/lib/actions/auth';
 import {
   LayoutDashboard, TrendingUp, Package, BarChart3,
   RefreshCw, Link2, CreditCard, Settings,
-  LogOut, ChevronRight, Zap, Radar,
+  LogOut, ChevronRight, Zap, Radar, ShieldCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Plan, Role } from '@/types';
@@ -27,7 +27,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Lead Feed',  href: '/dashboard/leads',     icon: TrendingUp },
   { label: 'Products',   href: '/dashboard/products',  icon: Package },
   { label: 'Inventory',  href: '/dashboard/inventory', icon: BarChart3 },
-  { label: 'Repricing',  href: '/dashboard/repricing', icon: RefreshCw, plan: 'PRO' },
+  { label: 'Repricing',       href: '/dashboard/repricing', icon: RefreshCw,   plan: 'PRO' },
+  { label: 'Profit Recovery', href: '/dashboard/recovery',  icon: ShieldCheck, plan: 'PRO' },
 ];
 
 const BOTTOM_NAV: NavItem[] = [

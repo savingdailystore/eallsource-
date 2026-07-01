@@ -64,8 +64,10 @@ model Organization {
   repricingRules RepricingRule[]
   scanJobs       ScanJob[]
   savedSearches  SavedSearch[]
-  amazonCred     AmazonCredential?
-  auditLogs      AuditLog[]
+  amazonCred          AmazonCredential?
+  auditLogs           AuditLog[]
+  reimbursements      Reimbursement[]
+  reimbursementSyncs  ReimbursementSync[]
 
   @@index([slug])
   @@map("organizations")
@@ -477,4 +479,68 @@ model AuditLog {
   @@index([userId])
   @@index([orgId, createdAt])
   @@map("audit_logs")
+}
+
+// ─── Profit Recovery Center ─────────────────────────────────────────────────
+
+model Reimbursement {
+  id    String @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // Amazon report fields — exact column names from GET_FBA_REIMBURSEMENTS_DATA TSV
+  reimbursementId             String   // "reimbursement-id"
+  approvalDate                DateTime // "approval-date"
+  caseId                      String?  // "case-id"
+  amazonOrderId               String?  // "amazon-order-id"
+  reason                      String   // "reason" e.g. REVERSAL_REIMBURSEMENT, LOST_INBOUND_SHIPMENT
+  sku                         String?  // "sku"
+  fnsku                       String?  // "fnsku"
+  asin                        String?  // "asin"
+  productName                 String?  // "product-name"
+  condition                   String?  // "condition"
+  currencyUnit                String   @default("USD") // "currency-unit"
+  amountPerUnit               Float    // "amount-per-unit"
+  amountTotal                 Float    // "amount-total"
+  quantityReimbursedCash      Int      @default(0) // "quantity-reimbursed-cash"
+  quantityReimbursedInventory Int      @default(0) // "quantity-reimbursed-inventory"
+  quantityReimbursedTotal     Int      @default(0) // "quantity-reimbursed-total"
+  originalReimbursementId     String?  // "original-reimbursement-id"
+  originalReimbursementType   String?  // "original-reimbursement-type"
+
+  // EALLsource metadata
+  importSource String @default("SP_API") // "SP_API" | "MANUAL_CSV"
+  rawPayload   Json   // full parsed row — preserved for audit
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, reimbursementId])
+  @@index([orgId])
+  @@index([orgId, asin])
+  @@index([orgId, approvalDate])
+  @@map("reimbursements")
+}
+
+model ReimbursementSync {
+  id    String @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  source           String    @default("SP_API") // "SP_API" | "MANUAL_CSV"
+  status           String    // "PENDING" | "RUNNING" | "DONE" | "FAILED"
+  reportId         String?   // Amazon report ID (SP_API only)
+  reportDocumentId String?   // Amazon report document ID (SP_API only)
+  startedAt        DateTime  @default(now())
+  completedAt      DateTime?
+  recordsFound     Int?
+  recordsUpserted  Int?
+  error            String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([orgId, startedAt])
+  @@map("reimbursement_syncs")
 }

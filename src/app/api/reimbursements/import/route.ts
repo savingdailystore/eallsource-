@@ -13,9 +13,13 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { role, orgId } = session.user;
+  const { role, orgId, plan } = session.user;
+
+  if (plan === 'STARTER') {
+    return NextResponse.json({ error: 'Profit Recovery requires a Pro plan' }, { status: 403 });
+  }
   if (role !== 'OWNER' && role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Forbidden — only owners and admins can import reimbursement reports' }, { status: 403 });
   }
 
   // Accept multipart/form-data with a "file" field OR raw text body

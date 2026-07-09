@@ -56,6 +56,7 @@ export default async function DashboardPage() {
     settlementUnmatchedCount,
     refundRowsStored,
     unsupportedSettlementRowsStored,
+    amazonCred,
   ] = await Promise.all([
     // All non-expired leads for funnel + summarize
     prisma.lead.findMany({
@@ -214,6 +215,12 @@ export default async function DashboardPage() {
           where: { orgId, transactionType: { not: { in: ['Order', 'Refund'] } } },
         })
       : Promise.resolve(0),
+
+    // Amazon SP-API connection status — for Getting Started checklist
+    prisma.amazonCredential.findUnique({
+      where:  { orgId },
+      select: { isActive: true },
+    }),
   ]);
 
   // ── Product data for inventory health ─────────────────────────────────────
@@ -297,6 +304,61 @@ export default async function DashboardPage() {
     refundRowsStored:                isPro ? refundRowsStored : 0,
     unsupportedSettlementRowsStored: isPro ? unsupportedSettlementRowsStored : 0,
   });
+
+  // ── Getting Started checklist ─────────────────────────────────────────────
+  const amazonConnected = !!amazonCred?.isActive;
+  const gettingStarted = [
+    {
+      key:       'plan',
+      title:     'Choose your plan',
+      desc:      'Upgrade to Pro to unlock Sales & Profit Tracking, Profit Recovery, and Repricing.',
+      done:      isPro,
+      href:      '/dashboard/billing',
+      linkLabel: 'View plans',
+    },
+    {
+      key:       'amazon',
+      title:     'Connect Amazon',
+      desc:      'Connect your Seller Central account so inventory, pricing, and report workflows can use live Amazon data.',
+      done:      amazonConnected,
+      href:      '/dashboard/amazon',
+      linkLabel: 'Connect now',
+    },
+    {
+      key:       'inventory',
+      title:     'Add or sync inventory',
+      desc:      'Add items manually or sync from Amazon, then confirm SKU, ASIN, and unit cost for each item.',
+      done:      inventoryRaw.length > 0,
+      href:      '/dashboard/inventory',
+      linkLabel: 'Go to Inventory',
+    },
+    {
+      key:       'leads',
+      title:     'Review leads or run a scan',
+      desc:      'Find qualified product opportunities before creating purchase orders.',
+      done:      leadsRaw.length > 0,
+      href:      '/dashboard/leads',
+      linkLabel: 'View Lead Feed',
+    },
+    {
+      key:       'sales',
+      title:     'Import sales reports',
+      desc:      'Import orders first, then settlement reports to add fees and calculate realized profit.',
+      done:      salesRawBI.length > 0,
+      href:      '/dashboard/sales',
+      linkLabel: 'Go to Sales',
+    },
+    {
+      key:       'repricing',
+      title:     'Configure repricing last',
+      desc:      'Set up repricing only after inventory and costs are correct. Price pushes still require review and approval.',
+      done:      repricingRulesRaw.length > 0,
+      href:      '/dashboard/repricing',
+      linkLabel: 'Go to Repricing',
+    },
+  ] as const;
+  const completedCount = gettingStarted.filter((s) => s.done).length;
+  const allDone        = completedCount === gettingStarted.length;
 
   // Weekly chart data
   const avgRoi     = leadStats[0]?.avg_roi ?? 0;
@@ -409,6 +471,45 @@ export default async function DashboardPage() {
           View lead feed
         </Link>
       </div>
+
+      {/* ── Getting Started Checklist ── */}
+      {!allDone && (
+        <section className="card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+            <div>
+              <h2 className="font-semibold text-slate-50">Getting Started</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Follow these steps to set up EALLsource safely.</p>
+            </div>
+            <span className="text-xs font-medium text-slate-400">
+              {completedCount} of {gettingStarted.length} complete
+            </span>
+          </div>
+          <div className="divide-y divide-slate-800/60">
+            {gettingStarted.map((item) => (
+              <div key={item.key} className={`flex items-start gap-3 px-5 py-3.5 ${item.done ? 'opacity-50' : ''}`}>
+                <div className="flex-shrink-0 mt-0.5">
+                  {item.done
+                    ? <CheckCircle2 className="w-4 h-4 text-green-400" />
+                    : <div className="w-4 h-4 rounded-full border-2 border-slate-600" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium ${item.done ? 'text-slate-500 line-through' : 'text-slate-100'}`}>
+                    {item.title}
+                  </div>
+                  {!item.done && (
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{item.desc}</p>
+                  )}
+                </div>
+                {!item.done && (
+                  <Link href={item.href} className="flex-shrink-0 text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors whitespace-nowrap mt-0.5">
+                    {item.linkLabel} →
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── Executive Summary Cards ── */}
       <section>

@@ -183,7 +183,7 @@ export default async function RepricingPage() {
           </div>
           <h2 className="text-xl font-bold text-slate-50 mb-2">Repricing requires Pro</h2>
           <p className="text-slate-400 text-sm mb-5">
-            Automated repricing keeps you competitive while protecting your margins.
+            Rule-based repricing with a manual approval queue keeps you competitive while protecting your margins.
             Upgrade to Pro to unlock this feature.
           </p>
           <a href="/dashboard/billing" className="btn-primary">Upgrade to Pro →</a>

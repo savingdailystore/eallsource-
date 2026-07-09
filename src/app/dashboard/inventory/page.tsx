@@ -347,7 +347,7 @@ export default async function InventoryPage({
           <div className="py-16 text-center">
             <Package className="w-10 h-10 text-slate-600 mx-auto mb-3" />
             <p className="text-slate-400 font-medium">No inventory items yet</p>
-            <p className="text-sm text-slate-500 mt-1">Purchase a lead to start tracking inventory</p>
+            <p className="text-sm text-slate-500 mt-1">Add your first item manually or sync from Amazon using the buttons above.</p>
           </div>
         ) : displayItems.length === 0 ? (
           <div className="py-16 text-center">

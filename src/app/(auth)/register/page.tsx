@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
 
 const FEATURES = [
-  '14-day free trial — no credit card',
+  'Free starter access — no credit card required',
   'Full lead engine with ROI calculator',
   'Validation engine (95%+ confidence required)',
   'Inventory & repricing tools (Pro)',
@@ -48,8 +48,8 @@ export default function RegisterPage() {
 
   return (
     <>
-      <h1 className="text-2xl font-bold text-slate-50 mb-1">Start your free trial</h1>
-      <p className="text-slate-400 text-sm mb-4">14 days free. No credit card required.</p>
+      <h1 className="text-2xl font-bold text-slate-50 mb-1">Create your free account</h1>
+      <p className="text-slate-400 text-sm mb-4">Free to start. No credit card required.</p>
 
       <ul className="space-y-1 mb-6">
         {FEATURES.map((f) => (

@@ -42,7 +42,7 @@ export default function MarketingShell({ children }: { children: React.ReactNode
             <Link href="/#features" className="text-slate-400 hover:text-slate-200 transition-colors hidden sm:inline">Features</Link>
             <Link href="/contact" className="text-slate-400 hover:text-slate-200 transition-colors">Contact</Link>
             <Link href="/login" className="text-slate-300 hover:text-white transition-colors">Sign in</Link>
-            <Link href="/register" className="btn-primary py-2">Start free trial</Link>
+            <Link href="/register" className="btn-primary py-2">Start for free</Link>
           </nav>
         </div>
       </header>

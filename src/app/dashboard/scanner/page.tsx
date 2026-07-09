@@ -88,7 +88,7 @@ export default async function ScannerPage() {
             <p className="text-slate-500 text-xs max-w-sm mx-auto mt-4">
               Think this is a mistake or need help getting started?{' '}
               <a
-                href="mailto:savingdailystore@gmail.com?subject=EALLsource Scanner Access"
+                href="mailto:support@eallsource.com?subject=EALLsource Scanner Access"
                 className="text-blue-500 hover:underline"
               >
                 Contact support

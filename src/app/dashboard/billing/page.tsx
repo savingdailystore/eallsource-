@@ -131,7 +131,7 @@ export default async function BillingPage() {
                 </form>
               ) : (
                 <a
-                  href="mailto:savingdailystore@gmail.com?subject=EALLsource plan change"
+                  href="mailto:support@eallsource.com?subject=EALLsource plan change"
                   className={`w-full justify-center flex items-center ${plan.key === 'PRO' ? 'btn-primary' : 'btn-secondary'}`}
                 >
                   Contact us to {currentPlan === 'STARTER' ? 'upgrade' : 'change plan'}

@@ -338,12 +338,16 @@ export default async function DashboardPage() {
       desc:      'Find qualified product opportunities before creating purchase orders.',
       done:      leadsRaw.length > 0,
       href:      '/dashboard/leads',
-      linkLabel: 'View Lead Feed',
+      linkLabel: 'Lead Feed',
+      href2:     '/dashboard/scanner',
+      linkLabel2:'Scanner',
     },
     {
       key:       'sales',
       title:     'Import sales reports',
-      desc:      'Import orders first, then settlement reports to add fees and calculate realized profit.',
+      desc:      isPro
+        ? 'Import orders first, then settlement reports to add fees and calculate realized profit.'
+        : 'Sales report imports require Pro. Upgrade your plan to unlock this step.',
       done:      salesRawBI.length > 0,
       href:      '/dashboard/sales',
       linkLabel: 'Go to Sales',
@@ -501,9 +505,16 @@ export default async function DashboardPage() {
                   )}
                 </div>
                 {!item.done && (
-                  <Link href={item.href} className="flex-shrink-0 text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors whitespace-nowrap mt-0.5">
-                    {item.linkLabel} →
-                  </Link>
+                  <div className="flex-shrink-0 flex flex-col items-end gap-1 mt-0.5">
+                    <Link href={item.href} className="text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors whitespace-nowrap">
+                      {item.linkLabel} →
+                    </Link>
+                    {'href2' in item && (
+                      <Link href={(item as any).href2} className="text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors whitespace-nowrap">
+                        {(item as any).linkLabel2} →
+                      </Link>
+                    )}
+                  </div>
                 )}
               </div>
             ))}

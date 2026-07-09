@@ -266,9 +266,10 @@ interface LeadsTableProps {
   pageSize: number;
   orgPlan: Plan;
   isOwner?: boolean;
+  hasFilters?: boolean;
 }
 
-export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = false }: LeadsTableProps) {
+export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = false, hasFilters = false }: LeadsTableProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
   const totalPages = Math.ceil(total / pageSize);
@@ -280,11 +281,35 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = fa
   }
 
   if (!leads.length) {
+    if (!hasFilters) {
+      return (
+        <div className="card py-16 text-center">
+          <TrendingUp className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-200 font-semibold text-lg mb-1">No leads yet</p>
+          <p className="text-sm text-slate-400 max-w-sm mx-auto mb-6">
+            Run a scan or check your scanner access to start finding product opportunities.
+          </p>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <Link href="/dashboard/scanner" className="btn-primary text-sm">
+              Go to Scanner →
+            </Link>
+            <Link href="/contact" className="btn-secondary text-sm">
+              Help &amp; Support
+            </Link>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="card py-16 text-center">
         <TrendingUp className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-400 font-medium">No leads match your filters</p>
-        <p className="text-sm text-slate-500 mt-1">Run a scanner job to discover new opportunities</p>
+        <p className="text-slate-400 font-medium">No leads match these filters</p>
+        <p className="text-sm text-slate-500 mt-1">
+          Try clearing filters or turning off <strong className="text-slate-400">Sellable Only</strong>.
+        </p>
+        <Link href="/dashboard/leads" className="btn-secondary text-sm mt-4 inline-flex items-center">
+          Clear filters
+        </Link>
       </div>
     );
   }

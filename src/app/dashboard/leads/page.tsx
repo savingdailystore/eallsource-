@@ -21,6 +21,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const sortBy   = sp.sortBy ?? 'score';
   const gating   = sp.gating; // 'sellable' = hide restricted + approval-needed
 
+  const hasFilters = gating === 'sellable' || !!status || minRoi != null;
+
   // Build the product filter in one place so multiple conditions compose
   // (previously a second `product:` key silently clobbered the minRoi filter).
   const productWhere: any = { validationPassed: true };
@@ -76,7 +78,9 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         <div>
           <h1 className="page-title">Lead Feed</h1>
           <p className="page-subtitle">
-            {total.toLocaleString()} qualified opportunities — 30%+ ROI, $8+ profit, top-6% BSR, validated matches
+            {total > 0
+              ? `${total.toLocaleString()} qualified ${total === 1 ? 'opportunity' : 'opportunities'} · ranked by profit, ROI, demand, and match confidence`
+              : 'Qualified opportunities ranked by profit, ROI, demand, and match confidence'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -114,6 +118,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         pageSize={pageSize}
         orgPlan={session!.user.plan}
         isOwner={session!.user.role === 'OWNER'}
+        hasFilters={hasFilters}
       />
     </div>
   );

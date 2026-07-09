@@ -44,8 +44,11 @@ export async function POST() {
   // (a listing), not an ASIN, so a rule with no matching SKU can be proposed
   // but not pushed until inventory is synced.
   const skuByAsin = new Map<string, string>();
+  // Map ASIN → availableQuantity for zero-inventory guard.
+  const qtyByAsin = new Map<string, number>();
   for (const item of inventory) {
     if (item.sku && !skuByAsin.has(item.asin)) skuByAsin.set(item.asin, item.sku);
+    if (!qtyByAsin.has(item.asin)) qtyByAsin.set(item.asin, item.availableQuantity ?? 0);
   }
 
   // ── 2. Run every active rule ──────────────────────────────────────────────
@@ -59,6 +62,40 @@ export async function POST() {
   for (const rule of rules) {
     const product = await prisma.product.findFirst({ where: { orgId, asin: rule.asin } });
     const sku     = skuByAsin.get(rule.asin) ?? null;
+
+    // Guard 1: zero-inventory — emit HOLD instead of a proposal when the
+    // inventory record exists but has nothing on hand.  If there is no local
+    // inventory record (qtyByAsin has no entry) we fall through and let the
+    // normal price-data checks handle it.
+    const availableQty = qtyByAsin.has(rule.asin) ? (qtyByAsin.get(rule.asin) ?? 0) : null;
+    if (availableQty !== null && availableQty <= 0) {
+      const holdPrice = rule.lastPushedPrice ?? rule.lastRecommendedPrice ?? 0;
+      await prisma.$transaction([
+        prisma.repricingHistory.updateMany({
+          where: { ruleId: rule.id, status: 'PROPOSED' },
+          data:  { status: 'SUPERSEDED' },
+        }),
+        prisma.repricingRule.update({
+          where: { id: rule.id },
+          data:  { lastRepricedAt: new Date(), lastDirection: 'HOLD' },
+        }),
+        prisma.repricingHistory.create({
+          data: {
+            ruleId:           rule.id,
+            status:           'HOLD',
+            direction:        'HOLD',
+            reason:           'No inventory on hand — skipping repricing proposal.',
+            recommendedPrice: holdPrice,
+            previousPrice:    holdPrice,
+            riskScore:        0,
+            sku,
+            buyBoxPrice:      null,
+          },
+        }),
+      ]);
+      hold++;
+      continue;
+    }
 
     // Most repricing targets are the seller's OWN inventory, which was never run
     // through the sourcing scanner — so there's no Product row. Pull live market
@@ -141,6 +178,7 @@ export async function POST() {
           status,
           previousPrice:    currentPrice,
           sku,
+          reason:           result.reason,
         },
       }),
     ]);

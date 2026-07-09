@@ -166,7 +166,7 @@ export function InventoryTable({ items }: { items: InventoryRow[] }) {
                   {isExpanded && item.health && (
                     <tr key={`${item.id}-intel`}>
                       <td colSpan={COL_COUNT} className="p-0">
-                        <InventoryIntelPanel health={item.health} />
+                        <InventoryIntelPanel health={item.health} asin={item.asin} />
                       </td>
                     </tr>
                   )}

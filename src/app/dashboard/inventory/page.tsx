@@ -9,15 +9,23 @@ import { ImportCsvModal } from '@/components/inventory/ImportCsvModal';
 import { InventoryTable } from '@/components/inventory/InventoryTable';
 import { AmazonSyncButton } from '@/components/inventory/AmazonSyncButton';
 import { InventoryGuide } from '@/components/inventory/InventoryGuide';
+import { RecalculateCostModal } from '@/components/inventory/RecalculateCostModal';
 import { evaluateInventoryHealth } from '@/engines/inventoryHealth';
 import type { InventoryProductSnapshot, InventoryRepricingSnapshot } from '@/engines/inventoryHealth';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Inventory' };
 
-export default async function InventoryPage() {
+export default async function InventoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sku?: string }>;
+}) {
   const session = await auth();
   const orgId   = session!.user.orgId;
+
+  const sp        = await searchParams;
+  const skuFilter = typeof sp.sku === 'string' && sp.sku.trim() !== '' ? sp.sku.trim() : null;
 
   const [items, stats, amazonCred] = await Promise.all([
     prisma.inventoryItem.findMany({
@@ -173,6 +181,17 @@ export default async function InventoryPage() {
     }
   }
 
+  // Apply SKU filter (in-memory — all items already fetched for the org)
+  const displayItems = skuFilter
+    ? enrichedItems.filter((item) => item.sku === skuFilter)
+    : enrichedItems;
+
+  // Recalculate button is shown only when: SKU filter active, exactly one item, unitCost > 0
+  const recalcItem =
+    skuFilter && displayItems.length === 1 && (displayItems[0].unitCost ?? 0) > 0
+      ? displayItems[0]
+      : null;
+
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <div className="page-header">
@@ -280,8 +299,47 @@ export default async function InventoryPage() {
         </div>
       )}
 
-      {/* Beginner walkthrough */}
-      <InventoryGuide />
+      {/* SKU filter banner — shown when ?sku= is active */}
+      {skuFilter && (
+        <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 px-4 py-3 space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-sm text-blue-200">
+              Showing inventory for SKU: <span className="font-mono font-semibold">{skuFilter}</span>
+              <span className="text-slate-400 ml-2">
+                ({displayItems.length} item{displayItems.length !== 1 ? 's' : ''})
+              </span>
+            </div>
+            <a
+              href="/dashboard/inventory"
+              className="text-xs text-slate-400 hover:text-slate-200 whitespace-nowrap shrink-0"
+            >
+              Clear filter ×
+            </a>
+          </div>
+          <p className="text-xs text-slate-400">
+            These sales are missing unit cost. Some rows may also need settlement fees before
+            realized profit can be calculated.
+          </p>
+          {recalcItem ? (
+            <div className="flex items-center gap-3 pt-0.5">
+              <RecalculateCostModal sku={skuFilter} unitCost={recalcItem.unitCost!} />
+              <span className="text-xs text-slate-500">
+                Applies the current unit cost ({recalcItem.unitCost != null ? `$${recalcItem.unitCost.toFixed(2)}` : '—'}) to past sales missing cost — preview first.
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs text-amber-400">
+              Add a unit cost to the inventory item above, then use{' '}
+              <strong className="text-amber-300">Apply cost to past sales</strong> to apply it to
+              existing sale records for this SKU. Settlement fees are separate — import a settlement
+              report to calculate realized profit.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Beginner walkthrough — hidden when a SKU filter is active */}
+      {!skuFilter && <InventoryGuide />}
 
       {/* Table */}
       <div className="card overflow-hidden">
@@ -291,8 +349,19 @@ export default async function InventoryPage() {
             <p className="text-slate-400 font-medium">No inventory items yet</p>
             <p className="text-sm text-slate-500 mt-1">Purchase a lead to start tracking inventory</p>
           </div>
+        ) : displayItems.length === 0 ? (
+          <div className="py-16 text-center">
+            <Package className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+            <p className="text-slate-400 font-medium">
+              No inventory item found for SKU <span className="font-mono">{skuFilter}</span>
+            </p>
+            <p className="text-sm text-slate-500 mt-1">
+              Use <strong className="text-slate-400">Add Item</strong> to create an inventory item
+              with unit cost. Keep quantity at 0 unless you are actually adding stock.
+            </p>
+          </div>
         ) : (
-          <InventoryTable items={enrichedItems} />
+          <InventoryTable items={displayItems} />
         )}
       </div>
     </div>

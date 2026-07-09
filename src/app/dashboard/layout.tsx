@@ -32,10 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userEmail={session.user.email}
         canManualLead={!!(session.user as any).canManualLead}
       />
-      <main
-        className="flex-1 overflow-auto"
-        style={{ marginLeft: 'var(--sidebar-width)' }}
-      >
+      <main className="flex-1 overflow-auto lg:ml-[240px] pt-14 lg:pt-0">
         {passwordExpired && (
           <div className="flex items-center gap-2 px-6 py-2.5 bg-amber-500/10 border-b border-amber-500/30 text-sm text-amber-800">
             <AlertTriangle className="w-4 h-4 flex-shrink-0" />

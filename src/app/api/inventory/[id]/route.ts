@@ -28,6 +28,7 @@ const updateSchema = z.object({
   totalQuantity:     z.number().int().nonnegative().optional(),
   purchasedAt:       purchasedAtField,
   unitCost:          z.number().min(0).nullable().optional(),
+  confirmOverwrite:  z.boolean().optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -45,9 +46,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
+  // Guard: changing or clearing an existing unitCost requires explicit confirmation.
+  if ('unitCost' in body && existing.unitCost != null) {
+    const incomingCost = parsed.data.unitCost ?? null;
+    if (incomingCost !== existing.unitCost && !parsed.data.confirmOverwrite) {
+      return NextResponse.json(
+        {
+          error:                'Changing this unit cost may affect future sales cost lookup. Historical sales are not automatically recalculated. Use the historical cost recalculation workflow if needed.',
+          currentUnitCost:      existing.unitCost,
+          requestedUnitCost:    incomingCost,
+          requiresConfirmation: true,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
+  const { confirmOverwrite: _confirm, ...dataToUpdate } = parsed.data;
   const item = await prisma.inventoryItem.update({
     where: { id },
-    data:  parsed.data,
+    data:  dataToUpdate,
   });
 
   return NextResponse.json(item);

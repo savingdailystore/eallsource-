@@ -16,7 +16,8 @@ vi.mock('@/lib/prisma', () => ({
 
 import { PATCH } from './route';
 
-const EXISTING_ITEM = { id: 'item_1', orgId: 'org_1', asin: 'B000000001' };
+const EXISTING_ITEM    = { id: 'item_1', orgId: 'org_1', asin: 'B000000001', unitCost: null };
+const ITEM_WITH_COST   = { ...EXISTING_ITEM, unitCost: 14.99 };
 
 function makeRequest(body: unknown, id = 'item_1') {
   return {
@@ -129,5 +130,72 @@ describe('PATCH /api/inventory/[id]', () => {
     authMock.mockResolvedValue({ user: { orgId: 'org_1', role: 'ANALYST' } });
     const res = await PATCH(makeRequest({ productName: 'Test' }), params());
     expect(res.status).toBe(200);
+  });
+
+  // unitCost confirmation guard tests
+  it('allows setting unitCost when existing is null (no confirmation required)', async () => {
+    // EXISTING_ITEM has unitCost: null → first-time set → allowed
+    update.mockResolvedValue({ ...EXISTING_ITEM, unitCost: 9.99 });
+    const res = await PATCH(makeRequest({ unitCost: 9.99 }), params());
+    expect(res.status).toBe(200);
+    expect(update).toHaveBeenCalled();
+  });
+
+  it('returns 409 when changing existing unitCost without confirmOverwrite', async () => {
+    findFirst.mockResolvedValue(ITEM_WITH_COST);
+    const res = await PATCH(makeRequest({ unitCost: 19.99 }), params());
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.requiresConfirmation).toBe(true);
+    expect(body.currentUnitCost).toBe(14.99);
+    expect(body.requestedUnitCost).toBe(19.99);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('allows changing existing unitCost when confirmOverwrite is true', async () => {
+    findFirst.mockResolvedValue(ITEM_WITH_COST);
+    update.mockResolvedValue({ ...ITEM_WITH_COST, unitCost: 19.99 });
+    const res = await PATCH(makeRequest({ unitCost: 19.99, confirmOverwrite: true }), params());
+    expect(res.status).toBe(200);
+    expect(update).toHaveBeenCalled();
+    // confirmOverwrite must not be sent to Prisma
+    const callData = update.mock.calls[0][0].data;
+    expect(callData.confirmOverwrite).toBeUndefined();
+  });
+
+  it('returns 409 when clearing existing unitCost to null without confirmOverwrite', async () => {
+    findFirst.mockResolvedValue(ITEM_WITH_COST);
+    const res = await PATCH(makeRequest({ unitCost: null }), params());
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.requiresConfirmation).toBe(true);
+    expect(body.currentUnitCost).toBe(14.99);
+    expect(body.requestedUnitCost).toBeNull();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('allows clearing existing unitCost to null with confirmOverwrite: true', async () => {
+    findFirst.mockResolvedValue(ITEM_WITH_COST);
+    update.mockResolvedValue({ ...ITEM_WITH_COST, unitCost: null });
+    const res = await PATCH(makeRequest({ unitCost: null, confirmOverwrite: true }), params());
+    expect(res.status).toBe(200);
+    expect(update).toHaveBeenCalled();
+  });
+
+  it('allows sending same unitCost value without confirmOverwrite (no-op)', async () => {
+    findFirst.mockResolvedValue(ITEM_WITH_COST);
+    update.mockResolvedValue(ITEM_WITH_COST);
+    const res = await PATCH(makeRequest({ unitCost: 14.99 }), params());
+    expect(res.status).toBe(200);
+    expect(update).toHaveBeenCalled();
+  });
+
+  it('409 response includes warning message text', async () => {
+    findFirst.mockResolvedValue(ITEM_WITH_COST);
+    const res = await PATCH(makeRequest({ unitCost: 0.01 }), params());
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toMatch(/historical/i);
+    expect(body.requiresConfirmation).toBe(true);
   });
 });

@@ -43,6 +43,22 @@ enum GatingRisk {
   HIGH
 }
 
+enum POStatus {
+  DRAFT
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+  CLOSED
+}
+
+enum POItemStatus {
+  ORDERED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
 // ─── Multi-Tenant Core ─────────────────────────────────────────────────────
 
 model Organization {
@@ -56,40 +72,46 @@ model Organization {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  users          User[]
-  subscription   Subscription?
-  products       Product[]
-  leads          Lead[]
-  inventory      InventoryItem[]
-  repricingRules RepricingRule[]
-  scanJobs       ScanJob[]
-  savedSearches  SavedSearch[]
-  amazonCred          AmazonCredential?
-  auditLogs           AuditLog[]
-  reimbursements      Reimbursement[]
-  reimbursementSyncs  ReimbursementSync[]
+  users                User[]
+  subscription         Subscription?
+  products             Product[]
+  leads                Lead[]
+  inventory            InventoryItem[]
+  repricingRules       RepricingRule[]
+  scanJobs             ScanJob[]
+  savedSearches        SavedSearch[]
+  amazonCred           AmazonCredential?
+  auditLogs            AuditLog[]
+  reimbursements       Reimbursement[]
+  reimbursementSyncs   ReimbursementSync[]
+  purchaseOrders       PurchaseOrder[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  saleRecords          SaleRecord[]
+  salesSyncs           SalesSync[]
+  settlementRecords    SettlementRecord[]
+  SaleAdjustmentRecord SaleAdjustmentRecord[]
 
   @@index([slug])
   @@map("organizations")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      Role     @default(ANALYST)
-  orgId     String
-  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  id       String       @id @default(cuid())
+  email    String       @unique
+  password String
+  name     String?
+  role     Role         @default(ANALYST)
+  orgId    String
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   passwordChangedAt DateTime @default(now())
   mfaEnabled        Boolean  @default(false)
-  mfaSecret         String?  // AES-256-GCM encrypted TOTP secret
+  mfaSecret         String? // AES-256-GCM encrypted TOTP secret
 
   // Granular feature permission: allows a non-OWNER user to use the
   // "Add a lead manually" form on /dashboard/scanner. All other scanner
   // features (scheduled scans, scan history) remain OWNER-only.
-  canManualLead     Boolean  @default(false)
+  canManualLead Boolean @default(false)
 
   passwordResetTokens PasswordResetToken[]
 
@@ -115,18 +137,18 @@ model PasswordResetToken {
 }
 
 model Subscription {
-  id                String   @id @default(cuid())
-  orgId             String   @unique
+  id                String       @id @default(cuid())
+  orgId             String       @unique
   org               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  stripeCustomerId  String?  @unique
-  stripeSubId       String?  @unique
-  plan              Plan     @default(STARTER)
-  status            String   @default("trialing")
+  stripeCustomerId  String?      @unique
+  stripeSubId       String?      @unique
+  plan              Plan         @default(STARTER)
+  status            String       @default("trialing")
   currentPeriodEnd  DateTime?
   trialEndsAt       DateTime?
-  cancelAtPeriodEnd Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  cancelAtPeriodEnd Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   billingEvents BillingEvent[]
 
@@ -134,13 +156,13 @@ model Subscription {
 }
 
 model BillingEvent {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   subscriptionId String
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  stripeEventId  String   @unique
+  stripeEventId  String       @unique
   type           String
   data           Json?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime     @default(now())
 
   @@map("billing_events")
 }
@@ -148,7 +170,7 @@ model BillingEvent {
 // ─── Products & Leads ──────────────────────────────────────────────────────
 
 model Product {
-  id    String @id @default(cuid())
+  id    String       @id @default(cuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -168,7 +190,7 @@ model Product {
   sourceUrl       String?
   sourceRetailer  String?
   sourcePrice     Float?
-  sourceListPrice Float?   // original "was" price before markdown
+  sourceListPrice Float? // original "was" price before markdown
   onSale          Boolean? // retailer flagged on sale / rollback / clearance
   sourceTax       Float?
   sourceShipping  Float?
@@ -194,10 +216,10 @@ model Product {
   totalLandedCost Float?
 
   // Computed profitability
-  price  Float @default(0)
-  fees   Float @default(0)
-  profit Float @default(0)
-  roi    Float @default(0)
+  price  Float  @default(0)
+  fees   Float  @default(0)
+  profit Float  @default(0)
+  roi    Float  @default(0)
   margin Float?
 
   // Sales rank
@@ -205,7 +227,7 @@ model Product {
   bsrPercentage Float?
 
   // Sales velocity
-  monthlySales           Int?   // estimated units sold per month (Keepa)
+  monthlySales           Int? // estimated units sold per month (Keepa)
   expectedUnitsPerSeller Float? // monthlySales / (fbaSellers + 1) — your share
 
   // Seller / competition data
@@ -218,8 +240,8 @@ model Product {
   isVariation      Boolean @default(false)
   parentAsin       String?
   roiImplausible   Boolean @default(false) // ROI high enough to suggest a bad match — verify
-  rating           Float?  // average star rating (0–5)
-  reviewCount      Int?    // total ratings/reviews on the listing
+  rating           Float? // average star rating (0–5)
+  reviewCount      Int? // total ratings/reviews on the listing
   lowReviews       Boolean @default(false) // few reviews — new/unestablished listing risk
 
   // Validation scores (all must be >= 95 to pass)
@@ -232,16 +254,16 @@ model Product {
   validationPassed Boolean @default(false)
 
   // Gating & risk
-  autoUngated       Boolean    @default(false)
-  ipRiskScore       String     @default("LOW")
-  gatingRisk        GatingRisk @default(LOW)
-  hasHazmat         Boolean    @default(false)
-  isBrandRestricted Boolean    @default(false)
-  isCategoryGated   Boolean    @default(false)
-  isPrivateLabel    Boolean    @default(false)
-  isGenericBrand    Boolean    @default(false)
-  isMeltable        Boolean    @default(false)
-  feeEstimateConfirmed Boolean @default(false)
+  autoUngated          Boolean    @default(false)
+  ipRiskScore          String     @default("LOW")
+  gatingRisk           GatingRisk @default(LOW)
+  hasHazmat            Boolean    @default(false)
+  isBrandRestricted    Boolean    @default(false)
+  isCategoryGated      Boolean    @default(false)
+  isPrivateLabel       Boolean    @default(false)
+  isGenericBrand       Boolean    @default(false)
+  isMeltable           Boolean    @default(false)
+  feeEstimateConfirmed Boolean    @default(false)
 
   // Real per-ASIN IP complaint history — set manually by an owner after an
   // actual takedown/complaint, not inferred. Once set, permanently blocks the
@@ -253,8 +275,8 @@ model Product {
   // Demand & price stability
   demandLevel    DemandLevel @default(MEDIUM)
   priceStability String?
-  priceTrend     String?  // RISING | FLAT | DECLINING | UNKNOWN
-  priceTrendPct  Float?   // % change recent vs earlier window (negative = falling)
+  priceTrend     String? // RISING | FLAT | DECLINING | UNKNOWN
+  priceTrendPct  Float? // % change recent vs earlier window (negative = falling)
 
   // Canonical Keepa historical snapshot — raw time series (Amazon price/presence,
   // Buy Box price, sales rank, new offer count, etc; see KeepaHistorySnapshot in
@@ -289,11 +311,11 @@ model Product {
 }
 
 model Lead {
-  id        String     @id @default(cuid())
+  id        String       @id @default(cuid())
   orgId     String
   org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   score   Float
   status  LeadStatus @default(NEW)
@@ -312,7 +334,7 @@ model Lead {
 // ─── Inventory ─────────────────────────────────────────────────────────────
 
 model InventoryItem {
-  id    String @id @default(cuid())
+  id    String       @id @default(cuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -320,13 +342,13 @@ model InventoryItem {
   fnsku             String?
   asin              String
   productName       String
-  availableQuantity Int @default(0)
-  reservedQuantity  Int @default(0)
-  inboundQuantity   Int @default(0)
-  totalQuantity     Int @default(0)
+  availableQuantity Int     @default(0)
+  reservedQuantity  Int     @default(0)
+  inboundQuantity   Int     @default(0)
+  totalQuantity     Int     @default(0)
 
-  purchasedAt  DateTime?  // True acquisition date — user-supplied, never system-derived
-  unitCost     Float?     // Cost per unit at time of purchase — independent of RepricingRule
+  purchasedAt DateTime? // True acquisition date — user-supplied, never system-derived
+  unitCost    Float? // Cost per unit at time of purchase — independent of RepricingRule
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -340,7 +362,7 @@ model InventoryItem {
 // ─── Repricing ─────────────────────────────────────────────────────────────
 
 model RepricingRule {
-  id    String @id @default(cuid())
+  id    String       @id @default(cuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -349,15 +371,15 @@ model RepricingRule {
   minRoi     Float   @default(30)
   minProfit  Float   @default(5)
   strategy   String  @default("COMPETITIVE")
-  floorPrice Float?  // optional hard floor — price never drops below this
-  costBasis  Float?  // what you paid per unit; needed for the ROI/profit floor
+  floorPrice Float? // optional hard floor — price never drops below this
+  costBasis  Float? // what you paid per unit; needed for the ROI/profit floor
 
   lastRecommendedPrice Float?
   lastDirection        String?
   lastRepricedAt       DateTime?
-  lastPushedPrice      Float?     // last price actually pushed live to Amazon
+  lastPushedPrice      Float? // last price actually pushed live to Amazon
   lastPushedAt         DateTime?
-  isActive             Boolean @default(true)
+  isActive             Boolean   @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -370,7 +392,7 @@ model RepricingRule {
 }
 
 model RepricingHistory {
-  id     String @id @default(cuid())
+  id     String        @id @default(cuid())
   ruleId String
   rule   RepricingRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 
@@ -382,10 +404,11 @@ model RepricingHistory {
   // Approval-queue lifecycle: a run creates PROPOSED (actionable) or HOLD (no
   // change) rows; the owner then pushes or rejects. PUSHED/FAILED are terminal.
   status        String    @default("PROPOSED") // PROPOSED | HOLD | PUSHED | FAILED | REJECTED | SUPERSEDED
-  previousPrice Float?    // the live price this proposal would change away from
-  sku           String?   // resolved seller SKU used for the push
+  previousPrice Float? // the live price this proposal would change away from
+  sku           String? // resolved seller SKU used for the push
   pushedAt      DateTime?
   pushError     String?
+  reason        String? // engine explanation for why this price was recommended
 
   createdAt DateTime @default(now())
 
@@ -397,16 +420,16 @@ model RepricingHistory {
 // ─── Amazon SP-API ─────────────────────────────────────────────────────────
 
 model AmazonCredential {
-  id    String @id @default(cuid())
-  orgId String @unique
+  id    String       @id @default(cuid())
+  orgId String       @unique
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   sellerId       String
   marketplaceId  String
-  accessToken    String   // AES-256-GCM encrypted
-  refreshToken   String   // AES-256-GCM encrypted
+  accessToken    String // AES-256-GCM encrypted
+  refreshToken   String // AES-256-GCM encrypted
   tokenExpiresAt DateTime?
-  isActive       Boolean  @default(true)
+  isActive       Boolean   @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -417,16 +440,16 @@ model AmazonCredential {
 // ─── Scan Jobs ─────────────────────────────────────────────────────────────
 
 model ScanJob {
-  id    String @id @default(cuid())
+  id    String       @id @default(cuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  type        String
-  retailer    String?
-  query       String?
-  status      String   @default("PENDING")
-  error       String?
-  result      Json?
+  type     String
+  retailer String?
+  query    String?
+  status   String  @default("PENDING")
+  error    String?
+  result   Json?
 
   startedAt   DateTime?
   completedAt DateTime?
@@ -441,7 +464,7 @@ model ScanJob {
 // ─── Saved Search (scheduled weekly scans) ──────────────────────────────────
 
 model SavedSearch {
-  id    String @id @default(cuid())
+  id    String       @id @default(cuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -450,8 +473,8 @@ model SavedSearch {
   enabled  Boolean @default(true)
   position Int     @default(0)
 
-  lastRunAt   DateTime?
-  lastResult  Json?
+  lastRunAt  DateTime?
+  lastResult Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -464,7 +487,7 @@ model SavedSearch {
 // ─── Audit Log ─────────────────────────────────────────────────────────────
 
 model AuditLog {
-  id    String @id @default(cuid())
+  id    String       @id @default(cuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
@@ -484,33 +507,33 @@ model AuditLog {
 // ─── Profit Recovery Center ─────────────────────────────────────────────────
 
 model Reimbursement {
-  id    String @id @default(cuid())
+  id    String       @id @default(cuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   // Amazon report fields — exact column names from GET_FBA_REIMBURSEMENTS_DATA TSV
-  reimbursementId             String   // "reimbursement-id"
+  reimbursementId             String // "reimbursement-id"
   approvalDate                DateTime // "approval-date"
-  caseId                      String?  // "case-id"
-  amazonOrderId               String?  // "amazon-order-id"
-  reason                      String   // "reason" e.g. REVERSAL_REIMBURSEMENT, LOST_INBOUND_SHIPMENT
-  sku                         String?  // "sku"
-  fnsku                       String?  // "fnsku"
-  asin                        String?  // "asin"
-  productName                 String?  // "product-name"
-  condition                   String?  // "condition"
+  caseId                      String? // "case-id"
+  amazonOrderId               String? // "amazon-order-id"
+  reason                      String // "reason" e.g. REVERSAL_REIMBURSEMENT, LOST_INBOUND_SHIPMENT
+  sku                         String? // "sku"
+  fnsku                       String? // "fnsku"
+  asin                        String? // "asin"
+  productName                 String? // "product-name"
+  condition                   String? // "condition"
   currencyUnit                String   @default("USD") // "currency-unit"
-  amountPerUnit               Float    // "amount-per-unit"
-  amountTotal                 Float    // "amount-total"
+  amountPerUnit               Float // "amount-per-unit"
+  amountTotal                 Float // "amount-total"
   quantityReimbursedCash      Int      @default(0) // "quantity-reimbursed-cash"
   quantityReimbursedInventory Int      @default(0) // "quantity-reimbursed-inventory"
   quantityReimbursedTotal     Int      @default(0) // "quantity-reimbursed-total"
-  originalReimbursementId     String?  // "original-reimbursement-id"
-  originalReimbursementType   String?  // "original-reimbursement-type"
+  originalReimbursementId     String? // "original-reimbursement-id"
+  originalReimbursementType   String? // "original-reimbursement-type"
 
   // EALLsource metadata
   importSource String @default("SP_API") // "SP_API" | "MANUAL_CSV"
-  rawPayload   Json   // full parsed row — preserved for audit
+  rawPayload   Json // full parsed row — preserved for audit
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -523,14 +546,14 @@ model Reimbursement {
 }
 
 model ReimbursementSync {
-  id    String @id @default(cuid())
+  id    String       @id @default(cuid())
   orgId String
   org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   source           String    @default("SP_API") // "SP_API" | "MANUAL_CSV"
-  status           String    // "PENDING" | "RUNNING" | "DONE" | "FAILED"
-  reportId         String?   // Amazon report ID (SP_API only)
-  reportDocumentId String?   // Amazon report document ID (SP_API only)
+  status           String // "PENDING" | "RUNNING" | "DONE" | "FAILED"
+  reportId         String? // Amazon report ID (SP_API only)
+  reportDocumentId String? // Amazon report document ID (SP_API only)
   startedAt        DateTime  @default(now())
   completedAt      DateTime?
   recordsFound     Int?
@@ -543,4 +566,245 @@ model ReimbursementSync {
   @@index([orgId, status])
   @@index([orgId, startedAt])
   @@map("reimbursement_syncs")
+}
+
+// ─── Purchase Orders ────────────────────────────────────────────────────────
+
+model PurchaseOrder {
+  id    String       @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  status          POStatus  @default(DRAFT)
+  supplierName    String
+  supplierOrderId String? // external reference (Amazon order ID, supplier PO#, etc.)
+  orderDate       DateTime
+  expectedDate    DateTime?
+  notes           String?
+
+  shippingCost Float @default(0)
+  tax          Float @default(0)
+  totalCost    Float @default(0) // sum of item totals + shipping + tax; maintained by service
+
+  createdByUserId String? // User.id — nullable
+
+  closedAt    DateTime?
+  closeReason String?
+
+  items PurchaseOrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([orgId, orderDate])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  orgId           String
+  purchaseOrderId String
+  org             Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  // Source references — plain strings, no enforced FK (survives lead/product deletion)
+  leadId    String?
+  productId String?
+
+  // Product identity
+  asin        String?
+  sku         String?
+  productName String
+  sourceUrl   String?
+
+  // Quantities
+  quantityOrdered  Int
+  quantityReceived Int @default(0)
+
+  // Cost — required; no fabrication
+  unitCost  Float
+  totalCost Float // quantityOrdered × unitCost; maintained by service
+
+  status     POItemStatus @default(ORDERED)
+  receivedAt DateTime?
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([purchaseOrderId])
+  @@index([orgId, asin])
+  @@map("purchase_order_items")
+}
+
+// ─── Sales & Profit Tracking ────────────────────────────────────────────────
+
+model SaleRecord {
+  id    String       @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // Deduplication — computed from order-item-id if available, else {amazonOrderId}#{asin}#{sku}
+  dedupKey String // always set; used for @@unique
+
+  // Source order references
+  orderItemId   String? // order-item-id from the flat-file report
+  amazonOrderId String?
+
+  // Product identity
+  asin        String?
+  sku         String?
+  productName String?
+
+  // Sale details
+  saleDate     DateTime // purchase-date from the report
+  quantitySold Int
+
+  // Revenue (from report — what the buyer paid)
+  grossRevenue      Float // item-price total for this line (all units)
+  itemTax           Float? // item-tax; null if not in report
+  promotionDiscount Float? // item-promotion-discount + ship-promotion-discount; null if not in report
+  netRevenue        Float // grossRevenue − (promotionDiscount ?? 0); stored separately for clarity
+
+  // Order metadata
+  fulfillmentChannel String? // "AFN" (FBA) or "MFN" (seller-fulfilled)
+  orderStatus        String? // e.g. "Shipped", "Cancelled"
+
+  // Amazon fees — null means not provided in this report (never default to 0)
+  referralFee Float?
+  fbaFee      Float?
+  otherFees   Float?
+  totalFees   Float?
+
+  // Cost matching — resolved at import time; null = no cost data found
+  unitCostUsed Float? // cost per unit
+  costSource   String? // "PO_ITEM" | "INVENTORY" | "REPRICING" | "PRODUCT"
+
+  // Derived profit — null when required inputs are missing; NEVER fabricated
+  cogs                  Float? // unitCostUsed × quantitySold
+  grossProfitBeforeFees Float? // netRevenue − cogs (no fees; only when cogs != null)
+  grossRoiBeforeFees    Float? // grossProfitBeforeFees / cogs × 100
+  realizedProfit        Float? // netRevenue − totalFees − cogs (only when BOTH totalFees and cogs != null)
+  roi                   Float? // realizedProfit / cogs × 100 (only when realizedProfit != null)
+
+  // Import metadata
+  importSource String @default("MANUAL_CSV")
+  rawPayload   Json // full parsed row for audit
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  saleAdjustments SaleAdjustmentRecord[]
+
+  @@unique([orgId, dedupKey])
+  @@index([orgId])
+  @@index([orgId, asin])
+  @@index([orgId, sku])
+  @@index([orgId, saleDate])
+  @@map("sale_records")
+}
+
+model SalesSync {
+  id    String       @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  source          String // "MANUAL_CSV" | "MANUAL_SETTLEMENT" | "SP_API"
+  status          String // "PENDING" | "RUNNING" | "DONE" | "FAILED"
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  recordsFound    Int?
+  recordsUpserted Int?
+  error           String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+  @@index([orgId, status])
+  @@index([orgId, startedAt])
+  @@map("sales_syncs")
+}
+
+// ─── Settlement Records ─────────────────────────────────────────────────────
+
+model SettlementRecord {
+  id    String       @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // Deduplication — required; prevents duplicate rows on re-import of the same settlement file
+  dedupKey String
+
+  // Settlement identity
+  settlementId    String?
+  transactionType String? // "Order" | "Refund" | "Adjustment" | "Transfer" | etc.
+  postedDate      DateTime?
+
+  // Order matching keys
+  orderId       String? // order-id → matches SaleRecord.amazonOrderId
+  orderItemCode String? // order-item-code → matches SaleRecord.orderItemId (primary)
+  sku           String?
+
+  // Fee / amount data (raw from report — amounts are signed as received)
+  priceType      String? // "Principal" | "Tax" | "Shipping" | "Promotion"
+  priceAmount    Float? // signed; positive = income, negative = charge
+  itemFeeType    String? // "Commission" | "FBAPerUnitFulfillmentFee" | etc.
+  itemFeeAmount  Float? // signed; negative in report
+  otherFeeReason String? // other-fee-reason-description
+
+  // Matching result — set after fee application
+  matchedSaleRecordId String?
+
+  importSource String @default("MANUAL_CSV")
+  rawPayload   Json
+
+  createdAt DateTime @default(now())
+
+  saleAdjustment SaleAdjustmentRecord?
+
+  @@unique([orgId, dedupKey])
+  @@index([orgId])
+  @@index([orgId, settlementId])
+  @@index([orgId, orderId])
+  @@index([orgId, orderItemCode])
+  @@index([orgId, matchedSaleRecordId])
+  @@map("settlement_records")
+}
+
+// ─── Refund & Adjustment Records ────────────────────────────────────────────
+
+model SaleAdjustmentRecord {
+  id String @id @default(cuid())
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  saleRecordId String?
+  saleRecord   SaleRecord? @relation(fields: [saleRecordId], references: [id])
+
+  settlementRecordId String?           @unique
+  settlementRecord   SettlementRecord? @relation(fields: [settlementRecordId], references: [id])
+
+  settlementId    String?
+  transactionType String?
+  adjustmentType  String // "PRINCIPAL_REFUND" | "FEE_CREDIT" | "RETURN_FEE" | "TAX_REFUND" | "UNSUPPORTED"
+  orderId         String?
+  orderItemCode   String?
+  sku             String?
+  amountCategory  String? // raw priceType or itemFeeType label
+  amount          Float // signed as received
+  profitImpact    Float // sign-adjusted: negative = loss, positive = gain
+  appliedToProfit Boolean @default(false)
+  rawPayload      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, saleRecordId])
+  @@index([orgId, orderItemCode])
+  @@map("sale_adjustment_records")
 }

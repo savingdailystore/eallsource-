@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pencil, X, Loader2 } from 'lucide-react';
+import { Pencil, X, Loader2, AlertTriangle } from 'lucide-react';
 
 interface Item {
   id:                string;
@@ -23,6 +23,11 @@ export function EditItemModal({ item }: { item: Item }) {
   const [open, setOpen]       = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    message: string;
+    currentUnitCost: number;
+    requestedUnitCost: number | null;
+  } | null>(null);
 
   const [form, setForm] = useState({
     sku:               item.sku ?? '',
@@ -42,44 +47,60 @@ export function EditItemModal({ item }: { item: Item }) {
     return (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
-  function close() { setOpen(false); setError(''); }
+  function close() { setOpen(false); setError(''); setPendingConfirm(null); }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function buildBody(confirmOverwrite = false) {
+    return {
+      sku:               form.sku.trim() || null,
+      fnsku:             form.fnsku.trim() || null,
+      asin:              form.asin.trim().toUpperCase(),
+      productName:       form.productName.trim(),
+      availableQuantity: parseInt(form.availableQuantity, 10) || 0,
+      reservedQuantity:  parseInt(form.reservedQuantity, 10) || 0,
+      inboundQuantity:   parseInt(form.inboundQuantity, 10) || 0,
+      totalQuantity:     parseInt(form.totalQuantity, 10) || 0,
+      purchasedAt: form.purchasedAt ? new Date(form.purchasedAt).toISOString() : null,
+      unitCost: form.unitCost.trim() !== '' ? parseFloat(form.unitCost) : null,
+      ...(confirmOverwrite ? { confirmOverwrite: true } : {}),
+    };
+  }
+
+  async function doSave(confirmOverwrite = false) {
     setLoading(true);
     setError('');
+    setPendingConfirm(null);
 
     const res = await fetch(`/api/inventory/${item.id}`, {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sku:               form.sku.trim() || null,
-        fnsku:             form.fnsku.trim() || null,
-        asin:              form.asin.trim().toUpperCase(),
-        productName:       form.productName.trim(),
-        availableQuantity: parseInt(form.availableQuantity, 10) || 0,
-        reservedQuantity:  parseInt(form.reservedQuantity, 10) || 0,
-        inboundQuantity:   parseInt(form.inboundQuantity, 10) || 0,
-        totalQuantity:     parseInt(form.totalQuantity, 10) || 0,
-        // Send ISO datetime string or null; empty field clears the date.
-        purchasedAt: form.purchasedAt
-          ? new Date(form.purchasedAt).toISOString()
-          : null,
-        unitCost: form.unitCost.trim() !== ''
-          ? parseFloat(form.unitCost)
-          : null,
-      }),
+      body:    JSON.stringify(buildBody(confirmOverwrite)),
     });
 
     setLoading(false);
 
+    if (res.status === 409) {
+      const data = await res.json();
+      setPendingConfirm({
+        message:           data.error ?? 'Confirmation required.',
+        currentUnitCost:   data.currentUnitCost,
+        requestedUnitCost: data.requestedUnitCost,
+      });
+      return;
+    }
+
     if (!res.ok) {
       const data = await res.json();
       setError(data.error ?? 'Failed to save changes.');
-    } else {
-      close();
-      router.refresh();
+      return;
     }
+
+    close();
+    router.refresh();
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    doSave(false);
   }
 
   return (
@@ -165,6 +186,41 @@ export function EditItemModal({ item }: { item: Item }) {
                   />
                 </div>
               </div>
+
+              {item.unitCost != null && (
+                <p className="text-xs text-slate-500">
+                  Changing this unit cost affects future sales cost lookup only. Historical sales will not
+                  change unless you run the historical cost recalculation workflow.
+                </p>
+              )}
+
+              {pendingConfirm && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-200">{pendingConfirm.message}</p>
+                  </div>
+                  <p className="text-xs text-slate-400 pl-6">
+                    Current: <strong className="text-slate-200">${pendingConfirm.currentUnitCost.toFixed(2)}</strong>
+                    {' → '}
+                    New: <strong className="text-slate-200">
+                      {pendingConfirm.requestedUnitCost != null
+                        ? `$${pendingConfirm.requestedUnitCost.toFixed(2)}`
+                        : 'cleared'}
+                    </strong>
+                  </p>
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => doSave(true)}
+                      disabled={loading}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white transition-colors disabled:opacity-50"
+                    >
+                      {loading ? <Loader2 className="w-3 h-3 animate-spin inline" /> : 'Confirm change'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {error && <p className="text-sm text-red-400">{error}</p>}
 

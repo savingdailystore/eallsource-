@@ -26,6 +26,7 @@ import { ExplanationPanel } from '@/components/leads/ExplanationPanel';
 import { OpportunityTimeline } from '@/components/leads/OpportunityTimeline';
 import { RiskBreakdownPanel } from '@/components/leads/RiskBreakdownPanel';
 import { HistoricalInsights } from '@/components/leads/HistoricalInsights';
+import { CreateOrderModal } from '@/components/orders/CreateOrderModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +40,19 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   });
 
   if (!lead) notFound();
+
+  const [linkedPOItem, linkedInventory] = await Promise.all([
+    lead.status === 'PURCHASED'
+      ? prisma.purchaseOrderItem.findFirst({
+          where:  { leadId: lead.id },
+          select: { purchaseOrderId: true },
+        })
+      : Promise.resolve(null),
+    prisma.inventoryItem.findFirst({
+      where:  { orgId: session!.user.orgId, asin: lead.product.asin },
+      select: { id: true },
+    }),
+  ]);
 
   const p = lead.product;
   const { label, color } = scoreLabel(lead.score);
@@ -89,10 +103,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   const historicalInsights = buildHistoricalInsights(history);
 
-  function ScoreRow({ label, value, pass }: { label: string; value?: number | null; pass?: boolean }) {
+  function ScoreRow({ label, value, pass, tip }: { label: string; value?: number | null; pass?: boolean; tip?: string }) {
     const pct = value ?? 0;
     return (
-      <div className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+      <div className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0" title={tip}>
         <span className="text-sm text-slate-300">{label}</span>
         <div className="flex items-center gap-2">
           <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -143,6 +157,36 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <a href={p.sourceUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary text-xs py-1.5">
                 <ExternalLink className="w-3.5 h-3.5" />{p.sourceRetailer ?? 'Source'}
               </a>
+            )}
+            {lead.status === 'PURCHASED' ? (
+              linkedPOItem ? (
+                <Link
+                  href={`/dashboard/orders/${linkedPOItem.purchaseOrderId}`}
+                  className="btn-secondary text-xs py-1.5"
+                >
+                  <Package className="w-3.5 h-3.5" />Ordered →
+                </Link>
+              ) : (
+                <span className="badge bg-green-500/15 text-green-400 text-xs py-1.5 px-2">
+                  Purchased
+                </span>
+              )
+            ) : lead.status !== 'REJECTED' && (
+              <CreateOrderModal
+                triggerLabel="Create PO"
+                prefill={{
+                  leadId:      lead.id,
+                  productName: p.title,
+                  asin:        p.asin,
+                  sourceUrl:   p.sourceUrl ?? undefined,
+                  unitCost:    p.sourcePrice ?? undefined,
+                }}
+              />
+            )}
+            {linkedInventory && (
+              <Link href="/dashboard/inventory" className="btn-secondary text-xs py-1.5">
+                <BarChart3 className="w-3.5 h-3.5" />View in Inventory →
+              </Link>
             )}
           </div>
         </div>
@@ -284,23 +328,23 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <h2 className="font-semibold text-slate-50 mb-4">Amazon Market Data</h2>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3">
               {[
-                ['Buy Box Price', p.buyBoxPrice != null ? formatCurrency(p.buyBoxPrice) : '—'],
-                ['Lowest FBA Price', p.lowestFbaPrice != null ? formatCurrency(p.lowestFbaPrice) : '—'],
-                ['BSR', p.bsr != null ? `#${p.bsr.toLocaleString()}${p.isVariation ? ' (parent)' : ''}` : '—'],
-                ['BSR %', p.bsrPercentage != null ? `Top ${p.bsrPercentage.toFixed(2)}%` : '—'],
-                ['Est. Monthly Sales', p.monthlySales != null ? `~${p.monthlySales.toLocaleString()}/mo` : '—'],
-                ['Your Est. Share', p.expectedUnitsPerSeller != null ? `~${p.expectedUnitsPerSeller.toFixed(1)} units/mo` : '—'],
-                ['Rating', p.rating != null ? `${p.rating.toFixed(1)}★` : '—'],
-                ['Reviews', p.reviewCount != null ? `${p.reviewCount.toLocaleString()}${p.lowReviews ? ' ⚠️ new listing' : ''}` : '—'],
-                ['Buy Box Owner', p.buyBoxSuppressed ? 'None (suppressed) ⚠️' : (p.buyBoxOwner ?? '—')],
-                ['Amazon Sells It', p.amazonOwnsBuyBox ? 'Yes ⚠️' : 'No ✓'],
-                ['Demand Level', p.demandLevel],
-                ['Price Stability', p.priceStability ?? '—'],
-                ['Price Trend', p.priceTrend && p.priceTrend !== 'UNKNOWN'
+                ['Buy Box Price',      p.buyBoxPrice != null ? formatCurrency(p.buyBoxPrice) : '—',           'The price that wins Amazon\'s featured "Add to Cart" spot'],
+                ['Lowest FBA Price',   p.lowestFbaPrice != null ? formatCurrency(p.lowestFbaPrice) : '—',    'Lowest price offered by an FBA (Fulfilled by Amazon) seller'],
+                ['BSR',                p.bsr != null ? `#${p.bsr.toLocaleString()}${p.isVariation ? ' (parent)' : ''}` : '—', 'Best Sellers Rank — lower number means it sells more frequently in its category'],
+                ['BSR %',              p.bsrPercentage != null ? `Top ${p.bsrPercentage.toFixed(2)}%` : '—', 'How this product ranks compared to everything in its category (Top 1% = very fast seller)'],
+                ['Est. Monthly Sales', p.monthlySales != null ? `~${p.monthlySales.toLocaleString()}/mo` : '—', 'Estimated units sold per month across all sellers, based on BSR'],
+                ['Your Est. Share',    p.expectedUnitsPerSeller != null ? `~${p.expectedUnitsPerSeller.toFixed(1)} units/mo` : '—', 'Your estimated monthly sales share if you list at a competitive price'],
+                ['Rating',             p.rating != null ? `${p.rating.toFixed(1)}★` : '—',                  'Average customer star rating (1–5)'],
+                ['Reviews',            p.reviewCount != null ? `${p.reviewCount.toLocaleString()}${p.lowReviews ? ' ⚠️ new listing' : ''}` : '—', 'Total customer reviews — fewer than 10 may indicate a new or low-trust listing'],
+                ['Buy Box Owner',      p.buyBoxSuppressed ? 'None (suppressed) ⚠️' : (p.buyBoxOwner ?? '—'), 'Seller currently winning the featured Buy Box — if suppressed, no one is winning it'],
+                ['Amazon Sells It',    p.amazonOwnsBuyBox ? 'Yes ⚠️' : 'No ✓',                              'If Amazon itself is selling this item, it\'s very hard to win the Buy Box'],
+                ['Demand Level',       p.demandLevel,                                                         'Overall demand rating based on BSR, monthly sales, and price trends'],
+                ['Price Stability',    p.priceStability ?? '—',                                               'How much the price fluctuates — STABLE means predictable margins, VOLATILE means higher risk'],
+                ['Price Trend',        p.priceTrend && p.priceTrend !== 'UNKNOWN'
                   ? `${p.priceTrend === 'DECLINING' ? '↓' : p.priceTrend === 'RISING' ? '↑' : '→'} ${p.priceTrend}${p.priceTrendPct != null ? ` (${p.priceTrendPct > 0 ? '+' : ''}${p.priceTrendPct}%)` : ''}${p.priceTrend === 'DECLINING' ? ' ⚠️' : ''}`
-                  : '—'],
-              ].map(([label, value]) => (
-                <div key={label as string}>
+                  : '—',                                                                                       'Direction Amazon prices have moved recently — DECLINING means your margin could shrink'],
+              ].map(([label, value, tip]) => (
+                <div key={label as string} title={tip as string | undefined}>
                   <div className="text-xs text-slate-500">{label}</div>
                   <div className="text-sm font-medium text-slate-100 mt-0.5">{value}</div>
                 </div>
@@ -323,11 +367,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 : <XCircle className="w-4 h-4 text-red-400" />}
               Validation
             </h2>
-            <ScoreRow label="Identity"  value={p.identityScore}  pass={(p.identityScore ?? 0)  >= 80} />
-            <ScoreRow label="URL"       value={p.urlScore}        pass={(p.urlScore ?? 0)        >= 95} />
-            <ScoreRow label="Price"     value={p.priceScore}      pass={(p.priceScore ?? 0)      >= 70} />
-            <ScoreRow label="Inventory" value={p.inventoryScore}  pass={(p.inventoryScore ?? 0)  >= 95} />
-            <ScoreRow label="Match"     value={p.matchConfidence} pass={(p.matchConfidence ?? 0) >= 80} />
+            <ScoreRow label="Identity"  value={p.identityScore}  pass={(p.identityScore ?? 0)  >= 80} tip="Confidence that this product exists and is correctly identified on Amazon (ASIN, brand, title)" />
+            <ScoreRow label="URL"       value={p.urlScore}        pass={(p.urlScore ?? 0)        >= 95} tip="Confidence that the source listing URL resolves and matches the expected retailer" />
+            <ScoreRow label="Price"     value={p.priceScore}      pass={(p.priceScore ?? 0)      >= 70} tip="Confidence that the source price is current and the profit calculation is reliable" />
+            <ScoreRow label="Inventory" value={p.inventoryScore}  pass={(p.inventoryScore ?? 0)  >= 95} tip="Confidence that the item is actually in stock and available to purchase from the source" />
+            <ScoreRow label="Match"     value={p.matchConfidence} pass={(p.matchConfidence ?? 0) >= 80} tip="How closely the source listing matches the Amazon listing — 100% means barcode-verified (UPC/EAN)" />
             <div className="mt-3 text-xs text-slate-500">
               Identity &amp; Match ≥ 80%, Price ≥ 70%, URL &amp; Inventory ≥ 95%. Barcode (UPC/EAN) matches score 100%.
             </div>

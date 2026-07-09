@@ -47,6 +47,10 @@
     border: 1px solid #1e293b;
   }
 
+  .card-dark {
+    @apply card;
+  }
+
   .table-th {
     @apply text-left px-4 py-3 text-xs font-medium whitespace-nowrap uppercase;
     color: #94a3b8;

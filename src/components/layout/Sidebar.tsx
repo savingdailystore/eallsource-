@@ -1,12 +1,14 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOutAction } from '@/lib/actions/auth';
 import {
   LayoutDashboard, TrendingUp, Package, BarChart3,
   RefreshCw, Link2, CreditCard, Settings,
-  LogOut, ChevronRight, Zap, Radar, ShieldCheck,
+  LogOut, ChevronRight, Zap, Radar, ShieldCheck, ShoppingCart, DollarSign,
+  Menu, X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Plan, Role } from '@/types';
@@ -16,19 +18,21 @@ interface NavItem {
   href:  string;
   icon:  React.ComponentType<{ className?: string }>;
   plan?: Plan;
-  ownerOnly?:          boolean; // visible only to OWNER (and canManualLead users when allowManualLead is true)
-  ownerOrAdminOnly?:   boolean; // visible to OWNER and ADMIN
-  allowManualLead?:    boolean; // also visible when canManualLead is true (combined with ownerOnly)
+  ownerOnly?:          boolean;
+  ownerOrAdminOnly?:   boolean;
+  allowManualLead?:    boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard',  href: '/dashboard',           icon: LayoutDashboard },
-  { label: 'Scanner',    href: '/dashboard/scanner',   icon: Radar, ownerOnly: true, allowManualLead: true },
-  { label: 'Lead Feed',  href: '/dashboard/leads',     icon: TrendingUp },
-  { label: 'Products',   href: '/dashboard/products',  icon: Package },
-  { label: 'Inventory',  href: '/dashboard/inventory', icon: BarChart3 },
+  { label: 'Dashboard',       href: '/dashboard',           icon: LayoutDashboard },
+  { label: 'Scanner',         href: '/dashboard/scanner',   icon: Radar,       ownerOnly: true, allowManualLead: true },
+  { label: 'Lead Feed',       href: '/dashboard/leads',     icon: TrendingUp },
+  { label: 'Products',        href: '/dashboard/products',  icon: Package },
+  { label: 'Inventory',       href: '/dashboard/inventory', icon: BarChart3 },
+  { label: 'Orders',          href: '/dashboard/orders',    icon: ShoppingCart },
   { label: 'Repricing',       href: '/dashboard/repricing', icon: RefreshCw,   plan: 'PRO' },
   { label: 'Profit Recovery', href: '/dashboard/recovery',  icon: ShieldCheck, plan: 'PRO' },
+  { label: 'Sales & Profit',  href: '/dashboard/sales',     icon: DollarSign,  plan: 'PRO' },
 ];
 
 const BOTTOM_NAV: NavItem[] = [
@@ -61,20 +65,34 @@ function BrandIcon() {
         </linearGradient>
       </defs>
       <rect width="42" height="42" rx="10" fill="#070d1a" />
-      {/* Vertical bar */}
-      <rect x="9"  y="9"    width="6"  height="24" rx="2" fill="url(#eall-g)" />
-      {/* Top horizontal */}
-      <rect x="9"  y="9"    width="22" height="6"  rx="2" fill="url(#eall-g)" />
-      {/* Middle horizontal */}
-      <rect x="9"  y="18"   width="16" height="5"  rx="2" fill="url(#eall-g)" />
-      {/* Bottom horizontal */}
-      <rect x="9"  y="27"   width="22" height="6"  rx="2" fill="url(#eall-g)" />
+      <rect x="9"  y="9"  width="6"  height="24" rx="2" fill="url(#eall-g)" />
+      <rect x="9"  y="9"  width="22" height="6"  rx="2" fill="url(#eall-g)" />
+      <rect x="9"  y="18" width="16" height="5"  rx="2" fill="url(#eall-g)" />
+      <rect x="9"  y="27" width="22" height="6"  rx="2" fill="url(#eall-g)" />
     </svg>
   );
 }
 
-export function Sidebar({ plan, role, orgName, userEmail, canManualLead }: SidebarProps) {
+export function Sidebar({ plan, role, orgName: _orgName, userEmail, canManualLead }: SidebarProps) {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Close drawer on route change (handles programmatic navigation too)
+  useEffect(() => { setIsOpen(false); }, [pathname]);
+
+  // Escape key closes drawer
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setIsOpen(false); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Prevent body scroll when mobile drawer is open
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
+
   const visibleNav = NAV_ITEMS.filter((item) => {
     if (item.ownerOnly) return role === 'OWNER' || (item.allowManualLead && canManualLead);
     return true;
@@ -91,6 +109,8 @@ export function Sidebar({ plan, role, orgName, userEmail, canManualLead }: Sideb
     return (
       <Link
         href={isLocked ? '/dashboard/billing' : item.href}
+        onClick={() => setIsOpen(false)}
+        title={isLocked ? `${item.label} is a PRO plan feature — upgrade to unlock` : undefined}
         className={cn(
           'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
           isActive
@@ -108,25 +128,24 @@ export function Sidebar({ plan, role, orgName, userEmail, canManualLead }: Sideb
   }
 
   return (
-    <aside
-      className="fixed inset-y-0 left-0 z-40 flex flex-col"
-      style={{ width: 'var(--sidebar-width)', background: '#0f172a', borderRight: '1px solid #1e293b' }}
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-5" style={{ borderBottom: '1px solid #1e293b' }}>
+    <>
+      {/* ── Mobile top bar (hidden on lg+) ─────────────────────────────── */}
+      <div
+        className="lg:hidden fixed top-0 left-0 right-0 z-30 h-14 flex items-center gap-3 px-4"
+        style={{ background: '#0f172a', borderBottom: '1px solid #1e293b' }}
+      >
+        <button
+          onClick={() => setIsOpen(true)}
+          className="p-2 -ml-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          aria-label="Open navigation"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
         <BrandIcon />
-        <div className="min-w-0">
-          <div className="font-black text-[16px] leading-none tracking-tight text-white truncate">
-            EALL
-          </div>
-          <div className="flex items-center gap-1 mt-[3px]">
-            <span className="text-[8px] font-bold tracking-[0.22em] text-blue-400 uppercase leading-none">
-              SOURCE
-            </span>
-            <svg width="16" height="5" viewBox="0 0 16 5" fill="none" aria-hidden="true">
-              <path d="M0.5 2.5 Q7 5 14 2.5" stroke="#3b82f6" strokeWidth="1" strokeLinecap="round"/>
-              <path d="M12.5 1 L14.5 2.5 L12.5 4" stroke="#3b82f6" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+        <div>
+          <div className="font-black text-[15px] leading-none tracking-tight text-white">EALL</div>
+          <div className="text-[8px] font-bold tracking-[0.22em] text-blue-400 uppercase leading-none mt-[2px]">
+            SOURCE
           </div>
         </div>
         <span className={cn('ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0', PLAN_COLORS[plan])}>
@@ -134,37 +153,90 @@ export function Sidebar({ plan, role, orgName, userEmail, canManualLead }: Sideb
         </span>
       </div>
 
-      {/* Primary nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {visibleNav.map((item) => (
-          <NavLink key={item.href} item={item} />
-        ))}
+      {/* ── Backdrop (mobile only, shown when drawer is open) ──────────── */}
+      <div
+        className={cn(
+          'lg:hidden fixed inset-0 z-30 bg-black/60 transition-opacity duration-300',
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        )}
+        aria-hidden="true"
+        onClick={() => setIsOpen(false)}
+      />
 
-        <div className="my-3 border-t border-slate-800" />
-
-        {visibleBottom.map((item) => (
-          <NavLink key={item.href} item={item} />
-        ))}
-      </nav>
-
-      {/* User footer */}
-      <div className="px-3 py-3" style={{ borderTop: '1px solid #1e293b' }}>
-        <div className="flex items-center gap-2 px-2 mb-2">
-          <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-bold">{userEmail[0]?.toUpperCase()}</span>
+      {/* ── Sidebar panel ──────────────────────────────────────────────── */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-40 flex flex-col transition-transform duration-300',
+          // Desktop: always visible
+          'lg:translate-x-0',
+          // Mobile: slide in/out
+          isOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+        style={{ width: 'var(--sidebar-width)', background: '#0f172a', borderRight: '1px solid #1e293b' }}
+        aria-label="Site navigation"
+      >
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 px-4 py-5" style={{ borderBottom: '1px solid #1e293b' }}>
+          <BrandIcon />
+          <div className="min-w-0 flex-1">
+            <div className="font-black text-[16px] leading-none tracking-tight text-white truncate">
+              EALL
+            </div>
+            <div className="flex items-center gap-1 mt-[3px]">
+              <span className="text-[8px] font-bold tracking-[0.22em] text-blue-400 uppercase leading-none">
+                SOURCE
+              </span>
+              <svg width="16" height="5" viewBox="0 0 16 5" fill="none" aria-hidden="true">
+                <path d="M0.5 2.5 Q7 5 14 2.5" stroke="#3b82f6" strokeWidth="1" strokeLinecap="round"/>
+                <path d="M12.5 1 L14.5 2.5 L12.5 4" stroke="#3b82f6" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
           </div>
-          <span className="text-xs text-slate-400 truncate flex-1">{userEmail}</span>
-        </div>
-        <form action={signOutAction}>
+          <span className={cn('text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0', PLAN_COLORS[plan])}>
+            {plan}
+          </span>
+          {/* Close button — mobile only */}
           <button
-            type="submit"
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
+            onClick={() => setIsOpen(false)}
+            className="lg:hidden flex-shrink-0 p-1.5 -mr-1 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            aria-label="Close navigation"
           >
-            <LogOut className="w-3.5 h-3.5" />
-            Sign out
+            <X className="w-4 h-4" />
           </button>
-        </form>
-      </div>
-    </aside>
+        </div>
+
+        {/* Primary nav */}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+          {visibleNav.map((item) => (
+            <NavLink key={item.href} item={item} />
+          ))}
+
+          <div className="my-3 border-t border-slate-800" />
+
+          {visibleBottom.map((item) => (
+            <NavLink key={item.href} item={item} />
+          ))}
+        </nav>
+
+        {/* User footer */}
+        <div className="px-3 py-3" style={{ borderTop: '1px solid #1e293b' }}>
+          <div className="flex items-center gap-2 px-2 mb-2">
+            <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-xs font-bold">{userEmail[0]?.toUpperCase()}</span>
+            </div>
+            <span className="text-xs text-slate-400 truncate flex-1">{userEmail}</span>
+          </div>
+          <form action={signOutAction}>
+            <button
+              type="submit"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign out
+            </button>
+          </form>
+        </div>
+      </aside>
+    </>
   );
 }

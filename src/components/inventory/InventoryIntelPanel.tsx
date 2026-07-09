@@ -1,4 +1,5 @@
-import { AlertTriangle, DollarSign } from 'lucide-react';
+import Link from 'next/link';
+import { AlertTriangle, DollarSign, ShoppingCart } from 'lucide-react';
 import type { InventoryHealthResult, RestockSignal } from '@/engines/inventoryHealth';
 import { InventoryHealthBadge } from './InventoryHealthBadge';
 
@@ -10,7 +11,7 @@ const RESTOCK_CONFIG: Record<RestockSignal, { label: string; color: string }> = 
   UNKNOWN:        { label: 'Unknown',        color: 'text-slate-500'  },
 };
 
-export function InventoryIntelPanel({ health }: { health: InventoryHealthResult }) {
+export function InventoryIntelPanel({ health, asin }: { health: InventoryHealthResult; asin?: string }) {
   const restock = RESTOCK_CONFIG[health.restockSignal];
 
   return (
@@ -164,6 +165,16 @@ export function InventoryIntelPanel({ health }: { health: InventoryHealthResult 
               <div key={i} className="text-xs text-slate-400">{r}</div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Purchase order history link */}
+      {asin && (
+        <div className="flex items-center gap-2 pt-2 border-t border-slate-800/70">
+          <ShoppingCart className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+          <Link href="/dashboard/orders" className="text-xs text-slate-400 hover:text-slate-200">
+            View purchase orders →
+          </Link>
         </div>
       )}
     </div>

@@ -207,7 +207,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
                 ['Brand Restricted',  (p as any).isBrandRestricted ? 'Yes ⚠️' : 'No', !(p as any).isBrandRestricted],
                 ['Category Gated',    (p as any).isCategoryGated   ? 'Yes ⚠️' : 'No', !(p as any).isCategoryGated],
               ].map(([lbl, val, good]) => (
-                <div key={lbl as string} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
+                <div key={lbl as string} className="flex items-center justify-between py-1.5 border-b border-slate-800 last:border-0">
                   <span className="text-sm text-slate-400">{lbl as string}</span>
                   <span className={`text-sm font-medium ${good ? 'text-green-400' : 'text-red-400'}`}>{val as string}</span>
                 </div>

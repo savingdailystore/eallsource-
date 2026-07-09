@@ -12,7 +12,7 @@ interface Props {
   originalDiscounts: Discount[];
   originalFinalCost: number;
   originalProfit:    number;
-  amazonFees:        number;
+  amazonFees:        number | null;
   prepFee:           number | null;
   taxAmount:         number | null;
   resellPrice:       number;
@@ -202,12 +202,17 @@ export function ProfitabilityCalculator({
         <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
           Deductions from Resell Price ({formatCurrency(resellPrice)})
         </div>
-        {amazonFees > 0 && (
+        {amazonFees === null ? (
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Amazon Fees (referral + FBA)</span>
+            <span className="text-slate-500">—</span>
+          </div>
+        ) : amazonFees > 0 ? (
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Amazon Fees (referral + FBA)</span>
             <span className="text-red-400">−{formatCurrency(amazonFees)}</span>
           </div>
-        )}
+        ) : null}
         {prepFee != null && (
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">Prep Fee</span>

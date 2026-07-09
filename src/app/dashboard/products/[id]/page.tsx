@@ -122,7 +122,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               originalDiscounts={discounts}
               originalFinalCost={p.finalCost ?? 0}
               originalProfit={p.profit}
-              amazonFees={p.amazonFees ?? 0}
+              amazonFees={p.amazonFees ?? null}
               prepFee={p.prepFee ?? null}
               taxAmount={p.taxAmount ?? null}
               resellPrice={p.lowestFbaPrice ?? p.price}
@@ -169,7 +169,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               ['Inventory', (p as any).inventoryScore,  ((p as any).inventoryScore ?? 0) >= 95],
               ['Match',     (p as any).matchConfidence, ((p as any).matchConfidence ?? 0) >= 70],
             ].map(([lbl, val, pass]) => (
-              <div key={lbl as string} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+              <div key={lbl as string} className="flex items-center justify-between py-2 border-b border-slate-800 last:border-0">
                 <span className="text-sm text-slate-300">{lbl as string}</span>
                 <div className="flex items-center gap-2">
                   <div className="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">

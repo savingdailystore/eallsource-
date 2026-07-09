@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, ChevronUp, ExternalLink, Package, ChevronLeft, ChevronRight, ShieldCheck, ShieldAlert, ShieldX, ArrowUpRight, Trash2, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink, Package, ChevronLeft, ChevronRight, ShieldCheck, ShieldAlert, ShieldX, ArrowUpRight, Trash2, Loader2, ScanSearch } from 'lucide-react';
 import { formatCurrency, formatPercent, cn, buildAmazonUrl } from '@/lib/utils';
 import { scoreLabel } from '@/engines/scoring';
 import type { Discount } from '@/types';
@@ -26,9 +27,9 @@ function IpBadge({ score }: { score?: string | null }) {
   return <span className="flex items-center gap-1 text-xs text-green-400"><ShieldCheck className="w-3 h-3" />Low</span>;
 }
 
-interface Props { products: ProductRow[]; total: number; page: number; pageSize: number; isOwner?: boolean; }
+interface Props { products: ProductRow[]; total: number; page: number; pageSize: number; isOwner?: boolean; hasFilters?: boolean; }
 
-export function ProductsTable({ products, total, page, pageSize, isOwner = false }: Props) {
+export function ProductsTable({ products, total, page, pageSize, isOwner = false, hasFilters = false }: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -43,10 +44,33 @@ export function ProductsTable({ products, total, page, pageSize, isOwner = false
   }
 
   if (!products.length) {
+    if (!hasFilters) {
+      return (
+        <div className="card py-16 text-center">
+          <ScanSearch className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-200 font-semibold text-lg mb-1">No products yet</p>
+          <p className="text-sm text-slate-400 max-w-sm mx-auto mb-6">
+            Run a scan to start discovering products for your pipeline.
+          </p>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
+            <Link href="/dashboard/scanner" className="btn-primary text-sm">
+              Go to Scanner →
+            </Link>
+            <Link href="/contact" className="btn-secondary text-sm">
+              Help &amp; Support
+            </Link>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="card py-16 text-center">
         <Package className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-400 font-medium">No products found</p>
+        <p className="text-slate-400 font-medium">No products match these filters</p>
+        <p className="text-sm text-slate-500 mt-1">Try clearing search or filter options.</p>
+        <Link href="/dashboard/products" className="btn-secondary text-sm mt-4 inline-flex items-center">
+          Clear filters
+        </Link>
       </div>
     );
   }

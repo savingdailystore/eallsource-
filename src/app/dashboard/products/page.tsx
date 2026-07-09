@@ -27,6 +27,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     ...(retailer ? { sourceRetailer: { equals: retailer, mode: 'insensitive' } } : {}),
   };
 
+  const hasFilters = !!search || !!category || !!retailer;
+
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
@@ -42,14 +44,20 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       <div className="page-header mb-5">
         <div>
           <h1 className="page-title">Products</h1>
-          <p className="page-subtitle">{total.toLocaleString()} discovered products in your pipeline</p>
+          <p className="page-subtitle">
+            {total > 0
+              ? `${total.toLocaleString()} ${total === 1 ? 'product' : 'products'} in your pipeline`
+              : 'Products discovered from scanner scans'}
+          </p>
         </div>
-        <Link href="/api/export?type=products&format=csv" className="btn-secondary text-xs">
-          <Download className="w-3.5 h-3.5" />Export CSV
-        </Link>
+        {total > 0 && (
+          <Link href="/api/export?type=products&format=csv" className="btn-secondary text-xs">
+            <Download className="w-3.5 h-3.5" />Export CSV
+          </Link>
+        )}
       </div>
 
-      <ProductsTable products={products as any} total={total} page={page} pageSize={pageSize} isOwner={session!.user.role === 'OWNER'} />
+      <ProductsTable products={products as any} total={total} page={page} pageSize={pageSize} isOwner={session!.user.role === 'OWNER'} hasFilters={hasFilters} />
     </div>
   );
 }

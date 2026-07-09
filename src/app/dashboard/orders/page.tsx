@@ -87,46 +87,48 @@ export default async function OrdersPage() {
         columns={3}
       />
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card-dark rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <ShoppingCart className="w-4 h-4 text-blue-400" />
-            <span className="text-xs text-slate-400">Open Orders</span>
+      {/* Summary cards — only shown when orders exist */}
+      {orders.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="card-dark rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <ShoppingCart className="w-4 h-4 text-blue-400" />
+              <span className="text-xs text-slate-400">Open Orders</span>
+            </div>
+            <div className="text-2xl font-bold text-white">{summary.openOrders}</div>
+            {summary.draftOrders > 0 && (
+              <div className="text-xs text-slate-500 mt-0.5">{summary.draftOrders} draft</div>
+            )}
           </div>
-          <div className="text-2xl font-bold text-white">{summary.openOrders}</div>
-          {summary.draftOrders > 0 && (
-            <div className="text-xs text-slate-500 mt-0.5">{summary.draftOrders} draft</div>
-          )}
-        </div>
 
-        <div className="card-dark rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span className="text-xs text-slate-400">Partial</span>
+          <div className="card-dark rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span className="text-xs text-slate-400">Partial</span>
+            </div>
+            <div className="text-2xl font-bold text-white">{summary.partiallyReceived}</div>
           </div>
-          <div className="text-2xl font-bold text-white">{summary.partiallyReceived}</div>
-        </div>
 
-        <div className="card-dark rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <PackageCheck className="w-4 h-4 text-green-400" />
-            <span className="text-xs text-slate-400">Received</span>
+          <div className="card-dark rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <PackageCheck className="w-4 h-4 text-green-400" />
+              <span className="text-xs text-slate-400">Received</span>
+            </div>
+            <div className="text-2xl font-bold text-white">{summary.fullyReceived}</div>
           </div>
-          <div className="text-2xl font-bold text-white">{summary.fullyReceived}</div>
-        </div>
 
-        <div className="card-dark rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-1">
-            <DollarSign className="w-4 h-4 text-blue-400" />
-            <span className="text-xs text-slate-400">Total Ordered</span>
+          <div className="card-dark rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <DollarSign className="w-4 h-4 text-blue-400" />
+              <span className="text-xs text-slate-400">Total Ordered</span>
+            </div>
+            <div className="text-2xl font-bold text-white">{fmt(summary.totalOrderedCost)}</div>
+            {summary.totalPendingUnits > 0 && (
+              <div className="text-xs text-slate-500 mt-0.5">{summary.totalPendingUnits} units pending</div>
+            )}
           </div>
-          <div className="text-2xl font-bold text-white">{fmt(summary.totalOrderedCost)}</div>
-          {summary.totalPendingUnits > 0 && (
-            <div className="text-xs text-slate-500 mt-0.5">{summary.totalPendingUnits} units pending</div>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Orders table */}
       <div className="card-dark rounded-xl overflow-hidden">

@@ -77,10 +77,22 @@ export default async function ScannerPage() {
             </div>
             <h2 className="text-xl font-bold text-slate-50 mb-2">Scan access pending</h2>
             <p className="text-slate-400 text-sm max-w-sm mx-auto">
-              Your account is being reviewed. Once approved, you'll be able to run scans and set up
-              scheduled searches here. In the meantime, check your{' '}
-              <a href="/dashboard/leads" className="text-blue-500 hover:underline">Lead Feed</a> for
-              opportunities.
+              Your scanner access is being reviewed by the EALLsource team. Once enabled, you'll be
+              able to run scans and set up scheduled searches here.
+            </p>
+            <p className="text-slate-400 text-sm max-w-sm mx-auto mt-3">
+              In the meantime, check your{' '}
+              <a href="/dashboard/leads" className="text-blue-500 hover:underline">Lead Feed</a>{' '}
+              for available opportunities.
+            </p>
+            <p className="text-slate-500 text-xs max-w-sm mx-auto mt-4">
+              Think this is a mistake or need help getting started?{' '}
+              <a
+                href="mailto:savingdailystore@gmail.com?subject=EALLsource Scanner Access"
+                className="text-blue-500 hover:underline"
+              >
+                Contact support
+              </a>
             </p>
           </div>
         ) : (

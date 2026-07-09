@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ConnectForm } from '@/components/amazon/ConnectForm';
 import { DisconnectButton } from '@/components/amazon/DisconnectButton';
+import { PageGuide } from '@/components/ui/PageGuide';
 import { CheckCircle2, XCircle, AlertTriangle, ShoppingBag } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -57,6 +58,19 @@ export default async function AmazonPage({ searchParams: searchParamsPromise }: 
         </div>
       )}
 
+      {/* Beginner guide */}
+      <PageGuide
+        storageKey="amazon-guide-collapsed"
+        title="How your Amazon connection works"
+        subtitle="Connect once, then use live Amazon data for inventory and pricing workflows."
+        steps={[
+          { title: '1. Connect your seller account', body: 'Click Connect below and complete the Amazon authorization flow. You will be redirected back here when done.' },
+          { title: '2. Confirm the connection is active', body: 'The status badge on this page turns green when your credentials are valid. If it shows an error, reconnect.' },
+          { title: '3. Use live data safely', body: 'Once connected, Inventory Sync pulls your FBA stock from Seller Central, and Repricing can fetch and push live listing prices.' },
+        ]}
+        columns={3}
+      />
+
       {/* Connection status */}
       <div className={`card p-5 ${isConnected ? 'border-green-500/30 bg-green-500/10' : ''}`}>
         <div className="flex items-center gap-3">
@@ -80,6 +94,17 @@ export default async function AmazonPage({ searchParams: searchParamsPromise }: 
       {/* Connect options */}
       {!isConnected && (
         <div className="space-y-4">
+          {/* Non-owner explanation */}
+          {!isOwner && (
+            <div className="bg-slate-800/60 rounded-xl px-4 py-3 flex gap-2">
+              <AlertTriangle className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-slate-400">
+                Only the account owner can connect or reconnect Amazon SP-API.
+                Ask your account owner to complete this setup.
+              </p>
+            </div>
+          )}
+
           {/* Primary: OAuth button — owner only until app is published */}
           {isOwner && (
             <div className="card p-6">

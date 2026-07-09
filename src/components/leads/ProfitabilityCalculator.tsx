@@ -101,7 +101,8 @@ export function ProfitabilityCalculator({
                 value={d.source}
                 onChange={(e) => updateField(d._id, 'source', e.target.value)}
                 placeholder="Source name"
-                className="text-xs border border-slate-800 rounded px-1.5 py-0.5 w-28 text-slate-200 focus:outline-none focus:border-blue-400"
+                aria-label="Discount code"
+                className="text-xs bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 w-32 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
               />
             ) : (
               <span className="text-green-400 flex items-center gap-1 min-w-0">
@@ -118,7 +119,8 @@ export function ProfitabilityCalculator({
               <select
                 value={d.type}
                 onChange={(e) => updateField(d._id, 'type', e.target.value)}
-                className="text-[11px] border border-slate-800 rounded px-1 py-0.5 text-slate-400 focus:outline-none focus:border-blue-400"
+                aria-label="Discount type"
+                className="text-[11px] bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-slate-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
               >
                 <option value="coupon">coupon</option>
                 <option value="cashback">cashback</option>
@@ -147,7 +149,8 @@ export function ProfitabilityCalculator({
                 step="0.01"
                 value={d.amount === 0 && d._custom ? '' : d.amount}
                 onChange={(e) => updateAmount(d._id, e.target.value)}
-                className="w-20 text-right text-sm font-medium text-green-400 border border-slate-800 rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-400"
+                aria-label="Discount amount"
+                className="w-24 text-right text-sm font-medium text-green-400 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 placeholder:text-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
               />
               <button
                 onClick={() => removeDiscount(d._id)}

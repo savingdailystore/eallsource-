@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ConnectForm } from '@/components/amazon/ConnectForm';
@@ -70,6 +71,13 @@ export default async function AmazonPage({ searchParams: searchParamsPromise }: 
         ]}
         columns={3}
       />
+
+      <p className="text-xs text-slate-500">
+        Need step-by-step instructions?{' '}
+        <Link href="/dashboard/amazon/guide" className="text-blue-500 hover:text-blue-400">
+          View the full SP-API setup guide →
+        </Link>
+      </p>
 
       {/* Connection status */}
       <div className={`card p-5 ${isConnected ? 'border-green-500/30 bg-green-500/10' : ''}`}>

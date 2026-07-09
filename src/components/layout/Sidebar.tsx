@@ -8,7 +8,7 @@ import {
   LayoutDashboard, TrendingUp, Package, BarChart3,
   RefreshCw, Link2, CreditCard, Settings,
   LogOut, ChevronRight, Zap, Radar, ShieldCheck, ShoppingCart, DollarSign,
-  Menu, X,
+  Menu, X, LifeBuoy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Plan, Role } from '@/types';
@@ -36,9 +36,10 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const BOTTOM_NAV: NavItem[] = [
-  { label: 'Amazon SP-API', href: '/dashboard/amazon',   icon: Link2 },
-  { label: 'Billing',       href: '/dashboard/billing',  icon: CreditCard, ownerOrAdminOnly: true },
-  { label: 'Settings',      href: '/dashboard/settings', icon: Settings },
+  { label: 'Amazon SP-API',  href: '/dashboard/amazon',   icon: Link2 },
+  { label: 'Billing',        href: '/dashboard/billing',  icon: CreditCard, ownerOrAdminOnly: true },
+  { label: 'Help & Support', href: '/contact',            icon: LifeBuoy },
+  { label: 'Settings',       href: '/dashboard/settings', icon: Settings },
 ];
 
 const PLAN_COLORS: Record<Plan, string> = {

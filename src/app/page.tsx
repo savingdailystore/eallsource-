@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import MarketingShell from '@/components/marketing/MarketingShell';
-import { ScanSearch, LineChart, RefreshCw, Boxes, ShieldCheck, Link2 } from 'lucide-react';
+import { ScanSearch, LineChart, RefreshCw, Boxes, ShieldCheck, Link2, Check, Zap, Crown, LifeBuoy } from 'lucide-react';
 
 export const metadata = {
   title: 'EALLsource · Amazon FBA Arbitrage Sourcing & Repricing',
@@ -53,6 +53,87 @@ export default async function RootPage() {
               <p className="mt-2 text-sm text-slate-400 leading-relaxed">{body}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="max-w-5xl mx-auto px-6 py-12">
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-bold text-slate-50">Simple, transparent pricing</h2>
+          <p className="mt-3 text-slate-400">Start free. Upgrade when you're ready.</p>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* Starter */}
+          <div className="card p-6 flex flex-col">
+            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center mb-4">
+              <Zap className="w-5 h-5 text-slate-300" />
+            </div>
+            <div className="font-bold text-lg text-slate-50">Starter</div>
+            <div className="mt-1 mb-5">
+              <span className="text-3xl font-black text-slate-50">Free</span>
+            </div>
+            <ul className="space-y-2 text-sm text-slate-400 mb-6 flex-1">
+              {['3 leads/week', 'ROI calculator', 'Validation engine', 'Export to CSV', '1 user'].map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-400 flex-shrink-0" />{f}
+                </li>
+              ))}
+            </ul>
+            <Link href="/register" className="btn-secondary w-full flex items-center justify-center">
+              Start for free
+            </Link>
+          </div>
+
+          {/* Pro */}
+          <div className="card p-6 flex flex-col border-blue-500/40 ring-1 ring-blue-500/20">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4">
+              <Crown className="w-5 h-5 text-blue-400" />
+            </div>
+            <div className="font-bold text-lg text-slate-50">Pro</div>
+            <div className="mt-1 mb-5">
+              <span className="text-3xl font-black text-slate-50">$50</span>
+              <span className="text-slate-500 text-sm">/mo</span>
+            </div>
+            <ul className="space-y-2 text-sm text-slate-400 mb-6 flex-1">
+              {[
+                '20 leads/week',
+                'Everything in Starter',
+                'Amazon SP-API',
+                'Sales & Profit Tracking',
+                'Profit Recovery',
+                'Amazon report imports',
+                'Repricing approval queue',
+                '1 user',
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-400 flex-shrink-0" />{f}
+                </li>
+              ))}
+            </ul>
+            <Link href="/register" className="btn-primary w-full flex items-center justify-center">
+              Start for free
+            </Link>
+          </div>
+
+          {/* Need more? */}
+          <div className="card p-6 flex flex-col sm:col-span-2 lg:col-span-1">
+            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center mb-4">
+              <LifeBuoy className="w-5 h-5 text-slate-400" />
+            </div>
+            <div className="font-bold text-lg text-slate-50">Need more?</div>
+            <div className="mt-1 mb-5">
+              <span className="text-slate-400 text-sm">Custom</span>
+            </div>
+            <p className="text-sm text-slate-400 mb-6 leading-relaxed flex-1">
+              Have volume or team requirements? Get in touch and we'll find the right fit.
+            </p>
+            <a
+              href="mailto:support@eallsource.com?subject=EALLsource Enterprise Inquiry"
+              className="btn-secondary w-full flex items-center justify-center"
+            >
+              Contact us
+            </a>
+          </div>
         </div>
       </section>
 

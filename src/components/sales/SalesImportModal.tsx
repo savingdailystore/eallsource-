@@ -4,18 +4,23 @@ import { useState, useRef } from 'react';
 import { Upload, X, CheckCircle2, AlertTriangle, Loader2, Info } from 'lucide-react';
 
 interface ImportResult {
-  imported:    number;
-  parseErrors: number;
-  total:       number;
-  syncId:      string;
-  rowErrors?:  { rowIndex: number; message: string }[];
+  imported:             number;
+  created:              number;
+  updated:              number;
+  skipped:              number;
+  currencySkipped:      number;
+  parseErrors:          number;
+  total:                number;
+  syncId:               string;
+  rowErrors?:           { rowIndex: number; message: string }[];
+  currencySkippedNote?: string;
 }
 
-export function RecoveryImportModal() {
-  const [open,    setOpen]    = useState(false);
-  const [status,  setStatus]  = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
-  const [result,  setResult]  = useState<ImportResult | null>(null);
-  const [errMsg,  setErrMsg]  = useState<string>('');
+export function SalesImportModal() {
+  const [open,   setOpen]   = useState(false);
+  const [status, setStatus] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle');
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [errMsg, setErrMsg] = useState<string>('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   function reset() {
@@ -34,7 +39,7 @@ export function RecoveryImportModal() {
     form.append('file', file);
 
     try {
-      const res  = await fetch('/api/reimbursements/import', { method: 'POST', body: form });
+      const res  = await fetch('/api/sales/import', { method: 'POST', body: form });
       const data = await res.json();
       if (!res.ok) {
         setErrMsg(data?.error ?? `Upload failed (${res.status})`);
@@ -43,7 +48,7 @@ export function RecoveryImportModal() {
       }
       setResult(data as ImportResult);
       setStatus('done');
-    } catch (e) {
+    } catch {
       setErrMsg('Network error — please try again.');
       setStatus('error');
     }
@@ -67,7 +72,7 @@ export function RecoveryImportModal() {
         className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors"
       >
         <Upload className="w-4 h-4" />
-        Import Report
+        Import Orders Report
       </button>
 
       {open && (
@@ -75,9 +80,9 @@ export function RecoveryImportModal() {
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg mx-4 p-6 space-y-5">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-base font-semibold text-slate-100">Import Reimbursements</h2>
+                <h2 className="text-base font-semibold text-slate-100">Import Sales Report</h2>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Upload the Amazon FBA Reimbursements report (TSV or CSV)
+                  Upload the Amazon flat-file orders report (TSV or CSV)
                 </p>
               </div>
               <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-300 transition-colors">
@@ -85,29 +90,31 @@ export function RecoveryImportModal() {
               </button>
             </div>
 
-            {/* What this report does — important for beginners */}
-            <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-blue-300">
-              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-              <span>
-                Reimbursements are stored in <strong className="text-blue-200">Profit Recovery</strong> — they do{' '}
-                <strong className="text-blue-200">not</strong> change your Sales &amp; Profit realized profit numbers.
-                After importing, review possible underpayment flags on the Profit Recovery page.
-              </span>
-            </div>
-
-            {/* Upload instructions */}
+            {/* Download instructions */}
             <div className="bg-slate-800/60 rounded-xl p-4 text-xs text-slate-400 space-y-1.5">
               <p className="font-semibold text-slate-300">How to download from Seller Central:</p>
               <ol className="list-decimal list-inside space-y-1">
                 <li>Go to <span className="text-slate-200">Reports → Fulfillment</span></li>
-                <li>Select <span className="text-slate-200">FBA Reimbursements</span></li>
-                <li>Set your date range and click <span className="text-slate-200">Download</span></li>
-                <li>Upload the <span className="text-slate-200">.txt or .csv</span> file here</li>
+                <li>Select <span className="text-slate-200">Amazon Fulfilled Shipments</span></li>
+                <li>Set your date range and click <span className="text-slate-200">Request Report</span></li>
+                <li>Download the <span className="text-slate-200">.txt or .tsv</span> flat file and upload it here</li>
               </ol>
               <p className="text-slate-500 pt-0.5">
-                Accepted: FBA Reimbursements report (.txt / .csv) — tab or comma separated.
-                Re-importing overlapping date ranges is safe — duplicate reimbursement IDs update in place.
+                Accepted: Amazon Fulfilled Shipments flat file (.txt / .tsv) — tab-separated.
+                Re-importing the same file is safe — existing records update in place, no duplicates created.
+                If the report exceeds 5 MB, download a shorter date range.
               </p>
+            </div>
+
+            {/* Fee notice */}
+            <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300">
+              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>
+                The orders report contains order, quantity, and revenue data.
+                It does <strong className="text-amber-200">not</strong> include final Amazon fees (referral fees, FBA fees).
+                Gross profit before fees will be shown where unit cost is available.
+                Import a settlement report afterwards to add exact fee data and unlock realized profit.
+              </span>
             </div>
 
             {/* Drop zone */}
@@ -144,20 +151,61 @@ export function RecoveryImportModal() {
                   <CheckCircle2 className="w-5 h-5" />
                   <span className="text-sm font-semibold">Import complete</span>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+
+                {/* Duplicate notice — shown prominently when nothing new was added */}
+                {result.created === 0 && result.updated > 0 && (
+                  <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-blue-300">
+                    <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>
+                      0 new records created — this file was already imported.{' '}
+                      {result.updated} record{result.updated !== 1 ? 's were' : ' was'} updated in place.
+                      No duplicate entries were added. Re-importing the same report is always safe.
+                    </span>
+                  </div>
+                )}
+
+                {/* Currency-skipped notice — shown when non-USD rows were dropped */}
+                {result.currencySkipped > 0 && (
+                  <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300">
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>
+                      {result.currencySkipped} row{result.currencySkipped !== 1 ? 's were' : ' was'} skipped —
+                      unsupported currency (non-USD). These rows were not imported to prevent storing
+                      foreign currency amounts as if they were USD.
+                    </span>
+                  </div>
+                )}
+
+                {/* Stats grid */}
+                <div className="grid grid-cols-3 gap-2">
                   {[
-                    { label: 'Rows found',    value: result.total    },
-                    { label: 'Imported',      value: result.imported },
-                    { label: 'Parse errors',  value: result.parseErrors },
+                    { label: 'Rows found',        value: result.total,            warn: false },
+                    { label: 'New records',        value: result.created,          warn: false },
+                    { label: 'Already imported',   value: result.updated,          warn: false },
                   ].map((s) => (
                     <div key={s.label} className="bg-slate-800 rounded-xl p-3 text-center">
-                      <div className={`text-xl font-bold ${s.label === 'Parse errors' && s.value > 0 ? 'text-amber-400' : 'text-slate-100'}`}>
+                      <div className={`text-xl font-bold ${s.warn ? 'text-amber-400' : 'text-slate-100'}`}>
                         {s.value}
                       </div>
                       <div className="text-[10px] text-slate-500 mt-0.5">{s.label}</div>
                     </div>
                   ))}
                 </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Skipped (cancelled/pending)', value: result.skipped,         warn: false },
+                    { label: 'Skipped (non-USD currency)',  value: result.currencySkipped,  warn: result.currencySkipped > 0 },
+                    { label: 'Parse errors',                value: result.parseErrors,      warn: result.parseErrors > 0 },
+                  ].map((s) => (
+                    <div key={s.label} className="bg-slate-800 rounded-xl p-3 text-center">
+                      <div className={`text-xl font-bold ${s.warn ? 'text-amber-400' : 'text-slate-100'}`}>
+                        {s.value}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+
                 {result.rowErrors && result.rowErrors.length > 0 && (
                   <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-300 space-y-1">
                     <p className="font-semibold">First parse errors:</p>
@@ -166,14 +214,13 @@ export function RecoveryImportModal() {
                     ))}
                   </div>
                 )}
-                <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-blue-300">
-                  <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                  <span>
-                    These reimbursements appear on the <strong className="text-blue-200">Profit Recovery</strong> page.
-                    They do <strong className="text-blue-200">not</strong> affect Sales &amp; Profit realized profit.
-                    Duplicate reimbursement IDs were updated in place — no double-counting.
-                  </span>
-                </div>
+
+                <p className="text-xs text-slate-500">
+                  <strong className="text-slate-400">Skipped rows</strong> are Cancelled, Pending, or Unshipped orders —
+                  they have no confirmed revenue and are intentionally excluded.
+                  Non-USD orders are also excluded to prevent foreign currency amounts being stored as USD.
+                  Each order line is matched by its unique order-item ID — re-importing updates records in place, no duplicates.
+                </p>
               </div>
             )}
 

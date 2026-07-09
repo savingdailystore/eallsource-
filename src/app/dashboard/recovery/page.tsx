@@ -1,11 +1,13 @@
 import { redirect }  from 'next/navigation';
 import { auth }       from '@/lib/auth';
 import { prisma }     from '@/lib/prisma';
+import Link           from 'next/link';
 import {
   DollarSign, AlertTriangle, CheckCircle2,
-  HelpCircle, RefreshCw, Package, Clock,
+  HelpCircle, RefreshCw, Package, Clock, ShieldCheck, Zap,
 } from 'lucide-react';
 import { RecoveryImportModal } from '@/components/reimbursements/RecoveryImportModal';
+import { PageGuide }           from '@/components/ui/PageGuide';
 import {
   analyseReimbursement,
   buildRecoverySummary,
@@ -43,7 +45,39 @@ export default async function RecoveryPage() {
 
   const { role, orgId, plan } = session.user;
   if (role === 'VIEWER') redirect('/dashboard');
-  if (plan === 'STARTER') redirect('/dashboard/billing');
+
+  if (plan === 'STARTER') {
+    return (
+      <div className="p-6 lg:p-8 max-w-xl">
+        <div className="card p-10 text-center">
+          <div className="w-14 h-14 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Zap className="w-7 h-7 text-amber-500" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-50 mb-2">Profit Recovery requires Pro</h2>
+          <p className="text-slate-400 text-sm mb-5 leading-relaxed">
+            Upgrade to Pro to import your Amazon reimbursement reports and find money you may be owed.
+          </p>
+          <ul className="text-left text-sm text-slate-400 space-y-2 mb-6 inline-block text-left">
+            {[
+              'Import Amazon FBA reimbursement reports',
+              'Spot possible underpayments vs your unit cost',
+              'Flag missing cost data before it hurts you',
+              'Review and dispute with Amazon when needed',
+              'Full reimbursement history in one place',
+            ].map((f) => (
+              <li key={f} className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                {f}
+              </li>
+            ))}
+          </ul>
+          <Link href="/dashboard/billing" className="btn-primary block w-full text-center">
+            Upgrade to Pro →
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   // ── Data fetch ──────────────────────────────────────────────────────────────
   const [reimbursements, lastSync, costData] = await Promise.all([
@@ -164,6 +198,19 @@ export default async function RecoveryPage() {
           </div>
         )}
       </div>
+
+      {/* Beginner guide */}
+      <PageGuide
+        storageKey="recovery-guide-collapsed"
+        title="How reimbursement recovery works"
+        subtitle="Use Amazon reimbursement reports to find recovery opportunities."
+        steps={[
+          { title: '1. Download the report from Amazon', body: 'In Seller Central go to Reports → Fulfillment → Reimbursements and request a date range report. Download the CSV when it is ready.' },
+          { title: '2. Import it here', body: 'Upload the CSV using the Import button above. The app compares each reimbursement amount against your known unit cost to flag possible underpayments. Reimbursements do not affect Sales & Profit realized profit.' },
+          { title: '3. Review underpayments', body: 'Check items flagged as "Possible underpayment" or "Large reimbursement". These may warrant a follow-up case with Amazon Seller Support.' },
+        ]}
+        columns={3}
+      />
 
       {/* Last sync status bar */}
       {lastSync && (

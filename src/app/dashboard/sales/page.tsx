@@ -269,9 +269,9 @@ export default async function SalesPage({ searchParams: searchParamsPromise }: P
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {isOwnerOrAdmin && <SalesSettlementModal />}
+        <div className="flex flex-wrap items-center gap-3">
           {isOwnerOrAdmin && <SalesImportModal />}
+          {isOwnerOrAdmin && <SalesSettlementModal />}
         </div>
       </div>
 
@@ -436,7 +436,7 @@ export default async function SalesPage({ searchParams: searchParamsPromise }: P
             <h2 className="text-sm font-semibold text-slate-300">Import History</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs" style={{ minWidth: '560px' }}>
               <thead>
                 <tr className="border-b border-slate-800 text-slate-500">
                   <th className="text-left px-4 py-2.5 font-medium">Date</th>
@@ -456,7 +456,7 @@ export default async function SalesPage({ searchParams: searchParamsPromise }: P
                         {s.startedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-slate-400">{s.source}</td>
+                    <td className="px-4 py-2.5 text-slate-400">{SYNC_SOURCE_LABELS[s.source] ?? s.source}</td>
                     <td className="px-4 py-2.5">
                       <SyncStatusBadge status={s.status} />
                     </td>
@@ -475,6 +475,11 @@ export default async function SalesPage({ searchParams: searchParamsPromise }: P
 }
 
 // ─── Sub-components (server-only — import history only) ──────────────────────
+
+const SYNC_SOURCE_LABELS: Record<string, string> = {
+  MANUAL_SALES:       'Orders Report',
+  MANUAL_SETTLEMENT:  'Settlement Report',
+};
 
 function SummaryCard({
   icon: Icon, iconColor, iconBg, label, value, sub, subColor,

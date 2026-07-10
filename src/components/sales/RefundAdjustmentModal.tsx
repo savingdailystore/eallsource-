@@ -289,7 +289,7 @@ export function RefundAdjustmentModal({ refundRowsCount }: { refundRowsCount: nu
                                   <th className="text-left px-3 py-2 font-medium">Order Item</th>
                                   <th className="text-left px-3 py-2 font-medium">Type</th>
                                   <th className="text-right px-3 py-2 font-medium">Amount</th>
-                                  <th className="text-right px-3 py-2 font-medium">Profit impact</th>
+                                  <th className="text-right px-3 py-2 font-medium">Profit impact (stored only)</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-800/60">

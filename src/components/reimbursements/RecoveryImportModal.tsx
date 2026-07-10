@@ -67,7 +67,7 @@ export function RecoveryImportModal() {
         className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white transition-colors"
       >
         <Upload className="w-4 h-4" />
-        Import Report
+        Import Reimbursements
       </button>
 
       {open && (
@@ -144,6 +144,17 @@ export function RecoveryImportModal() {
                   <CheckCircle2 className="w-5 h-5" />
                   <span className="text-sm font-semibold">Import complete</span>
                 </div>
+
+                {result.imported === 0 && (
+                  <div className="flex items-start gap-2 bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-blue-300">
+                    <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>
+                      No new reimbursements were imported. This file may have already been imported —
+                      duplicate reimbursement IDs are updated in place and not double-counted.
+                    </span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { label: 'Rows found',    value: result.total    },

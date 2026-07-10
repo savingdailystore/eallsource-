@@ -318,10 +318,10 @@ export default async function RecoveryPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs" style={{ minWidth: '720px' }}>
               <thead>
                 <tr className="border-b border-slate-800">
-                  {['Date', 'ASIN / SKU', 'Product', 'Reason', 'Qty', 'Per Unit', 'Total', 'Unit Cost', 'Difference', 'Status'].map((h) => (
+                  {['Date', 'ASIN / SKU', 'Product', 'Reason', 'Qty', 'Per Unit', 'Total', 'Unit Cost', 'Est. gap/unit', 'Status'].map((h) => (
                     <th
                       key={h}
                       className="px-4 py-3 text-left text-[10px] font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap"
@@ -413,7 +413,7 @@ export default async function RecoveryPage() {
 
             {reimbursements.length >= 200 && (
               <div className="px-4 py-3 text-xs text-slate-500 border-t border-slate-800">
-                Showing first 200 reimbursements — import filtering coming in a future update.
+                Showing most recent 200 records.
               </div>
             )}
           </div>

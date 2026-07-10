@@ -38,7 +38,7 @@ const NAV_ITEMS: NavItem[] = [
 const BOTTOM_NAV: NavItem[] = [
   { label: 'Amazon SP-API',  href: '/dashboard/amazon',   icon: Link2 },
   { label: 'Billing',        href: '/dashboard/billing',  icon: CreditCard, ownerOrAdminOnly: true },
-  { label: 'Help & Support', href: '/contact',            icon: LifeBuoy },
+  { label: 'Help & Support', href: '/dashboard/help',     icon: LifeBuoy },
   { label: 'Settings',       href: '/dashboard/settings', icon: Settings },
 ];
 

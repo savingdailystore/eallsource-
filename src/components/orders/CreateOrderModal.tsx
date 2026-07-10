@@ -282,7 +282,7 @@ export function CreateOrderModal({ prefill, triggerLabel }: Props) {
               </div>
 
               {/* Costs */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Shipping ($)</label>
                   <input type="number" min={0} step={0.01} value={shippingCost} onChange={(e) => setShippingCost(e.target.value)} className="input-field w-full" />

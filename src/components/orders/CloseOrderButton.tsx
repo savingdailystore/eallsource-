@@ -30,7 +30,7 @@ export function CloseOrderButton({ poId }: { poId: string }) {
 
   if (open) {
     return (
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-700 bg-slate-800/60 p-4 max-w-sm text-sm">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-700 bg-slate-800/60 p-4 w-full sm:max-w-sm text-sm">
         <p className="text-slate-200 font-medium">Close this order?</p>
         <p className="text-xs text-slate-400">
           This closes the purchase order without receiving inventory. Inventory quantities, unit cost, and

@@ -95,7 +95,7 @@ export default async function OrderDetailPage({
             <p className="text-slate-400 text-sm">Ref: {po.supplierOrderId}</p>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
           {canReceive && <ReceiveItemsModal poId={po.id} items={receiveableItems} />}
           {canCancel  && <CancelOrderButton poId={po.id} />}
           {canClose   && <CloseOrderButton  poId={po.id} />}

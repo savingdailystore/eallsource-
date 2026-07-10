@@ -26,22 +26,24 @@ export function CancelOrderButton({ poId }: { poId: string }) {
 
   if (confirm) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
         <span className="text-xs text-slate-400">Cancel this order?</span>
-        <button
-          onClick={handleCancel}
-          disabled={loading}
-          className="text-xs px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium flex items-center gap-1"
-        >
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-          Yes, cancel
-        </button>
-        <button
-          onClick={() => setConfirm(false)}
-          className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white"
-        >
-          Keep
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCancel}
+            disabled={loading}
+            className="flex-1 sm:flex-none text-xs px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium flex items-center justify-center gap-1"
+          >
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            Yes, cancel
+          </button>
+          <button
+            onClick={() => setConfirm(false)}
+            className="flex-1 sm:flex-none text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white"
+          >
+            Keep
+          </button>
+        </div>
         {error && <span className="text-xs text-red-400">{error}</span>}
       </div>
     );

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Package, X, Loader2 } from 'lucide-react';
+import { dateInputToIso } from '@/lib/date';
 
 export function AddItemModal() {
   const router = useRouter();
@@ -32,7 +33,7 @@ export function AddItemModal() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...form,
-        purchasedAt: form.purchasedAt ? new Date(form.purchasedAt).toISOString() : null,
+        purchasedAt: dateInputToIso(form.purchasedAt),
         unitCost:    form.unitCost.trim() !== '' ? parseFloat(form.unitCost) : null,
       }),
     });

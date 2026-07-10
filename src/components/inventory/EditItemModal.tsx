@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Pencil, X, Loader2, AlertTriangle } from 'lucide-react';
+import { dateInputToIso, isoToDateInput } from '@/lib/date';
 
 interface Item {
   id:                string;
@@ -38,8 +39,7 @@ export function EditItemModal({ item }: { item: Item }) {
     reservedQuantity:  String(item.reservedQuantity),
     inboundQuantity:   String(item.inboundQuantity),
     totalQuantity:     String(item.totalQuantity),
-    // purchasedAt stored as YYYY-MM-DD for <input type="date">
-    purchasedAt:       item.purchasedAt ? item.purchasedAt.slice(0, 10) : '',
+    purchasedAt:       isoToDateInput(item.purchasedAt),
     unitCost:          item.unitCost != null ? String(item.unitCost) : '',
   });
 
@@ -59,7 +59,7 @@ export function EditItemModal({ item }: { item: Item }) {
       reservedQuantity:  parseInt(form.reservedQuantity, 10) || 0,
       inboundQuantity:   parseInt(form.inboundQuantity, 10) || 0,
       totalQuantity:     parseInt(form.totalQuantity, 10) || 0,
-      purchasedAt: form.purchasedAt ? new Date(form.purchasedAt).toISOString() : null,
+      purchasedAt: dateInputToIso(form.purchasedAt),
       unitCost: form.unitCost.trim() !== '' ? parseFloat(form.unitCost) : null,
       ...(confirmOverwrite ? { confirmOverwrite: true } : {}),
     };

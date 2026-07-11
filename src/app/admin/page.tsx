@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { isPlatformAdmin } from '@/lib/admin';
 import { AdminOrgsTable } from '@/components/admin/AdminOrgsTable';
+import { AdminScanJobRecovery } from '@/components/admin/AdminScanJobRecovery';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Admin' };
@@ -11,27 +12,35 @@ export default async function AdminPage() {
   const session = await auth();
   if (!isPlatformAdmin(session?.user?.email)) redirect('/dashboard');
 
-  const orgs = await prisma.organization.findMany({
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      plan: true,
-      scanEnabled: true,
-      isBroadcastSource: true,
-      receiveBroadcast: true,
-      createdAt: true,
-      _count: { select: { users: true, leads: true } },
-      subscription: {
-        select: { status: true, trialEndsAt: true, currentPeriodEnd: true },
+  const [orgs, staleJobCount] = await Promise.all([
+    prisma.organization.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        plan: true,
+        scanEnabled: true,
+        isBroadcastSource: true,
+        receiveBroadcast: true,
+        createdAt: true,
+        _count: { select: { users: true, leads: true } },
+        subscription: {
+          select: { status: true, trialEndsAt: true, currentPeriodEnd: true },
+        },
+        users: {
+          select: { id: true, email: true, role: true, canManualLead: true },
+          orderBy: { createdAt: 'asc' },
+        },
       },
-      users: {
-        select: { id: true, email: true, role: true, canManualLead: true },
-        orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.scanJob.count({
+      where: {
+        status:    { in: ['PENDING', 'RUNNING'] },
+        createdAt: { lt: new Date(Date.now() - 10 * 60 * 1000) },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+    }),
+  ]);
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl">
@@ -58,6 +67,7 @@ export default async function AdminPage() {
         </div>
       </div>
 
+      <AdminScanJobRecovery staleCount={staleJobCount} />
       <AdminOrgsTable orgs={orgs} />
     </div>
   );

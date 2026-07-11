@@ -1,8 +1,9 @@
 # EALLsource — Soft Launch Runbook
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Created:** 2026-07-09  
-**Phase:** 13.1  
+**Last updated:** 2026-07-10  
+**Phase:** 13.7  
 **Support:** support@eallsource.com
 
 ---
@@ -12,6 +13,11 @@
 | Item | Status |
 |---|---|
 | Phase 12.9 Go/No-Go audit | ✅ GO |
+| Phase 13.2 In-App Help / FAQ Page | ✅ Deployed — `/dashboard/help` live |
+| Phase 13.3 Forgot-Password Smoke Test | ✅ Passed — Resend verified, token reuse blocked |
+| Phase 13.4 Scanner Gate Audit | ✅ Complete — no code changes needed |
+| Phase 13.5 Scanner Enablement Preflight | ✅ Complete — EALLsource `scanEnabled=true` confirmed |
+| Phase 13.6 Admin Scan Job Recovery | ✅ Deployed — `/admin` recovery card live |
 | Production health (`/api/health`) | ✅ `{"status":"ok","db":"connected"}` |
 | Database connected | ✅ Neon PostgreSQL reachable |
 | Critical launch blockers | ✅ None found |
@@ -58,7 +64,7 @@ Run this checklist before inviting any user.
 
 - [ ] Homepage pricing section matches current plan capabilities
 - [ ] `/terms` and `/privacy` pages are readable and complete
-- [ ] Help & Support link in sidebar routes to `/contact`
+- [ ] Help & Support link in sidebar routes to `/dashboard/help`
 
 ### Billing
 
@@ -280,7 +286,7 @@ Check Resend deliverability. Check spam folder. Confirm `RESEND_API_KEY` is set 
 | User imports a report | Import count matches expected rows; no unexpected record creation |
 | User syncs inventory | `availableQuantity` updated correctly; existing records not duplicated |
 | User creates a PO | New PO record only; existing CLOSED PO not modified |
-| User runs scanner | Scan job status reaches DONE or FAILED; no jobs stuck RUNNING |
+| User runs scanner | Scan job status reaches DONE or FAILED; no jobs stuck RUNNING; use admin recovery card if stuck count > 0 |
 | User upgrades plan | Stripe webhook logs; subscription record updated; plan badge in sidebar reflects new plan |
 | Amazon OAuth completes | Callback resolves; `AmazonCredential` record created with `isActive=true` |
 
@@ -376,11 +382,139 @@ If counts differ from baseline in a direction not explained by a known approved 
 
 ---
 
-## 10. Recommended Next Build Phases
+## 10. Build Phase Status
 
-| Phase | Title | Description |
+| Phase | Title | Status |
 |---|---|---|
-| **13.2** | In-App Help / FAQ Page | Add `/dashboard/help` with beginner-facing answers to the most common first-user questions: two-step import, repricing safety, lead limits, Amazon connection. Static — no DB or API changes. |
-| **13.3** | Forgot-Password Smoke Test | Verify the forgot-password and reset-password flow end-to-end in production. Confirm Resend deliverability. Currently untested in production — a gap identified in the Phase 12.9 audit. |
-| **13.4** | Scanner `scanEnabled` Operator Gate | The scanner requires `scanEnabled=true` on the org record, but there is no UI to set this flag. Build or document a lightweight admin toggle so scanner access can be granted per org without a direct DB edit. |
-| **14.0** | First Real Orders Report Import | When Amazon reports are ready: smoke-test the full Orders → Settlement import cycle with a real file in production. Verify `getSaleProfitStatus` reaches `COMPLETE` after settlement import. This is the first time production `Sale` and `SettlementRecord` counts will legitimately increase beyond the Phase 12.9 baseline. |
+| **13.2** | In-App Help / FAQ Page | ✅ Complete — `/dashboard/help` deployed |
+| **13.3** | Forgot-Password Smoke Test | ✅ Complete — Resend verified, flow production-tested |
+| **13.4** | Scanner `scanEnabled` Operator Gate Audit | ✅ Complete — no code changes needed; admin UI confirmed |
+| **13.5** | Scanner Enablement Preflight | ✅ Complete — EALLsource scanner already active |
+| **13.6** | Admin Stuck Scan Job Recovery | ✅ Complete — recovery card on `/admin` deployed |
+| **13.7** | Soft Launch Runbook Update | ✅ This document |
+| **14.0** | First Real Orders Report Import | ⏸ Paused — waiting for Amazon reports to be available |
+| **14.1** | `canManualLead` Session Refresh | 🔲 Pending — admin permission changes currently require user sign-out to take effect |
+| **14.2** | Production Scanner Customer Enablement | 🔲 Pending — enable first customer org scanner from `/admin` when ready |
+
+---
+
+## 11. Scanner & Admin Operator Guide
+
+### A. Scanner Access Status
+
+| Field | Value |
+|---|---|
+| EALLsource org `scanEnabled` | `true` (already enabled) |
+| EALLsource org `isBroadcastSource` | `true` — scan results are broadcast to receiving orgs |
+| EALLsource org plan | PRO |
+| Scheduled searches active | 42 |
+| Customer org default | `scanEnabled=false` — requires operator action to enable |
+
+The EALLsource (operator) org has had scanner access active from the start. Scans run automatically on a weekly cron schedule. Customer orgs must be explicitly enabled by the platform admin — no direct database edit is required.
+
+---
+
+### B. Enabling Scanner for a Customer Org
+
+**Before enabling, confirm:**
+- The customer is an OWNER of their org (only OWNER accounts see the full scanner UI)
+- The customer is on PRO plan if they need lead-limit parity (STARTER gets 3 leads/week)
+- You have verified the correct org name and email in the admin table
+
+**Operator steps:**
+
+1. Log in as platform admin (`savingdailystore@gmail.com`)
+2. Navigate to `https://eallsource.com/admin`
+3. Locate the customer org row — confirm org name and owner email match
+4. Click **Enable** in the Scan Access column
+5. Ask the customer's OWNER to refresh `/dashboard/scanner`
+6. Confirm the full scanner UI appears (not the "Scan access pending" card)
+
+**After enabling:**
+- The customer can run manual scans and set up scheduled searches immediately
+- Scheduled searches will be included in the weekly cron automatically
+- Scanner results appear in their Lead Feed; if `receiveBroadcast=true`, broadcast leads appear there too
+- No further operator action is needed unless the customer reports a stuck job
+
+**Do not:**
+- Click Enable for the wrong org row
+- Enable scanner for unverified users
+- Enable scanner before confirming the customer's plan/account is active
+
+---
+
+### C. Scan Job Recovery
+
+The `/admin` page shows a **Scan Job Recovery** card above the org table.
+
+**What it shows:**
+- A badge with the current count of stale scan jobs (RUNNING or PENDING, older than 10 minutes)
+- Under normal operation this shows "0 stuck"
+
+**What stale means:**
+A scan job is stale when it is still in `RUNNING` or `PENDING` state more than 10 minutes after creation. This indicates a serverless function timed out before it could mark the job `DONE` or `FAILED`.
+
+> **Note:** The scanner page also auto-heals stuck jobs for the org of the currently logged-in OWNER on every page load (6-minute cutoff). The admin recovery button handles cross-org recovery and provides an audit trail.
+
+**When to use the recovery button:**
+- The stale count on `/admin` is greater than 0, **or**
+- A customer reports their scanner is spinning and never finishing
+
+**When NOT to use the recovery button:**
+- During routine checks when stale count is 0
+- As a precaution before scans have run — it is a no-op but avoid clicking casually
+- Do not use it to reset jobs that are actively running (within the last 10 minutes)
+
+**What the button does:**
+1. Finds all `ScanJob` rows with `status IN (PENDING, RUNNING)` and `createdAt < now - 10 minutes`
+2. Sets `status = FAILED`, `error = "Marked failed by platform admin after becoming stale."`, `completedAt = now`
+3. Returns the number of affected rows
+4. Writes an `ADMIN_MARK_STALE_SCANS_FAILED` AuditLog entry recording the admin email, affected count, and cutoff
+
+**What it does NOT change:**
+- `DONE` jobs
+- Already-`FAILED` jobs
+- Leads, products, inventory, orders, repricing, sales, or settlements
+
+**After using the recovery button:**
+- Confirm the stale count drops to 0 on refresh
+- Ask the affected customer to retry their scan
+- Check Vercel logs for the original timeout error if the root cause is unclear
+
+---
+
+### D. Manual Lead Access (`canManualLead`)
+
+`canManualLead` is a **per-user** permission separate from org-level `scanEnabled`.
+
+| What it grants | Access to the "Add a lead manually" form on `/dashboard/scanner` |
+|---|---|
+| What it does NOT grant | Full scanner access (scan panel and scheduled searches remain OWNER-only) |
+| Who sees the Scanner link | OWNER always; non-OWNER only if `canManualLead=true` |
+| Requires `scanEnabled=true`? | No — manual lead API does not check `scanEnabled` |
+
+**To grant `canManualLead` to a user:**
+1. Go to `https://eallsource.com/admin`
+2. Expand the user's org row
+3. Toggle the **Manual Lead** button for that specific user
+
+**Important — session staleness:**  
+`canManualLead` is baked into the user's JWT at sign-in. If you grant or revoke this permission, the change **does not take effect until the user signs out and signs back in**. Instruct the user to sign out and sign back in after any `canManualLead` change.
+
+**Do not grant `canManualLead` unless intentionally supporting a specific user for manual lead entry.** It is not a general-access flag.
+
+---
+
+### E. Amazon-Dependent Work — Still Paused
+
+The following workflows remain paused until Amazon Seller Central reports are available and the SP-API connection is confirmed for the relevant org:
+
+| Workflow | Status |
+|---|---|
+| Inventory sync (AmazonSyncButton) | ⏸ Paused — requires active SP-API connection |
+| Orders/Settlement report import | ⏸ Paused — requires correct Amazon flat-file downloaded |
+| FBA Reimbursements import | ⏸ Paused — requires correct TSV from Seller Central |
+| Repricing push to Amazon | ⏸ Paused — do not push prices until costs are confirmed and user approves proposals |
+| First Orders Report import (Phase 14.0) | ⏸ Paused — waiting for Amazon reports to be ready |
+
+None of these workflows should proceed without explicit operator approval and the correct Amazon files in hand. All protected inventory and repricing data (Section 8) must be verified unchanged before any Amazon-connected workflow runs.

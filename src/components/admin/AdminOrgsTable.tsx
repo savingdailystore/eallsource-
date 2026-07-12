@@ -316,7 +316,9 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                                     <button
                                       onClick={() => !busy && toggleManualLead(org.id, u.id, !u.canManualLead)}
                                       disabled={busy}
-                                      title={u.canManualLead ? 'Revoke manual lead access' : 'Grant manual lead access'}
+                                      title={u.canManualLead
+                                        ? 'Revoke manual lead access — takes effect immediately'
+                                        : 'Grant manual lead access — user may need to reload or sign in for the Scanner sidebar link to appear'}
                                       className={`text-xs px-2 py-0.5 rounded-md border transition-colors ${
                                         u.canManualLead
                                           ? 'border-blue-500/50 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'

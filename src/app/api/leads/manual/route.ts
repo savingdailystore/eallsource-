@@ -40,9 +40,18 @@ function extractAsin(url: string): string | null {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const canManualLead = !!(session.user as any).canManualLead;
-  if (session.user.role !== 'OWNER' && !canManualLead) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  // Re-read canManualLead from DB so revocation takes effect immediately
+  // rather than waiting for the 8-hour JWT to expire.
+  const isOwner = session.user.role === 'OWNER';
+  if (!isOwner) {
+    const dbUser = await prisma.user.findUnique({
+      where:  { id: session.user.id },
+      select: { canManualLead: true },
+    });
+    if (!dbUser?.canManualLead) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
   }
 
   const parsed = schema.safeParse(await req.json());

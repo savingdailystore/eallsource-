@@ -13,8 +13,19 @@ export const metadata = { title: 'Scanner' };
 export default async function ScannerPage() {
   const session = await auth();
 
-  const isOwner       = session!.user.role === 'OWNER';
-  const canManualLead = !!(session!.user as any).canManualLead;
+  const isOwner = session!.user.role === 'OWNER';
+
+  // Re-read canManualLead from DB so revocation takes effect immediately.
+  // OWNER bypasses this check; the DB read is skipped to avoid an extra query
+  // on every scanner page load for the primary operator.
+  let canManualLead = false;
+  if (!isOwner) {
+    const dbUser = await prisma.user.findUnique({
+      where:  { id: session!.user.id },
+      select: { canManualLead: true },
+    });
+    canManualLead = !!dbUser?.canManualLead;
+  }
 
   if (!isOwner && !canManualLead) redirect('/dashboard');
 

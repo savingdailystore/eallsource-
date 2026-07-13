@@ -1,9 +1,9 @@
 # EALLsource — Soft Launch Runbook
 
-**Version:** 1.1  
+**Version:** 1.2  
 **Created:** 2026-07-09  
-**Last updated:** 2026-07-10  
-**Phase:** 13.7  
+**Last updated:** 2026-07-12  
+**Phase:** 14.2c  
 **Support:** support@eallsource.com
 
 ---
@@ -393,53 +393,106 @@ If counts differ from baseline in a direction not explained by a known approved 
 | **13.6** | Admin Stuck Scan Job Recovery | ✅ Complete — recovery card on `/admin` deployed |
 | **13.7** | Soft Launch Runbook Update | ✅ This document |
 | **14.0** | First Real Orders Report Import | ⏸ Paused — waiting for Amazon reports to be available |
-| **14.1** | `canManualLead` Session Refresh | 🔲 Pending — admin permission changes currently require user sign-out to take effect |
-| **14.2** | Production Scanner Customer Enablement | 🔲 Pending — enable first customer org scanner from `/admin` when ready |
+| **14.1** | `canManualLead` Session Refresh | ✅ Complete — DB re-read on every request; revocation immediate |
+| **14.2** | Production Scanner Customer Enablement | ✅ Complete — model audited; corrected in 14.2c (see §11B) |
+| **14.2b** | Customer Role / Scanner Access Audit | ✅ Complete — OWNER is operator-only; customers are ADMIN by design |
+| **14.2c** | Runbook Correction: Customer Scanner Model | ✅ This update |
+| **14.3** | Optional: `canManualLead` validation on tester org | 🔲 Pending — grant Manual Lead to tester, confirm partial scanner view |
 
 ---
 
 ## 11. Scanner & Admin Operator Guide
 
-### A. Scanner Access Status
+### A. Customer Access Model (Corrected — Phase 14.2b)
 
-| Field | Value |
+> **⚠️ Correction from v1.1:** Earlier versions of this runbook said to "confirm the customer is an OWNER" before enabling scanner access. That instruction was wrong. Customers are never OWNER. See the full model below.
+
+#### Role model
+
+| Role | Who has it | Can run scans | Can submit manual leads |
+|---|---|---|---|
+| `OWNER` | Platform operator (`savingdailystore@gmail.com`) only | ✅ Yes | ✅ Yes |
+| `ADMIN` | All self-registered customers (by design) | ❌ No | Only if `canManualLead=true` |
+| `ANALYST` | Invited team members | ❌ No | Only if `canManualLead=true` |
+| `VIEWER` | Invited team members (read-only) | ❌ No | ❌ No |
+
+Self-registration (`/register`) always creates users with role `ADMIN`. The invite flow (`/api/team`) only accepts `ADMIN`, `ANALYST`, or `VIEWER`. There is no UI, API, or admin panel path that assigns `OWNER` to a customer. **Do not promote customers to `OWNER` via direct database edits** — this would grant unintended access to scanner execution and bypass the access model.
+
+#### What customers receive
+
+| What | How |
 |---|---|
-| EALLsource org `scanEnabled` | `true` (already enabled) |
-| EALLsource org `isBroadcastSource` | `true` — scan results are broadcast to receiving orgs |
-| EALLsource org plan | PRO |
-| Scheduled searches active | 42 |
-| Customer org default | `scanEnabled=false` — requires operator action to enable |
+| Broadcast leads | Automatically — if `receiveBroadcast=true`, leads discovered by the EALLsource scanner are fanned out to the customer's Lead Feed |
+| Manual lead entry | Optionally — if `canManualLead=true` for their user, they can submit product URLs manually via the Scanner page form |
+| Full scanner execution | ❌ Not available to customers — scan execution, job history, and scheduled searches are `OWNER`-only |
 
-The EALLsource (operator) org has had scanner access active from the start. Scans run automatically on a weekly cron schedule. Customer orgs must be explicitly enabled by the platform admin — no direct database edit is required.
+#### What `scanEnabled` actually does for customers
+
+`scanEnabled` is an org-level flag. For `ADMIN` users, **toggling `scanEnabled` has no visible effect** — the scanner page redirects non-OWNER users before it reads `scanEnabled`. The flag only gates the full scanner UI for `OWNER` sessions.
+
+**Do not enable `scanEnabled` for a customer org expecting this to give the customer scanner access.** It will not. Customer scanner access requires `canManualLead=true` for manual lead entry. Full execution is not available to customers without a separate approved product/security phase to extend the OWNER-only API gates.
+
+#### Scanner access state matrix
+
+| Role | `scanEnabled` | `canManualLead` | What the customer sees |
+|---|---|---|---|
+| `ADMIN` | `false` | `false` | Redirected to `/dashboard` — no scanner page |
+| `ADMIN` | `true` | `false` | Redirected to `/dashboard` — `scanEnabled` has no effect |
+| `ADMIN` | `true` or `false` | `true` | ManualLeadEntry form; ScannerPanel + ScheduledSearches visible but locked |
+| `OWNER` | `false` | — | "Scan access pending" card |
+| `OWNER` | `true` | — | Full scanner: ManualLeadEntry + ScannerPanel + ScheduledSearches |
 
 ---
 
-### B. Enabling Scanner for a Customer Org
+### B. Enabling Scanner for a Customer Org (Corrected — Phase 14.2c)
 
-**Before enabling, confirm:**
-- The customer is an OWNER of their org (only OWNER accounts see the full scanner UI)
-- The customer is on PRO plan if they need lead-limit parity (STARTER gets 3 leads/week)
-- You have verified the correct org name and email in the admin table
+> **⚠️ The original steps in this section assumed customers would be OWNER. That is incorrect. These steps now reflect the correct model.**
+
+#### Current customer scanner model
+
+- EALLsource runs the scanner. All scan execution is operator-only.
+- Customer orgs receive leads via broadcast (`receiveBroadcast=true`).
+- Customers do not run their own scans.
+- Customers may optionally be granted manual lead entry via `canManualLead`.
+
+#### To grant a customer manual lead entry access
+
+**Before granting, confirm:**
+- You have identified the specific user by email in the admin table
+- The user understands they are submitting product URLs for qualification, not running a scan
+- You are granting access deliberately, not as a general "enable scanner" action
 
 **Operator steps:**
 
-1. Log in as platform admin (`savingdailystore@gmail.com`)
+1. Sign in as platform admin (`savingdailystore@gmail.com`)
 2. Navigate to `https://eallsource.com/admin`
-3. Locate the customer org row — confirm org name and owner email match
-4. Click **Enable** in the Scan Access column
-5. Ask the customer's OWNER to refresh `/dashboard/scanner`
-6. Confirm the full scanner UI appears (not the "Scan access pending" card)
-
-**After enabling:**
-- The customer can run manual scans and set up scheduled searches immediately
-- Scheduled searches will be included in the weekly cron automatically
-- Scanner results appear in their Lead Feed; if `receiveBroadcast=true`, broadcast leads appear there too
-- No further operator action is needed unless the customer reports a stuck job
+3. Expand the customer org row (chevron on the right)
+4. In the Members section, locate the user by email
+5. Click **Manual Lead** to toggle `canManualLead=true` for that user
+6. Inform the user: they must **sign out and sign back in** for the Scanner sidebar link to appear (sidebar visibility is JWT-based; manual lead authorization itself is immediate)
+7. After sign-in: confirm they see `/dashboard/scanner` with the ManualLeadEntry form
+8. Confirm the ScannerPanel and ScheduledSearches sections are **locked** (overlay: "Scanner — owner access only") — this is expected and correct
 
 **Do not:**
-- Click Enable for the wrong org row
-- Enable scanner for unverified users
-- Enable scanner before confirming the customer's plan/account is active
+- Click the **Enable** button in the Scan Access column expecting this to give the customer scanner access — it will not (see §11A)
+- Promote any customer user to `OWNER` via direct database edits
+- Extend scanner execution to `ADMIN` users without a separately approved product and security phase
+- Grant `canManualLead` without understanding which specific user is receiving access
+
+#### Phase 14.3 — Optional tester org validation
+
+When ready to validate the manual lead entry flow end-to-end:
+
+**Recommended validation org:** `tester` — `villaeric23@gmail.com` (ADMIN, `canManualLead=false`, `scanEnabled=false`)
+
+**Steps:**
+1. Grant `canManualLead=true` to `villaeric23@gmail.com` via `/admin`
+2. Ask that user to sign out and back in
+3. Confirm the Scanner link appears in their sidebar
+4. Confirm they see ManualLeadEntry and the locked scanner/scheduled-search panels
+5. Do not submit a real manual lead unless separately approved
+6. Do not change the tester user's role
+7. Do not enable `scanEnabled` for the tester org (it has no effect for ADMIN users and is unnecessary)
 
 ---
 
@@ -498,8 +551,13 @@ A scan job is stale when it is still in `RUNNING` or `PENDING` state more than 1
 2. Expand the user's org row
 3. Toggle the **Manual Lead** button for that specific user
 
-**Important — session staleness:**  
-`canManualLead` is baked into the user's JWT at sign-in. If you grant or revoke this permission, the change **does not take effect until the user signs out and signs back in**. Instruct the user to sign out and sign back in after any `canManualLead` change.
+**Session staleness — authorization vs. sidebar visibility (Phase 14.1):**  
+As of Phase 14.1, `canManualLead` is re-read from the database on every request at both `/dashboard/scanner` and `POST /api/leads/manual`. This means:
+
+- **Revocation** (`true` → `false`): takes effect **immediately** — the user is denied on their next page load or API call, without signing out.
+- **Grant** (`false` → `true`): the **API and page gate** take effect immediately, but the **Scanner sidebar link** (Sidebar component) remains hidden until the user signs out and back in, because the sidebar reads from the JWT which is baked at login.
+
+Instruct newly-granted users to sign out and sign back in so the Scanner link appears in their sidebar. The permission itself is live from the moment it is toggled.
 
 **Do not grant `canManualLead` unless intentionally supporting a specific user for manual lead entry.** It is not a general-access flag.
 

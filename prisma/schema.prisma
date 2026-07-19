@@ -59,6 +59,20 @@ enum POItemStatus {
   CANCELLED
 }
 
+enum LeadTier {
+  BASIC
+  PRO
+  PREMIUM
+}
+
+enum EntitlementSource {
+  AUTO_BROADCAST  // weekly cron delivery to receiveBroadcast orgs
+  BACKFILL        // registration seed — does not count toward weekly limit
+  OWNER_GRANT     // manually granted by platform operator
+  CUSTOMER_MANUAL // customer submitted via ManualLeadEntry
+  SUPPORT_BONUS   // support/recovery override — never counts toward weekly limit
+}
+
 // ─── Multi-Tenant Core ─────────────────────────────────────────────────────
 
 model Organization {
@@ -82,6 +96,7 @@ model Organization {
   savedSearches        SavedSearch[]
   amazonCred           AmazonCredential?
   auditLogs            AuditLog[]
+  leadEntitlements     LeadEntitlement[]
   reimbursements       Reimbursement[]
   reimbursementSyncs   ReimbursementSync[]
   purchaseOrders       PurchaseOrder[]
@@ -317,18 +332,70 @@ model Lead {
   productId String
   product   Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  score   Float
-  status  LeadStatus @default(NEW)
-  savedAt DateTime?
-  notes   String?
+  score    Float
+  status   LeadStatus @default(NEW)
+  leadTier LeadTier   @default(BASIC)
+  savedAt  DateTime?
+  notes    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  entitlements LeadEntitlement[]
+
   @@index([orgId])
   @@index([orgId, status])
   @@index([orgId, score])
+  @@index([orgId, leadTier])
   @@map("leads")
+}
+
+// Tracks which orgs are entitled to view a lead, when it was delivered, and
+// why. This is the source of truth for access control and weekly-drop quota
+// enforcement. Plan/tier limits are checked at delivery time only — an
+// entitlement once granted persists until explicitly revoked, so historical
+// leads remain visible across plan changes or downgrade events.
+//
+// Weekly delivery model: new leads drop every Monday at 06:00 Arizona time
+// (America/Phoenix, UTC-7 year-round — no DST). deliveryWeekStart stores the
+// UTC timestamp of that Monday-morning anchor for the drop that created this
+// entitlement, enabling exact per-week quota queries:
+//   WHERE orgId = ? AND deliveryWeekStart = <current week anchor>
+//     AND countsTowardWeeklyLimit = true
+// BACKFILL, OWNER_GRANT, and SUPPORT_BONUS entitlements set deliveryWeekStart
+// null (they are outside normal weekly-drop accounting).
+model LeadEntitlement {
+  id      String       @id @default(cuid())
+  orgId   String
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leadId  String
+  lead    Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  deliverySource           EntitlementSource
+  countsTowardWeeklyLimit  Boolean           @default(true)
+  // Snapshot of the lead's tier at delivery time — future tier changes on the
+  // lead do not retroactively alter existing entitlements.
+  leadTierAtDelivery       LeadTier          @default(BASIC)
+
+  // UTC timestamp of the Monday 06:00 Arizona-time anchor for the weekly drop
+  // this entitlement belongs to. Null for BACKFILL, OWNER_GRANT, and
+  // SUPPORT_BONUS entries that fall outside normal weekly-drop accounting.
+  deliveryWeekStart DateTime?
+
+  // Exact moment the lead was unlocked/granted for this org.
+  deliveredAt DateTime @default(now())
+
+  grantedByUserId String? // non-null for OWNER_GRANT; null for automated sources
+  note            String? // operator note (OWNER_GRANT / SUPPORT_BONUS only)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, leadId])
+  @@index([orgId])
+  @@index([orgId, deliveryWeekStart])
+  @@index([leadId])
+  @@map("lead_entitlements")
 }
 
 // ─── Inventory ─────────────────────────────────────────────────────────────

@@ -319,10 +319,22 @@ export interface ApiResponse<T = null> {
 
 // ─── Plan limits ─────────────────────────────────────────────────────────────
 
-export const PLAN_LIMITS: Record<Plan, { leadsPerWeek: number; repricing: boolean; spApi: boolean; apiAccess: boolean; maxUsers: number }> = {
-  STARTER:    { leadsPerWeek: 3,    repricing: false, spApi: false, apiAccess: false, maxUsers: 1  },
-  PRO:        { leadsPerWeek: 20,   repricing: true,  spApi: true,  apiAccess: false, maxUsers: 1  },
-  ENTERPRISE: { leadsPerWeek: 9999, repricing: true,  spApi: true,  apiAccess: true,  maxUsers: 99 },
+// Lead tiers accessible per plan — checked at delivery/unlock time only.
+// Existing entitlements are never revoked by a plan change; this governs
+// which tiers can be newly unlocked for an org on a given plan.
+export type LeadTierValue = 'BASIC' | 'PRO' | 'PREMIUM';
+
+export const PLAN_LIMITS: Record<Plan, {
+  leadsPerWeek:     number;
+  allowedLeadTiers: LeadTierValue[];
+  repricing:        boolean;
+  spApi:            boolean;
+  apiAccess:        boolean;
+  maxUsers:         number;
+}> = {
+  STARTER:    { leadsPerWeek: 3,    allowedLeadTiers: ['BASIC'],                   repricing: false, spApi: false, apiAccess: false, maxUsers: 1  },
+  PRO:        { leadsPerWeek: 15,   allowedLeadTiers: ['BASIC', 'PRO'],            repricing: true,  spApi: true,  apiAccess: false, maxUsers: 1  },
+  ENTERPRISE: { leadsPerWeek: 9999, allowedLeadTiers: ['BASIC', 'PRO', 'PREMIUM'], repricing: true,  spApi: true,  apiAccess: true,  maxUsers: 99 },
 };
 
 export { Plan, Role, LeadStatus, DemandLevel, GatingRisk };

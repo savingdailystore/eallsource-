@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { isPlatformAdmin } from '@/lib/admin';
 import { AdminOrgsTable } from '@/components/admin/AdminOrgsTable';
 import { AdminScanJobRecovery } from '@/components/admin/AdminScanJobRecovery';
+import { AdminSourceLeads } from '@/components/admin/AdminSourceLeads';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Admin' };
@@ -69,6 +70,7 @@ export default async function AdminPage() {
 
       <AdminScanJobRecovery staleCount={staleJobCount} />
       <AdminOrgsTable orgs={orgs} />
+      <AdminSourceLeads />
     </div>
   );
 }

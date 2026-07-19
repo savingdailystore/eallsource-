@@ -13,11 +13,11 @@ export const metadata = { title: 'Billing' };
 const PLANS: { key: Plan; name: string; price: number; icon: any; color: string; features: string[] }[] = [
   {
     key: 'STARTER', name: 'Starter', price: 0, icon: Zap, color: 'text-slate-300',
-    features: ['3 leads/week', 'ROI calculator', 'Validation engine', 'Export to CSV', '1 user'],
+    features: ['Up to 3 new BASIC leads/week', 'New leads drop weekly', 'Lead Feed access', 'ROI calculator', 'Validation engine', 'Export accessible leads', '1 user', 'No customer-run scanner'],
   },
   {
     key: 'PRO', name: 'Pro', price: 50, icon: Crown, color: 'text-blue-600',
-    features: ['20 leads/week', 'Everything in Starter', 'Inventory management', 'Repricing engine', 'Amazon SP-API', 'Sales & Profit Tracking', 'Profit Recovery', 'Amazon report imports', '1 user'],
+    features: ['Up to 15 new BASIC + PRO leads/week', 'New leads drop weekly', 'Everything in Starter', 'Amazon SP-API', 'Sales & Profit Tracking', 'Profit Recovery', 'Amazon report imports', 'Repricing approval queue', 'Optional manual lead entry if enabled by EALLsource', '1 user'],
   },
 ];
 

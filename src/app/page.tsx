@@ -73,7 +73,16 @@ export default async function RootPage() {
               <span className="text-3xl font-black text-slate-50">Free</span>
             </div>
             <ul className="space-y-2 text-sm text-slate-400 mb-6 flex-1">
-              {['3 leads/week', 'ROI calculator', 'Validation engine', 'Export to CSV', '1 user'].map((f) => (
+              {[
+                'Up to 3 new BASIC leads/week',
+                'New leads drop weekly',
+                'Lead Feed access',
+                'ROI calculator',
+                'Validation engine',
+                'Export accessible leads',
+                '1 user',
+                'No customer-run scanner',
+              ].map((f) => (
                 <li key={f} className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-green-400 flex-shrink-0" />{f}
                 </li>
@@ -96,14 +105,17 @@ export default async function RootPage() {
             </div>
             <ul className="space-y-2 text-sm text-slate-400 mb-6 flex-1">
               {[
-                '20 leads/week',
+                'Up to 15 new BASIC + PRO leads/week',
+                'New leads drop weekly',
                 'Everything in Starter',
                 'Amazon SP-API',
                 'Sales & Profit Tracking',
                 'Profit Recovery',
                 'Amazon report imports',
                 'Repricing approval queue',
+                'Optional manual lead entry if enabled by EALLsource',
                 '1 user',
+                'No customer-run scanner',
               ].map((f) => (
                 <li key={f} className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-green-400 flex-shrink-0" />{f}
@@ -120,13 +132,24 @@ export default async function RootPage() {
             <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center mb-4">
               <LifeBuoy className="w-5 h-5 text-slate-400" />
             </div>
-            <div className="font-bold text-lg text-slate-50">Need more?</div>
+            <div className="font-bold text-lg text-slate-50">Enterprise</div>
             <div className="mt-1 mb-5">
               <span className="text-slate-400 text-sm">Custom</span>
             </div>
-            <p className="text-sm text-slate-400 mb-6 leading-relaxed flex-1">
-              Have volume or team requirements? Get in touch and we'll find the right fit.
-            </p>
+            <ul className="space-y-2 text-sm text-slate-400 mb-6 flex-1">
+              {[
+                'Custom lead volume',
+                'BASIC + PRO + PREMIUM leads',
+                'Owner-curated lead delivery',
+                'Custom sourcing criteria',
+                'Higher-touch support',
+                'Customer-run scanner requires separate approval',
+              ].map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-green-400 flex-shrink-0" />{f}
+                </li>
+              ))}
+            </ul>
             <a
               href="mailto:support@eallsource.com?subject=EALLsource Enterprise Inquiry"
               className="btn-secondary w-full flex items-center justify-center"

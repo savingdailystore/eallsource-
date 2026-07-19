@@ -2,17 +2,17 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { runScanJob } from '@/services/run-scan';
-import { broadcastLeads } from '@/services/broadcast';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 // Stop launching new searches with enough headroom for the in-flight search to
-// finish AND the broadcast step to run, all within the 300s function limit.
+// finish within the 300s function limit.
 const TIME_BUDGET_MS = 150_000;
 
-// Owner-triggered on-demand run of this org's enabled saved searches. Mirrors
-// the weekly cron but is auth-gated (not CRON_SECRET) and scoped to one org.
+// Owner-triggered on-demand run of this org's enabled saved searches. Writes
+// scan results to the source pool only. Customer lead delivery is handled
+// exclusively by /api/cron/weekly-lead-drop (Monday 13:00 UTC).
 export async function POST() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -22,7 +22,7 @@ export async function POST() {
 
   const org = await prisma.organization.findUnique({
     where:  { id: orgId },
-    select: { scanEnabled: true, isBroadcastSource: true },
+    select: { scanEnabled: true },
   });
   if (!org?.scanEnabled) {
     return NextResponse.json({ error: 'Scan access is not enabled for your account.' }, { status: 403 });
@@ -40,13 +40,11 @@ export async function POST() {
 
   const summary = {
     ran: 0, skippedForTime: 0, productsFound: 0, leadsCreated: 0, leadsUpdated: 0,
-    failures: 0, broadcast: 0,
+    failures: 0,
     ranSearches:     [] as string[],
     skippedSearches: [] as string[],
     filtered: { noMatch: 0, noPricing: 0, notProfitable: 0, demandTooLow: 0, velocityTooLow: 0, noBuyBox: 0, priceDeclining: 0, priceTooLow: 0, validationFailed: 0 },
   };
-
-  const allLeadIds: string[] = [];
 
   for (const search of searches) {
     if (Date.now() - start > TIME_BUDGET_MS) {
@@ -75,7 +73,6 @@ export async function POST() {
       summary.filtered.priceDeclining   += result.priceDeclining;
       summary.filtered.priceTooLow      += result.priceTooLow;
       summary.filtered.validationFailed += result.validationFailed;
-      allLeadIds.push(...result.leadIds);
       await prisma.savedSearch.update({ where: { id: search.id }, data: { lastRunAt: new Date(), lastResult: result as object } });
     } catch (err) {
       summary.failures++;
@@ -83,13 +80,10 @@ export async function POST() {
     }
   }
 
-  // Broadcast qualifying leads to subscriber orgs if this is the source org
-  if (org.isBroadcastSource && allLeadIds.length > 0) {
-    summary.broadcast = await broadcastLeads(orgId, allLeadIds).catch((err) => {
-      console.error('[run-now] broadcast failed:', err);
-      return 0;
-    });
-  }
-
-  return NextResponse.json({ ok: true, elapsedMs: Date.now() - start, ...summary });
+  return NextResponse.json({
+    ok: true,
+    elapsedMs: Date.now() - start,
+    ...summary,
+    message: 'Leads added to source pool. Customer delivery happens on the next weekly lead drop (Monday 6:00 AM Arizona time).',
+  });
 }

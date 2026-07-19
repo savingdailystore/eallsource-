@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { runScanJob } from '@/services/run-scan';
-import { broadcastLeads } from '@/services/broadcast';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // Vercel Pro: up to 300s per invocation
 
-// Stop launching new searches with headroom for the in-flight search + broadcast
-// to finish within the 300s function limit. Remaining searches run on the next
+// Stop launching new searches with headroom for the in-flight search to
+// finish within the 300s function limit. Remaining searches run on the next
 // cron tick (ordered by lastRunAt so they get priority and every search is covered).
 const TIME_BUDGET_MS = 150_000;
 
+// Runs stale saved searches and writes results into the EALLsource source pool only.
+// Never calls broadcastLeads(). Customer lead delivery is handled exclusively by
+// /api/cron/weekly-lead-drop (Monday 13:00 UTC).
 export async function GET(req: NextRequest) {
-  // ── Auth: Vercel Cron sends "Authorization: Bearer <CRON_SECRET>" ──────────
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
@@ -23,10 +24,10 @@ export async function GET(req: NextRequest) {
 
   const start = Date.now();
 
-  // Cron fires every few hours but each search should only run about once a week.
-  // Pick up searches never run, or not run in the last 6 days, least-recently-run
-  // first. Frequent ticks each drain 1-2 stale searches, so many searches all get
-  // covered weekly while the 6-day filter keeps Apify spend at ~1 run/search/week.
+  // Each search should only run about once a week. Pick up searches never run,
+  // or not run in the last 6 days, least-recently-run first. Frequent ticks
+  // each drain 1-2 stale searches so all searches are covered weekly while
+  // the 6-day filter keeps Apify spend at ~1 run/search/week.
   const staleBefore = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
   const searches = await prisma.savedSearch.findMany({
     where: {
@@ -37,18 +38,14 @@ export async function GET(req: NextRequest) {
     orderBy: [{ lastRunAt: { sort: 'asc', nulls: 'first' } }, { createdAt: 'asc' }],
   });
 
-  // Track lead IDs per source org so we can broadcast after all searches finish
-  const broadcastQueue = new Map<string, string[]>();
-
   const summary = {
-    totalEnabled: searches.length,
-    ran:          0,
+    totalEnabled:   searches.length,
+    ran:            0,
     skippedForTime: 0,
-    leadsCreated: 0,
-    leadsUpdated: 0,
-    failures:     0,
-    broadcast:    0,
-    details:      [] as Array<{ id: string; retailer: string; query: string; status: string; result?: unknown; error?: string }>,
+    leadsCreated:   0,
+    leadsUpdated:   0,
+    failures:       0,
+    details: [] as Array<{ id: string; retailer: string; query: string; status: string; result?: unknown; error?: string }>,
   };
 
   for (const search of searches) {
@@ -74,12 +71,6 @@ export async function GET(req: NextRequest) {
       summary.leadsUpdated += result.updated;
       summary.details.push({ id: search.id, retailer: search.retailer, query: search.query, status: 'done', result });
 
-      // Accumulate lead IDs per org for broadcast step
-      if (result.leadIds.length > 0) {
-        const existing = broadcastQueue.get(search.orgId) ?? [];
-        broadcastQueue.set(search.orgId, [...existing, ...result.leadIds]);
-      }
-
       await prisma.savedSearch.update({
         where: { id: search.id },
         data:  { lastRunAt: new Date(), lastResult: result as object },
@@ -92,24 +83,6 @@ export async function GET(req: NextRequest) {
         where: { id: search.id },
         data:  { lastRunAt: new Date(), lastResult: { error: String(err) } },
       }).catch(() => {});
-    }
-  }
-
-  // Broadcast leads from any source orgs that produced results
-  if (broadcastQueue.size > 0) {
-    const sourceOrgs = await prisma.organization.findMany({
-      where:  { isBroadcastSource: true, id: { in: [...broadcastQueue.keys()] } },
-      select: { id: true },
-    });
-
-    for (const { id: sourceOrgId } of sourceOrgs) {
-      const leadIds = broadcastQueue.get(sourceOrgId) ?? [];
-      if (leadIds.length > 0) {
-        summary.broadcast += await broadcastLeads(sourceOrgId, leadIds).catch((err) => {
-          console.error('[cron] broadcast failed:', err);
-          return 0;
-        });
-      }
     }
   }
 

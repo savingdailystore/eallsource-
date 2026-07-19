@@ -3,8 +3,12 @@
   "buildCommand": "npm run build",
   "crons": [
     {
-      "path": "/api/cron/weekly-scan",
+      "path": "/api/cron/source-scan",
       "schedule": "0 */3 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-lead-drop",
+      "schedule": "0 13 * * 1"
     }
   ]
 }

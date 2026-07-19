@@ -6,7 +6,9 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding database...');
 
-  const adminPw = await bcrypt.hash(process.env.ADMIN_PASSWORD ?? 'EALLsource@Admin1', 12);
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) throw new Error('ADMIN_PASSWORD env var is required to seed — do not use a hardcoded fallback');
+  const adminPw = await bcrypt.hash(adminPassword, 12);
   const demoPw  = await bcrypt.hash('Demo123!', 12);
 
   const trialEndsAt = new Date();
@@ -205,7 +207,7 @@ async function main() {
     await prisma.lead.create({ data: { orgId: ownerOrg.id, productId: p.id, score: product.score, status: 'NEW' } });
   }
 
-  console.log(`✓ ${process.env.ADMIN_EMAIL ?? 'savingdailystore@gmail.com'} / ${process.env.ADMIN_PASSWORD ?? 'EALLsource@Admin1'} (PRO)`);
+  console.log(`✓ ${process.env.ADMIN_EMAIL ?? 'savingdailystore@gmail.com'} (PRO — password set from ADMIN_PASSWORD env var)`);
   console.log('✓ demo@eallsource.com / Demo123! (STARTER)');
   console.log(`✓ ${products.length} seed products`);
   console.log('Seeding complete.');

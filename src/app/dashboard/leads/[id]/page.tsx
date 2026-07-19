@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { leadAccessWhere } from '@/lib/lead-access';
 import { notFound } from 'next/navigation';
 import { formatCurrency, formatPercent, buildAmazonUrl, buildKeepaUrl } from '@/lib/utils';
 import { scoreLabel } from '@/engines/scoring';
@@ -33,9 +34,16 @@ export const dynamic = 'force-dynamic';
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   const { id }  = await params;
+  const { orgId } = session!.user;
+
+  const org = await prisma.organization.findUnique({
+    where:  { id: orgId },
+    select: { isBroadcastSource: true },
+  });
+  const isBroadcastSource = org?.isBroadcastSource ?? false;
 
   const lead = await prisma.lead.findFirst({
-    where: { id, orgId: session!.user.orgId },
+    where:   { id, ...leadAccessWhere({ orgId, isBroadcastSource }) },
     include: { product: true },
   });
 

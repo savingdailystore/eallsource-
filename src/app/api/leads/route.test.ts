@@ -1,0 +1,189 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
+
+const authMock       = vi.fn();
+const orgFindUnique  = vi.fn();
+const leadFindMany   = vi.fn();
+const leadCount      = vi.fn();
+const leadFindFirst  = vi.fn();
+const leadUpdate     = vi.fn();
+
+vi.mock('@/lib/auth',   () => ({ auth: () => authMock() }));
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    organization: { findUnique: (...a: unknown[]) => orgFindUnique(...a) },
+    lead: {
+      findMany:  (...a: unknown[]) => leadFindMany(...a),
+      count:     (...a: unknown[]) => leadCount(...a),
+      findFirst: (...a: unknown[]) => leadFindFirst(...a),
+      update:    (...a: unknown[]) => leadUpdate(...a),
+    },
+  },
+}));
+// getCached calls through to the callback — no Redis in tests
+vi.mock('@/lib/redis', () => ({
+  getCached: (_key: string, fn: () => unknown) => fn(),
+}));
+
+import { GET, PATCH } from './route';
+
+// Source/operator org — isBroadcastSource = true
+const SOURCE_SESSION = { user: { id: 'u1', role: 'OWNER', orgId: 'source-org', plan: 'ENTERPRISE', email: 'owner@test.com' } };
+// Customer org — isBroadcastSource = false (role ADMIN)
+const ADMIN_SESSION  = { user: { id: 'u2', role: 'ADMIN', orgId: 'cust-org-1', plan: 'PRO',        email: 'customer@test.com' } };
+// Customer org — isBroadcastSource = false but role is OWNER (tests that role alone does not bypass)
+const CUST_OWNER_SESSION = { user: { id: 'u3', role: 'OWNER', orgId: 'cust-org-2', plan: 'PRO', email: 'custowner@test.com' } };
+
+function makeGet(params: Record<string, string> = {}) {
+  const url = new URL('http://localhost/api/leads');
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  return new NextRequest(url);
+}
+
+function makePatch(body: object) {
+  return new NextRequest('http://localhost/api/leads', {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  });
+}
+
+describe('GET /api/leads — entitlement enforcement', () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    orgFindUnique.mockReset();
+    leadFindMany.mockReset();
+    leadCount.mockReset();
+    leadFindMany.mockResolvedValue([]);
+    leadCount.mockResolvedValue(0);
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    authMock.mockResolvedValue(null);
+    const res = await GET(makeGet());
+    expect(res.status).toBe(401);
+  });
+
+  it('customer (ADMIN, isBroadcastSource=false): where includes entitlements.some', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    await GET(makeGet());
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].where).toMatchObject({
+      orgId:        'cust-org-1',
+      entitlements: { some: { orgId: 'cust-org-1' } },
+    });
+  });
+
+  it('source org (isBroadcastSource=true): where does NOT include entitlements', async () => {
+    authMock.mockResolvedValue(SOURCE_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: true });
+    await GET(makeGet());
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].where.orgId).toBe('source-org');
+    expect(call[0].where).not.toHaveProperty('entitlements');
+  });
+
+  it('customer OWNER (isBroadcastSource=false): role alone does not bypass — still requires entitlement', async () => {
+    authMock.mockResolvedValue(CUST_OWNER_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    await GET(makeGet());
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].where).toMatchObject({
+      orgId:        'cust-org-2',
+      entitlements: { some: { orgId: 'cust-org-2' } },
+    });
+  });
+
+  it('customer: count query uses same entitlement-aware where', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    await GET(makeGet());
+    const [countCall] = leadCount.mock.calls;
+    expect(countCall[0].where).toMatchObject({
+      orgId:        'cust-org-1',
+      entitlements: { some: { orgId: 'cust-org-1' } },
+    });
+  });
+
+  it('customer: no leadTier filter applied (no retroactive plan-tier gating)', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    await GET(makeGet());
+    const [call] = leadFindMany.mock.calls;
+    expect(JSON.stringify(call[0].where)).not.toContain('leadTier');
+    expect(JSON.stringify(call[0].where)).not.toContain('allowedLeadTiers');
+  });
+
+  it('BACKFILL entitlements visible: entitlements.some checks only orgId, not deliverySource', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    await GET(makeGet());
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].where.entitlements.some).toEqual({ orgId: 'cust-org-1' });
+    expect(JSON.stringify(call[0].where)).not.toContain('deliverySource');
+  });
+
+  it('returns 200 with lead data', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    leadFindMany.mockResolvedValue([{ id: 'lead-1', score: 80, status: 'NEW', product: { asin: 'B001' } }]);
+    leadCount.mockResolvedValue(1);
+    const res  = await GET(makeGet());
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data).toHaveLength(1);
+  });
+});
+
+describe('PATCH /api/leads — entitlement enforcement', () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    orgFindUnique.mockReset();
+    leadFindFirst.mockReset();
+    leadUpdate.mockReset();
+  });
+
+  it('customer: findFirst where includes entitlements.some', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    leadFindFirst.mockResolvedValue(null);
+    const res = await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
+    expect(res.status).toBe(404);
+    const [call] = leadFindFirst.mock.calls;
+    expect(call[0].where).toMatchObject({
+      orgId:        'cust-org-1',
+      entitlements: { some: { orgId: 'cust-org-1' } },
+    });
+  });
+
+  it('customer OWNER: role alone does not bypass — findFirst still requires entitlement', async () => {
+    authMock.mockResolvedValue(CUST_OWNER_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    leadFindFirst.mockResolvedValue(null);
+    await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
+    const [call] = leadFindFirst.mock.calls;
+    expect(call[0].where).toMatchObject({ entitlements: { some: { orgId: 'cust-org-2' } } });
+  });
+
+  it('customer: PATCH proceeds when entitlement exists', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    const fakeLead = { id: 'claaaaaaaaaaaaaaaaaaaaaa', orgId: 'cust-org-1', status: 'NEW' };
+    leadFindFirst.mockResolvedValue(fakeLead);
+    leadUpdate.mockResolvedValue({ ...fakeLead, status: 'SAVED' });
+    const res = await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
+    expect(res.status).toBe(200);
+  });
+
+  it('source org: findFirst where does NOT include entitlements', async () => {
+    authMock.mockResolvedValue(SOURCE_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: true });
+    leadFindFirst.mockResolvedValue(null);
+    await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
+    const [call] = leadFindFirst.mock.calls;
+    expect(call[0].where.orgId).toBe('source-org');
+    expect(call[0].where).not.toHaveProperty('entitlements');
+  });
+});

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCached } from '@/lib/redis';
+import { leadAccessWhere } from '@/lib/lead-access';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -18,9 +19,9 @@ export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const sp        = req.nextUrl.searchParams;
-  const orgId     = session.user.orgId;
-  const page      = Math.max(1, Number(sp.get('page') ?? 1));
+  const sp     = req.nextUrl.searchParams;
+  const orgId  = session.user.orgId;
+  const page   = Math.max(1, Number(sp.get('page') ?? 1));
   const pageSize  = Math.min(Number(sp.get('pageSize') ?? 25), 100);
   const rawStatus = sp.get('status');
   const status    = rawStatus && (LEAD_STATUSES as readonly string[]).includes(rawStatus)
@@ -30,8 +31,14 @@ export async function GET(req: NextRequest) {
   const minProfit = sp.get('minProfit') ? Number(sp.get('minProfit')) : undefined;
   const sortBy    = sp.get('sortBy') ?? 'score';
 
+  const org = await prisma.organization.findUnique({
+    where:  { id: orgId },
+    select: { isBroadcastSource: true },
+  });
+  const isBroadcastSource = org?.isBroadcastSource ?? false;
+
   const where: object = {
-    orgId,
+    ...leadAccessWhere({ orgId, isBroadcastSource }),
     ...(status
       ? { status }
       : { status: { notIn: ['REJECTED', 'EXPIRED'] } }),
@@ -72,8 +79,16 @@ export async function PATCH(req: NextRequest) {
   }
 
   const { id, status, notes } = parsed.data;
+  const patchOrgId = session.user.orgId;
 
-  const lead = await prisma.lead.findFirst({ where: { id, orgId: session.user.orgId } });
+  const patchOrg = await prisma.organization.findUnique({
+    where:  { id: patchOrgId },
+    select: { isBroadcastSource: true },
+  });
+
+  const lead = await prisma.lead.findFirst({
+    where: { id, ...leadAccessWhere({ orgId: patchOrgId, isBroadcastSource: patchOrg?.isBroadcastSource ?? false }) },
+  });
   if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const updated = await prisma.lead.update({

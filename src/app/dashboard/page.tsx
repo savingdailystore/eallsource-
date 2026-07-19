@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { leadAccessWhere } from '@/lib/lead-access';
 import { formatCurrency, relativeTime } from '@/lib/utils';
 import { scoreLabel } from '@/engines/scoring';
 import { analyseReimbursement } from '@/engines/reimbursementRecovery';
@@ -37,6 +38,12 @@ export default async function DashboardPage() {
   const isOwner = role === 'OWNER';
   const isPro   = plan === 'PRO' || plan === 'ENTERPRISE';
 
+  const currentOrg = await prisma.organization.findUnique({
+    where:  { id: orgId },
+    select: { isBroadcastSource: true },
+  });
+  const isBroadcastSource = currentOrg?.isBroadcastSource ?? false;
+
   // ── Parallel data fetch ────────────────────────────────────────────────────
   const [
     leadsRaw,
@@ -58,9 +65,9 @@ export default async function DashboardPage() {
     unsupportedSettlementRowsStored,
     amazonCred,
   ] = await Promise.all([
-    // All non-expired leads for funnel + summarize
+    // All non-expired entitled leads for funnel + summarize
     prisma.lead.findMany({
-      where:   { orgId, status: { not: 'EXPIRED' } },
+      where:   { ...leadAccessWhere({ orgId, isBroadcastSource }), status: { not: 'EXPIRED' } },
       select:  { status: true, createdAt: true },
     }),
 
@@ -83,9 +90,9 @@ export default async function DashboardPage() {
         AND l.status NOT IN ('REJECTED', 'EXPIRED')
     `,
 
-    // Top leads by score
+    // Top entitled leads by score
     prisma.lead.findMany({
-      where:   { orgId, status: { in: ['NEW', 'SAVED'] } },
+      where:   { ...leadAccessWhere({ orgId, isBroadcastSource }), status: { in: ['NEW', 'SAVED'] } },
       orderBy: { score: 'desc' },
       take:    5,
       include: {

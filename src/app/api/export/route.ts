@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { leadAccessWhere } from '@/lib/lead-access';
 import ExcelJS from 'exceljs';
 
 export const dynamic = 'force-dynamic';
@@ -14,11 +15,17 @@ export async function GET(req: NextRequest) {
   const format = sp.get('format') ?? 'csv';
   const orgId  = session.user.orgId;
 
+  const org = await prisma.organization.findUnique({
+    where:  { id: orgId },
+    select: { isBroadcastSource: true },
+  });
+  const isBroadcastSource = org?.isBroadcastSource ?? false;
+
   let rows: Record<string, unknown>[];
 
   if (type === 'leads') {
     const data = await prisma.lead.findMany({
-      where: { orgId, status: { notIn: ['REJECTED', 'EXPIRED'] } },
+      where: { ...leadAccessWhere({ orgId, isBroadcastSource }), status: { notIn: ['REJECTED', 'EXPIRED'] } },
       orderBy: { score: 'desc' },
       take: 1000,
       include: { product: true },

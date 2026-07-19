@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { leadAccessWhere } from '@/lib/lead-access';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { TrendingUp, Download } from 'lucide-react';
 import Link from 'next/link';
@@ -13,6 +14,12 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const session = await auth();
   const orgId   = session!.user.orgId;
   const sp      = await searchParams;
+
+  const org = await prisma.organization.findUnique({
+    where:  { id: orgId },
+    select: { isBroadcastSource: true },
+  });
+  const isBroadcastSource = org?.isBroadcastSource ?? false;
 
   const page     = Number(sp.page ?? 1);
   const pageSize = 25;
@@ -35,7 +42,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   }
 
   const where = {
-    orgId,
+    ...leadAccessWhere({ orgId, isBroadcastSource }),
     ...(status ? { status: status as any } : { status: { notIn: ['REJECTED', 'EXPIRED'] as any[] } }),
     product: productWhere,
   };

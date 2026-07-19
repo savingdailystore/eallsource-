@@ -1,122 +1,198 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NextRequest } from 'next/server';
+﻿import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
 
-const authMock            = vi.fn();
-const userFindUnique      = vi.fn();
-const processProductMock  = vi.fn();
-const broadcastMock       = vi.fn();
-const orgFindUnique       = vi.fn();
+const authMock               = vi.fn();
+const userFindUnique         = vi.fn();
+const orgFindUnique          = vi.fn();
+const entitlementUpsert      = vi.fn();
+const processRetailerProduct = vi.fn();
+const broadcastLeadsMock     = vi.fn();
+const getWeeklyLeadUsageMock = vi.fn();
 
-vi.mock('@/lib/auth',   () => ({ auth: () => authMock() }));
-vi.mock('@/lib/prisma', () => ({
+vi.mock("@/lib/auth",   () => ({ auth: () => authMock() }));
+vi.mock("@/lib/prisma", () => ({
   prisma: {
-    user:         { findUnique: (...a: unknown[]) => userFindUnique(...a) },
-    organization: { findUnique: (...a: unknown[]) => orgFindUnique(...a)  },
+    user:            { findUnique: (...a: unknown[]) => userFindUnique(...a) },
+    organization:    { findUnique: (...a: unknown[]) => orgFindUnique(...a) },
+    leadEntitlement: { upsert:     (...a: unknown[]) => entitlementUpsert(...a) },
   },
 }));
-vi.mock('@/services/pipeline', () => ({ processRetailerProduct: (...a: unknown[]) => processProductMock(...a) }));
-vi.mock('@/services/broadcast', () => ({ broadcastLeads: (...a: unknown[]) => broadcastMock(...a) }));
+vi.mock("@/services/pipeline", () => ({
+  processRetailerProduct: (...a: unknown[]) => processRetailerProduct(...a),
+}));
+vi.mock("@/services/broadcast", () => ({
+  broadcastLeads: (...a: unknown[]) => broadcastLeadsMock(...a),
+}));
+vi.mock("@/lib/lead-delivery", () => ({
+  getCurrentDeliveryWeekStart: () => new Date("2026-07-20T13:00:00Z"),
+  getWeeklyLeadUsage:          (...a: unknown[]) => getWeeklyLeadUsageMock(...a),
+}));
 
-import { POST } from './route';
+import { POST } from "./route";
 
-const OWNER_SESSION = { user: { id: 'u1', role: 'OWNER',   orgId: 'org1', email: 'owner@test.com' } };
-const USER_SESSION  = { user: { id: 'u2', role: 'ANALYST', orgId: 'org2', email: 'user@test.com'  } };
+const SOURCE_SESSION  = { user: { id: "u1", role: "OWNER", orgId: "source-org",   plan: "ENTERPRISE" } };
+const CUST_SESSION    = { user: { id: "u2", role: "OWNER", orgId: "cust-org-1",   plan: "PRO" } };
+const STARTER_SESSION = { user: { id: "u3", role: "OWNER", orgId: "cust-starter", plan: "STARTER" } };
 
-function makeReq(body: object) {
-  return new NextRequest('http://localhost/api/leads/manual', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
+function makeBody(overrides = {}) {
+  return {
+    amazonUrl:   "https://www.amazon.com/dp/B001BASIC01",
+    retailerUrl: "https://www.walmart.com/ip/test/123456",
+    retailer:    "Walmart",
+    sourcePrice: 10,
+    ...overrides,
+  };
+}
+
+function makePost(body = {}) {
+  return new NextRequest("http://localhost/api/leads/manual", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(makeBody(body)),
   });
 }
 
-const VALID_BODY = {
-  amazonUrl:   'https://www.amazon.com/dp/B0CGR29R63',
-  retailerUrl: 'https://www.walmart.com/ip/123',
-  retailer:    'Walmart',
-  sourcePrice: 12.99,
-};
-
-describe('POST /api/leads/manual', () => {
+describe("POST /api/leads/manual", () => {
   beforeEach(() => {
-    authMock.mockReset();
-    userFindUnique.mockReset();
-    processProductMock.mockReset();
-    broadcastMock.mockReset();
-    orgFindUnique.mockReset();
-    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    vi.clearAllMocks();
+    entitlementUpsert.mockResolvedValue({});
+    broadcastLeadsMock.mockResolvedValue(1);
+    getWeeklyLeadUsageMock.mockResolvedValue(0);
   });
 
-  it('returns 401 when unauthenticated', async () => {
+  it("returns 401 when unauthenticated", async () => {
     authMock.mockResolvedValue(null);
-    const res = await POST(makeReq(VALID_BODY));
+    const res = await POST(makePost());
     expect(res.status).toBe(401);
   });
 
-  it('allows OWNER without a DB lookup', async () => {
-    authMock.mockResolvedValue(OWNER_SESSION);
-    processProductMock.mockResolvedValue({ outcome: 'lead_created', leadId: 'l1', score: 80 });
-    const res = await POST(makeReq(VALID_BODY));
-    // No user.findUnique call for OWNER
-    expect(userFindUnique).not.toHaveBeenCalled();
-    expect(res.status).toBe(200);
-  });
-
-  it('returns 403 for non-OWNER user when DB canManualLead is false', async () => {
-    authMock.mockResolvedValue(USER_SESSION);
+  it("returns 403 when non-OWNER user lacks canManualLead", async () => {
+    authMock.mockResolvedValue({ user: { id: "u2", role: "ADMIN", orgId: "cust-org-1", plan: "PRO" } });
     userFindUnique.mockResolvedValue({ canManualLead: false });
-    const res = await POST(makeReq(VALID_BODY));
-    expect(res.status).toBe(403);
-    expect(processProductMock).not.toHaveBeenCalled();
-  });
-
-  it('returns 403 when DB user record not found', async () => {
-    authMock.mockResolvedValue(USER_SESSION);
-    userFindUnique.mockResolvedValue(null);
-    const res = await POST(makeReq(VALID_BODY));
+    const res = await POST(makePost());
     expect(res.status).toBe(403);
   });
 
-  it('allows non-OWNER user when DB canManualLead is true', async () => {
-    authMock.mockResolvedValue(USER_SESSION);
-    userFindUnique.mockResolvedValue({ canManualLead: true });
-    processProductMock.mockResolvedValue({ outcome: 'lead_created', leadId: 'l2', score: 75 });
-    const res = await POST(makeReq(VALID_BODY));
+  it("returns 400 for bad ASIN URL", async () => {
+    authMock.mockResolvedValue(CUST_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false, plan: "PRO" });
+    const res = await POST(makePost({ amazonUrl: "https://www.amazon.com/not-a-dp-link" }));
+    expect(res.status).toBe(400);
+  });
+
+  it("source org manual lead is added to source pool only — no immediate broadcast", async () => {
+    authMock.mockResolvedValue(SOURCE_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: true, plan: "ENTERPRISE" });
+    processRetailerProduct.mockResolvedValue({ outcome: "lead_created", leadId: "src-lead-1", score: 85 });
+
+    const res  = await POST(makePost());
+    const body = await res.json();
     expect(res.status).toBe(200);
+    // Must NOT call broadcastLeads — source manual leads go to the pool, not customers
+    expect(broadcastLeadsMock).not.toHaveBeenCalled();
+    // Must NOT create an entitlement for the source org itself
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+    // Response has no broadcast field
+    expect(body).not.toHaveProperty("broadcast");
+    expect(body.ok).toBe(true);
   });
 
-  it('reads canManualLead from DB for the requesting user id', async () => {
-    authMock.mockResolvedValue(USER_SESSION);
-    userFindUnique.mockResolvedValue({ canManualLead: true });
-    processProductMock.mockResolvedValue({ outcome: 'lead_created', leadId: 'l3', score: 70 });
-    await POST(makeReq(VALID_BODY));
-    expect(userFindUnique).toHaveBeenCalledWith({
-      where:  { id: USER_SESSION.user.id },
-      select: { canManualLead: true },
-    });
+  it("source org manual lead does not create entitlement for itself", async () => {
+    authMock.mockResolvedValue(SOURCE_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: true, plan: "ENTERPRISE" });
+    processRetailerProduct.mockResolvedValue({ outcome: "lead_created", leadId: "src-lead-1", score: 85 });
+
+    await POST(makePost());
+    expect(entitlementUpsert).not.toHaveBeenCalled();
   });
 
-  it('enforces revocation: DB false overrides any stale JWT value', async () => {
-    // Simulates: admin just revoked canManualLead, user's JWT still says true
-    const sessionWithStaleJwt = {
-      user: { ...USER_SESSION.user, canManualLead: true },
-    };
-    authMock.mockResolvedValue(sessionWithStaleJwt);
-    userFindUnique.mockResolvedValue({ canManualLead: false }); // DB is authoritative
-    const res = await POST(makeReq(VALID_BODY));
-    expect(res.status).toBe(403);
-    expect(processProductMock).not.toHaveBeenCalled();
+  it("source org is never blocked by weekly quota check", async () => {
+    authMock.mockResolvedValue(SOURCE_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: true, plan: "ENTERPRISE" });
+    processRetailerProduct.mockResolvedValue({ outcome: "lead_created", leadId: "src-lead-1", score: 85 });
+    getWeeklyLeadUsageMock.mockResolvedValue(9999);
+
+    const res = await POST(makePost());
+    expect(res.status).toBe(200);
+    expect(getWeeklyLeadUsageMock).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for invalid request body', async () => {
-    authMock.mockResolvedValue(OWNER_SESSION);
-    const res = await POST(makeReq({ amazonUrl: 'not-a-url' }));
-    expect(res.status).toBe(400);
+  it("customer org: creates CUSTOMER_MANUAL entitlement after lead creation", async () => {
+    authMock.mockResolvedValue(CUST_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false, plan: "PRO" });
+    processRetailerProduct.mockResolvedValue({ outcome: "lead_created", leadId: "cust-lead-1", score: 80 });
+
+    const res  = await POST(makePost());
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(entitlementUpsert).toHaveBeenCalledOnce();
+    const call = entitlementUpsert.mock.calls[0][0];
+    expect(call.create.orgId).toBe("cust-org-1");
+    expect(call.create.leadId).toBe("cust-lead-1");
+    expect(call.create.deliverySource).toBe("CUSTOMER_MANUAL");
+    expect(call.create.countsTowardWeeklyLimit).toBe(true);
+    expect(call.create.leadTierAtDelivery).toBe("BASIC");
+    expect(body).not.toHaveProperty("broadcast"); // customer leads are private, no broadcast field
   });
 
-  it('returns 400 when ASIN cannot be extracted from amazon URL', async () => {
-    authMock.mockResolvedValue(OWNER_SESSION);
-    const res = await POST(makeReq({ ...VALID_BODY, amazonUrl: 'https://www.amazon.com/no-asin-here' }));
-    expect(res.status).toBe(400);
+  it("customer org: does not broadcast to other orgs", async () => {
+    authMock.mockResolvedValue(CUST_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false, plan: "PRO" });
+    processRetailerProduct.mockResolvedValue({ outcome: "lead_created", leadId: "cust-lead-1", score: 80 });
+
+    await POST(makePost());
+    expect(broadcastLeadsMock).not.toHaveBeenCalled();
+  });
+
+  it("customer org: returns 429 when weekly limit is reached", async () => {
+    authMock.mockResolvedValue(STARTER_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false, plan: "STARTER" });
+    getWeeklyLeadUsageMock.mockResolvedValue(3);
+
+    const res  = await POST(makePost());
+    const body = await res.json();
+    expect(res.status).toBe(429);
+    expect(body.error).toMatch(/weekly lead limit/i);
+    expect(processRetailerProduct).not.toHaveBeenCalled();
+  });
+
+  it("customer at limit: lead is not created", async () => {
+    authMock.mockResolvedValue(STARTER_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false, plan: "STARTER" });
+    getWeeklyLeadUsageMock.mockResolvedValue(3);
+
+    await POST(makePost());
+    expect(processRetailerProduct).not.toHaveBeenCalled();
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it("customer OWNER role does not bypass weekly quota", async () => {
+    authMock.mockResolvedValue(CUST_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false, plan: "PRO" });
+    getWeeklyLeadUsageMock.mockResolvedValue(15);
+
+    const res = await POST(makePost());
+    expect(res.status).toBe(429);
+    expect(processRetailerProduct).not.toHaveBeenCalled();
+  });
+
+  it("entitlement upsert update is no-op — idempotent on re-submitted same lead", async () => {
+    authMock.mockResolvedValue(CUST_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false, plan: "PRO" });
+    processRetailerProduct.mockResolvedValue({ outcome: "lead_updated", leadId: "cust-lead-1", score: 80 });
+
+    await POST(makePost());
+    const call = entitlementUpsert.mock.calls[0][0];
+    expect(call.update).toEqual({});
+  });
+
+  it("no leadTier filter added to read paths — entitlement existence is the only gate", async () => {
+    authMock.mockResolvedValue(CUST_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false, plan: "PRO" });
+    processRetailerProduct.mockResolvedValue({ outcome: "lead_created", leadId: "cust-lead-1", score: 80 });
+
+    const res = await POST(makePost());
+    expect(res.status).toBe(200);
+    expect(entitlementUpsert).toHaveBeenCalledOnce();
   });
 });

@@ -4,17 +4,28 @@
  * One Apify run, many recipients — cost stays flat regardless of user count.
  *
  * Also exposes backfillOrgFromSource() so a newly-registered org immediately
- * receives the current lead set instead of waiting for the next scan.
+ * receives a plan-appropriate subset of the current lead set.
+ *
+ * Phase 14.8c: every customer-visible copy gets a LeadEntitlement row so the
+ * 14.8b read gate can allow access. Weekly quota is enforced per plan.
  */
 
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import type { Lead, Product } from '@prisma/client';
+import { PLAN_LIMITS } from '@/types';
+import type { Plan } from '@/types';
+import {
+  getCurrentDeliveryWeekStart,
+  allowedLeadTiersForPlan,
+  getWeeklyLeadUsage,
+} from '@/lib/lead-delivery';
 
 type LeadWithProduct = Lead & { product: Product };
 
 // Copy a single source lead's product + lead into a target org (upsert).
-async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct): Promise<void> {
+// Returns the id of the customer org's lead row (new or existing).
+async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct): Promise<string> {
   const p = lead.product;
 
   const productData = {
@@ -108,60 +119,155 @@ async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct): Promis
 
   if (existing) {
     await prisma.lead.update({ where: { id: existing.id }, data: { score: lead.score } });
-  } else {
-    await prisma.lead.create({
-      data: { orgId: targetOrgId, productId: savedProduct.id, score: lead.score, status: 'NEW' },
-    });
+    return existing.id;
   }
+
+  const created = await prisma.lead.create({
+    data: { orgId: targetOrgId, productId: savedProduct.id, score: lead.score, status: 'NEW', leadTier: lead.leadTier },
+  });
+  return created.id;
 }
 
-// Fan out freshly-created leads to every subscriber org.
+// Fan out freshly-created leads to every subscriber org, respecting each org's
+// plan tier allowance and weekly quota. Returns number of entitlements upserted.
 export async function broadcastLeads(sourceOrgId: string, leadIds: string[]): Promise<number> {
   if (leadIds.length === 0) return 0;
 
   const sourceLeads = await prisma.lead.findMany({
     where:   { id: { in: leadIds }, orgId: sourceOrgId },
     include: { product: true },
+    orderBy: [{ score: 'desc' }, { createdAt: 'desc' }],
   });
   if (sourceLeads.length === 0) return 0;
 
   const targetOrgs = await prisma.organization.findMany({
     where:  { receiveBroadcast: true, id: { not: sourceOrgId } },
-    select: { id: true },
+    select: { id: true, plan: true },
   });
   if (targetOrgs.length === 0) return 0;
 
-  let broadcast = 0;
-  for (const { id: targetOrgId } of targetOrgs) {
-    for (const lead of sourceLeads) {
-      await copyLeadToOrg(targetOrgId, lead);
-      broadcast++;
+  const weekStart = getCurrentDeliveryWeekStart();
+  let totalEntitlements = 0;
+
+  for (const org of targetOrgs) {
+    const plan         = org.plan as Plan;
+    const allowedTiers = allowedLeadTiersForPlan(plan);
+    const used         = await getWeeklyLeadUsage(org.id, weekStart);
+    const slots        = Math.max(0, PLAN_LIMITS[plan].leadsPerWeek - used);
+
+    if (slots === 0) {
+      console.log(`[broadcast] org ${org.id} (${plan}) at weekly limit — skipped`);
+      continue;
     }
+
+    // Pre-fetch every lead ID this org already holds an entitlement for (any source,
+    // any week). Dedupe identity: customer lead ID, which is unique per ASIN per org
+    // via the orgId_asin product upsert constraint in copyLeadToOrg.
+    const existing = await prisma.leadEntitlement.findMany({
+      where:  { orgId: org.id },
+      select: { leadId: true },
+    });
+    const alreadyEntitled = new Set(existing.map(e => e.leadId));
+
+    const eligible = sourceLeads
+      .filter(l => allowedTiers.includes(l.leadTier as string as 'BASIC' | 'PRO' | 'PREMIUM'));
+
+    // Iterate through all eligible candidates; skip those the org already owns.
+    // Stop once we have filled the org's remaining weekly slots with NEW entitlements.
+    let newThisRun = 0;
+    for (const lead of eligible) {
+      if (newThisRun >= slots) break;
+
+      const copiedLeadId = await copyLeadToOrg(org.id, lead);
+
+      if (alreadyEntitled.has(copiedLeadId)) {
+        // Org already has this lead from a previous drop or backfill — skip without
+        // consuming a slot. BACKFILL rows (countsTowardWeeklyLimit=false) are also
+        // caught here, preventing duplicate delivery of the same underlying lead.
+        continue;
+      }
+
+      await prisma.leadEntitlement.upsert({
+        where:  { orgId_leadId: { orgId: org.id, leadId: copiedLeadId } },
+        create: {
+          orgId:                   org.id,
+          leadId:                  copiedLeadId,
+          deliverySource:          'AUTO_BROADCAST',
+          countsTowardWeeklyLimit: true,
+          leadTierAtDelivery:      lead.leadTier,
+          deliveryWeekStart:       weekStart,
+          deliveredAt:             new Date(),
+        },
+        update: {},
+      });
+
+      alreadyEntitled.add(copiedLeadId);
+      newThisRun++;
+    }
+
+    totalEntitlements += newThisRun;
   }
 
-  console.log(`[broadcast] ${sourceLeads.length} leads → ${targetOrgs.length} orgs (${broadcast} upserts)`);
-  return broadcast;
+  console.log(`[broadcast] ${totalEntitlements} entitlements upserted across ${targetOrgs.length} orgs`);
+  return totalEntitlements;
 }
 
-// Seed a single new org with the current lead set from the broadcast source.
-// Called at registration so new users don't start with an empty feed.
+// Seed a newly-registered org with a plan-appropriate subset of the current source
+// lead pool. Entitlements count toward the first weekly allocation so the org
+// does not receive more than its advertised drop volume on sign-up.
 export async function backfillOrgFromSource(targetOrgId: string): Promise<number> {
-  const source = await prisma.organization.findFirst({
-    where:  { isBroadcastSource: true },
-    select: { id: true },
-  });
-  if (!source || source.id === targetOrgId) return 0;
+  const [source, targetOrg] = await Promise.all([
+    prisma.organization.findFirst({
+      where:  { isBroadcastSource: true },
+      select: { id: true },
+    }),
+    prisma.organization.findUnique({
+      where:  { id: targetOrgId },
+      select: { id: true, plan: true },
+    }),
+  ]);
+
+  if (!source || !targetOrg || source.id === targetOrgId) return 0;
+
+  const plan         = targetOrg.plan as Plan;
+  const allowedTiers = allowedLeadTiersForPlan(plan);
+  const limit        = PLAN_LIMITS[plan].leadsPerWeek;
+  const weekStart    = getCurrentDeliveryWeekStart();
 
   const sourceLeads = await prisma.lead.findMany({
-    where:   { orgId: source.id, status: { notIn: ['REJECTED', 'EXPIRED'] } },
+    where:   {
+      orgId:    source.id,
+      status:   { notIn: ['REJECTED', 'EXPIRED'] },
+      leadTier: { in: allowedTiers as string[] as ['BASIC'] },
+    },
     include: { product: true },
+    orderBy: [{ score: 'desc' }, { createdAt: 'desc' }],
+    take:    limit,
   });
+
   if (sourceLeads.length === 0) return 0;
 
+  let count = 0;
   for (const lead of sourceLeads) {
-    await copyLeadToOrg(targetOrgId, lead);
+    const copiedLeadId = await copyLeadToOrg(targetOrgId, lead);
+
+    await prisma.leadEntitlement.upsert({
+      where:  { orgId_leadId: { orgId: targetOrgId, leadId: copiedLeadId } },
+      create: {
+        orgId:                   targetOrgId,
+        leadId:                  copiedLeadId,
+        deliverySource:          'BACKFILL',
+        countsTowardWeeklyLimit: true,
+        leadTierAtDelivery:      lead.leadTier,
+        deliveryWeekStart:       weekStart,
+        deliveredAt:             new Date(),
+      },
+      update: {},
+    });
+
+    count++;
   }
 
-  console.log(`[backfill] seeded org ${targetOrgId} with ${sourceLeads.length} leads`);
-  return sourceLeads.length;
+  console.log(`[backfill] seeded org ${targetOrgId} with ${count} leads (plan=${plan}, limit=${limit})`);
+  return count;
 }

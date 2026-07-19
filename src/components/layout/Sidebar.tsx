@@ -56,20 +56,20 @@ interface SidebarProps {
   canManualLead: boolean;
 }
 
-function BrandIcon() {
+function BrandIcon({ gradientId = 'eall-g' }: { gradientId?: string }) {
   return (
     <svg width="34" height="34" viewBox="0 0 42 42" fill="none" aria-hidden="true">
       <defs>
-        <linearGradient id="eall-g" x1="8" y1="8" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+        <linearGradient id={gradientId} x1="8" y1="8" x2="34" y2="34" gradientUnits="userSpaceOnUse">
           <stop stopColor="#93c5fd" />
           <stop offset="1" stopColor="#1d4ed8" />
         </linearGradient>
       </defs>
       <rect width="42" height="42" rx="10" fill="#070d1a" />
-      <rect x="9"  y="9"  width="6"  height="24" rx="2" fill="url(#eall-g)" />
-      <rect x="9"  y="9"  width="22" height="6"  rx="2" fill="url(#eall-g)" />
-      <rect x="9"  y="18" width="16" height="5"  rx="2" fill="url(#eall-g)" />
-      <rect x="9"  y="27" width="22" height="6"  rx="2" fill="url(#eall-g)" />
+      <rect x="9"  y="9"  width="6"  height="24" rx="2" fill={`url(#${gradientId})`} />
+      <rect x="9"  y="9"  width="22" height="6"  rx="2" fill={`url(#${gradientId})`} />
+      <rect x="9"  y="18" width="16" height="5"  rx="2" fill={`url(#${gradientId})`} />
+      <rect x="9"  y="27" width="22" height="6"  rx="2" fill={`url(#${gradientId})`} />
     </svg>
   );
 }
@@ -142,7 +142,7 @@ export function Sidebar({ plan, role, orgName: _orgName, userEmail, canManualLea
         >
           <Menu className="w-5 h-5" />
         </button>
-        <BrandIcon />
+        <BrandIcon gradientId="eall-g-mobile" />
         <div>
           <div className="font-black text-[15px] leading-none tracking-tight text-white">EALL</div>
           <div className="text-[8px] font-bold tracking-[0.22em] text-blue-400 uppercase leading-none mt-[2px]">

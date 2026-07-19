@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, XCircle, Loader2, Radio, ChevronDown, ChevronUp, Save } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, Radio, ChevronDown, ChevronUp, Save, Gift } from 'lucide-react';
 
 interface Subscription {
   status:           string;
@@ -57,6 +57,41 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
   const [roleLoading, setRoleLoading] = useState<string | null>(null); // userId for role updates
   const [expanded, setExpanded]   = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, { plan: string; trialEndsAt: string }>>({});
+
+  // Grant-lead form state per org
+  const [grantForm, setGrantForm] = useState<Record<string, {
+    sourceLeadId: string; countsTowardWeeklyLimit: boolean; note: string;
+    status: 'idle' | 'loading' | 'success' | 'error'; message: string;
+  }>>({});
+
+  function getGrant(orgId: string) {
+    return grantForm[orgId] ?? { sourceLeadId: '', countsTowardWeeklyLimit: false, note: '', status: 'idle', message: '' };
+  }
+  function setGrant(orgId: string, patch: Partial<ReturnType<typeof getGrant>>) {
+    setGrantForm((prev) => ({ ...prev, [orgId]: { ...getGrant(orgId), ...patch } }));
+  }
+
+  async function submitGrant(orgId: string) {
+    const g = getGrant(orgId);
+    if (!g.sourceLeadId.trim()) { setGrant(orgId, { status: 'error', message: 'Source Lead ID is required.' }); return; }
+    setGrant(orgId, { status: 'loading', message: '' });
+    try {
+      const res  = await fetch(`/api/admin/orgs/${orgId}/lead-grant`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ sourceLeadId: g.sourceLeadId.trim(), countsTowardWeeklyLimit: g.countsTowardWeeklyLimit, note: g.note || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setGrant(orgId, { status: 'error', message: data.error ?? 'Grant failed.' }); return; }
+      const msg = data.alreadyGranted
+        ? `Lead already granted (id: ${data.copiedLeadId}).`
+        : `Granted! Lead id: ${data.copiedLeadId}`;
+      setGrant(orgId, { status: 'success', message: msg, sourceLeadId: '', note: '' });
+      router.refresh();
+    } catch {
+      setGrant(orgId, { status: 'error', message: 'Network error.' });
+    }
+  }
 
   function getEdit(org: Org) {
     return edits[org.id] ?? {
@@ -300,6 +335,62 @@ export function AdminOrgsTable({ orgs }: { orgs: Org[] }) {
                           Cancel
                         </button>
                       </div>
+
+                      {/* Grant Lead (owner-curated, not available on source org) */}
+                      {!org.isBroadcastSource && (() => {
+                        const g = getGrant(org.id);
+                        return (
+                          <div>
+                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                              <Gift className="w-3.5 h-3.5" />Grant Lead
+                            </div>
+                            <div className="flex flex-wrap items-end gap-3">
+                              <div>
+                                <label className="block text-xs text-slate-400 mb-1">Source Lead ID</label>
+                                <input
+                                  type="text"
+                                  value={g.sourceLeadId}
+                                  onChange={(e) => setGrant(org.id, { sourceLeadId: e.target.value, status: 'idle', message: '' })}
+                                  placeholder="lead_…"
+                                  className="bg-slate-700 border border-slate-600 rounded-md text-sm text-slate-200 px-3 py-1.5 w-56 focus:outline-none focus:border-blue-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-slate-400 mb-1">Note (optional)</label>
+                                <input
+                                  type="text"
+                                  value={g.note}
+                                  onChange={(e) => setGrant(org.id, { note: e.target.value })}
+                                  placeholder="e.g. VIP bonus"
+                                  className="bg-slate-700 border border-slate-600 rounded-md text-sm text-slate-200 px-3 py-1.5 w-44 focus:outline-none focus:border-blue-500"
+                                />
+                              </div>
+                              <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer pb-1.5">
+                                <input
+                                  type="checkbox"
+                                  checked={g.countsTowardWeeklyLimit}
+                                  onChange={(e) => setGrant(org.id, { countsTowardWeeklyLimit: e.target.checked })}
+                                  className="accent-blue-500"
+                                />
+                                Counts toward weekly limit
+                              </label>
+                              <button
+                                onClick={() => submitGrant(org.id)}
+                                disabled={g.status === 'loading'}
+                                className="flex items-center gap-1.5 btn-primary text-sm py-1.5 pb-1.5"
+                              >
+                                {g.status === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Gift className="w-3.5 h-3.5" />}
+                                Grant
+                              </button>
+                            </div>
+                            {g.message && (
+                              <p className={`text-xs mt-1.5 ${g.status === 'error' ? 'text-red-400' : 'text-green-400'}`}>
+                                {g.message}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Member role management */}
                       {org.users.length > 0 && (

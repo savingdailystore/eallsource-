@@ -25,7 +25,7 @@ type LeadWithProduct = Lead & { product: Product };
 
 // Copy a single source lead's product + lead into a target org (upsert).
 // Returns the id of the customer org's lead row (new or existing).
-async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct): Promise<string> {
+export async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct): Promise<string> {
   const p = lead.product;
 
   const productData = {

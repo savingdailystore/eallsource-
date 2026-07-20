@@ -17,7 +17,7 @@ const AUTH_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'
 
 // Marketing / legal pages: visible to everyone, signed in or not. Amazon's
 // SP-API review and Stripe both require these to be publicly reachable.
-const OPEN_PATHS = ['/privacy', '/terms', '/contact'];
+const OPEN_PATHS = ['/privacy', '/terms', '/contact', '/pricing', '/support'];
 
 // CSP must be generated here (not in next.config.ts) with a per-request
 // nonce — see src/lib/csp.ts for why. A static CSP with no nonce took the

@@ -84,7 +84,7 @@ export default function PricingPage() {
               <span className="text-3xl font-black text-slate-50">$50</span>
               <span className="text-slate-500 text-sm">/mo</span>
             </div>
-            <p className="text-xs text-slate-500 mb-5">Billed monthly, cancel any time</p>
+            <p className="text-xs text-slate-500 mb-5">$50/month · contact us to activate</p>
             <ul className="space-y-2 text-sm text-slate-400 mb-6 flex-1">
               {PRO_FEATURES.map((f) => (
                 <li key={f} className="flex items-start gap-2">
@@ -93,9 +93,12 @@ export default function PricingPage() {
                 </li>
               ))}
             </ul>
-            <Link href="/register" className="btn-primary w-full flex items-center justify-center">
-              Start for free
-            </Link>
+            <a
+              href={`mailto:${SUPPORT_EMAIL}?subject=EALLsource Pro Upgrade`}
+              className="btn-primary w-full flex items-center justify-center"
+            >
+              Contact us to upgrade
+            </a>
           </div>
 
           {/* Enterprise */}
@@ -142,8 +145,8 @@ export default function PricingPage() {
             <p className="mt-1">No. EALLsource&apos;s sourcing engine runs on our schedule and delivers leads to you. Customer-run scanning is not available on any self-serve plan.</p>
           </div>
           <div>
-            <p className="text-slate-200 font-medium">Can I cancel any time?</p>
-            <p className="mt-1">Yes. Cancel your Pro subscription at any time from your billing settings; it remains active through the end of the current billing period.</p>
+            <p className="text-slate-200 font-medium">How do I upgrade to Pro?</p>
+            <p className="mt-1">During our current launch period, Pro plan activation is handled manually. Email <a href={`mailto:${SUPPORT_EMAIL}?subject=EALLsource Pro Upgrade`} className="text-blue-400 hover:underline">{SUPPORT_EMAIL}</a> and we&apos;ll get you set up. Pro is billed at $50/month and can be cancelled at any time by contacting us.</p>
           </div>
           <div>
             <p className="text-slate-200 font-medium">Questions?</p>

@@ -73,8 +73,8 @@ export default function SupportPage() {
           </div>
 
           <div>
-            <p className="text-slate-200 font-medium mb-1">Billing and subscription</p>
-            <p>For billing questions, include your account email and the approximate date of the charge. We use Stripe for payment processing — we never store your full card number.</p>
+            <p className="text-slate-200 font-medium mb-1">Billing and plan upgrades</p>
+            <p>Pro plan activation is handled manually during our current launch period. Email us to upgrade, change, or cancel your plan. Include your account email so we can locate your account quickly.</p>
           </div>
 
           <div>

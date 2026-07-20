@@ -122,9 +122,12 @@ export default async function RootPage() {
                 </li>
               ))}
             </ul>
-            <Link href="/register" className="btn-primary w-full flex items-center justify-center">
-              Start for free
-            </Link>
+            <a
+              href="mailto:support@eallsource.com?subject=EALLsource Pro Upgrade"
+              className="btn-primary w-full flex items-center justify-center"
+            >
+              Contact us to upgrade
+            </a>
           </div>
 
           {/* Need more? */}

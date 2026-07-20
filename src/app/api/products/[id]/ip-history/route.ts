@@ -27,25 +27,47 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const product = await prisma.product.findFirst({
     where:  { id, orgId: session.user.orgId },
-    select: { asin: true },
+    select: { asin: true, hasIpComplaintHistory: true },
   });
   if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const ipComplaintNote = flagged ? (note?.trim() || null) : null;
+  const previousState   = product.hasIpComplaintHistory;
 
-  const updated = await prisma.product.updateMany({
-    where: { asin: product.asin },
-    data:  { hasIpComplaintHistory: flagged, ipComplaintNote },
+  const [updated, rejectedResult] = await prisma.$transaction(async (tx) => {
+    const upd = await tx.product.updateMany({
+      where: { asin: product.asin },
+      data:  { hasIpComplaintHistory: flagged, ipComplaintNote },
+    });
+
+    let rej = { count: 0 };
+    if (flagged) {
+      rej = await tx.lead.updateMany({
+        where: { product: { asin: product.asin }, status: { notIn: ['REJECTED', 'EXPIRED'] } },
+        data:  { status: 'REJECTED' },
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        orgId:    session.user.orgId,
+        userId:   session.user.id,
+        action:   flagged ? 'IP_COMPLAINT_ASIN_FLAGGED' : 'IP_COMPLAINT_ASIN_CLEARED',
+        resource: 'Product',
+        metadata: {
+          adminEmail:             session.user.email,
+          productId:              id,
+          asin:                   product.asin,
+          previousHasIpComplaint: previousState,
+          newHasIpComplaint:      flagged,
+          note:                   ipComplaintNote,
+          leadsRejected:          flagged ? rej.count : 0,
+        },
+      },
+    }).catch(() => {});
+
+    return [upd, rej] as const;
   });
 
-  let leadsRejected = 0;
-  if (flagged) {
-    const res = await prisma.lead.updateMany({
-      where: { product: { asin: product.asin }, status: { notIn: ['REJECTED', 'EXPIRED'] } },
-      data:  { status: 'REJECTED' },
-    });
-    leadsRejected = res.count;
-  }
-
-  return NextResponse.json({ ok: true, flagged, updated: updated.count, leadsRejected });
+  return NextResponse.json({ ok: true, flagged, updated: updated.count, leadsRejected: rejectedResult.count });
 }

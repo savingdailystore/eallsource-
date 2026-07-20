@@ -7,27 +7,31 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Products' };
 
-interface SearchParams { page?: string; search?: string; category?: string; retailer?: string; }
+interface SearchParams { page?: string; search?: string; category?: string; retailer?: string; showBlocked?: string; }
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const session = await auth();
   const orgId   = session!.user.orgId;
   const sp      = await searchParams;
 
-  const page     = Number(sp.page ?? 1);
-  const pageSize = 25;
-  const search   = sp.search?.trim();
-  const category = sp.category;
-  const retailer = sp.retailer;
+  const page        = Number(sp.page ?? 1);
+  const pageSize    = 25;
+  const search      = sp.search?.trim();
+  const category    = sp.category;
+  const retailer    = sp.retailer;
+  const isOwner     = session!.user.role === 'OWNER';
+  // showBlocked is honored only for OWNER — customers cannot opt in via URL param.
+  const showBlocked = isOwner && sp.showBlocked === 'true';
 
   const where: any = {
     orgId,
+    ...(showBlocked ? {} : { hasIpComplaintHistory: false }),
     ...(search   ? { OR: [{ title: { contains: search, mode: 'insensitive' } }, { asin: { contains: search } }] } : {}),
     ...(category ? { category: { equals: category, mode: 'insensitive' } } : {}),
     ...(retailer ? { sourceRetailer: { equals: retailer, mode: 'insensitive' } } : {}),
   };
 
-  const hasFilters = !!search || !!category || !!retailer;
+  const hasFilters = !!search || !!category || !!retailer || showBlocked;
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
@@ -57,7 +61,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         )}
       </div>
 
-      <ProductsTable products={products as any} total={total} page={page} pageSize={pageSize} isOwner={session!.user.role === 'OWNER'} hasFilters={hasFilters} />
+      <ProductsTable products={products as any} total={total} page={page} pageSize={pageSize} isOwner={isOwner} hasFilters={hasFilters} showBlocked={showBlocked} />
     </div>
   );
 }

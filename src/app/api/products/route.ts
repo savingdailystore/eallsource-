@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCached } from '@/lib/redis';
+import { isPlatformAdmin } from '@/lib/admin';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +24,14 @@ export async function GET(req: NextRequest) {
   const sortBy       = sp.get('sortBy') ?? 'score';
   const sortOrder    = (sp.get('sortOrder') as 'asc' | 'desc') ?? 'desc';
 
+  // showBlocked=true reveals IP-flagged products; restricted to OWNER / platform admin.
+  const isPrivileged = session.user.role === 'OWNER' || isPlatformAdmin(session.user.email);
+  const showBlocked  = isPrivileged && sp.get('showBlocked') === 'true';
+
   const where: any = {
     orgId,
+    // Hide IP-flagged products from all users by default; privileged users may opt in.
+    ...(showBlocked ? {} : { hasIpComplaintHistory: false }),
     ...(search    ? { OR: [{ title: { contains: search, mode: 'insensitive' } }, { asin: { contains: search } }] } : {}),
     ...(category  ? { category:      { equals: category, mode: 'insensitive' } } : {}),
     ...(retailer  ? { sourceRetailer:{ equals: retailer, mode: 'insensitive' } } : {}),
@@ -37,7 +44,7 @@ export async function GET(req: NextRequest) {
   const VALID_SORT = ['score', 'roi', 'profit', 'bsr', 'createdAt'];
   const orderBy = { [VALID_SORT.includes(sortBy) ? sortBy : 'score']: sortOrder };
 
-  const cacheKey = `products:${orgId}:${JSON.stringify({ page, pageSize, search, category, retailer, buyBoxOwner, ipRisk, minRoi, minProfit, sortBy, sortOrder })}`;
+  const cacheKey = `products:${orgId}:${JSON.stringify({ page, pageSize, search, category, retailer, buyBoxOwner, ipRisk, minRoi, minProfit, sortBy, sortOrder, showBlocked })}`;
 
   const result = await getCached(cacheKey, async () => {
     const skip = (page - 1) * pageSize;

@@ -19,6 +19,8 @@ export interface ProductRow {
   demandLevel: string; gatingRisk: string; ipRiskScore?: string | null;
   autoUngated?: boolean | null; amazonOwnsBuyBox?: boolean | null; buyBoxOwner?: string | null;
   keepaLink?: string | null; score: number; createdAt: string;
+  hasIpComplaintHistory?: boolean | null;
+  ipComplaintNote?: string | null;
 }
 
 function IpBadge({ score }: { score?: string | null }) {
@@ -27,9 +29,9 @@ function IpBadge({ score }: { score?: string | null }) {
   return <span className="flex items-center gap-1 text-xs text-green-400"><ShieldCheck className="w-3 h-3" />Low</span>;
 }
 
-interface Props { products: ProductRow[]; total: number; page: number; pageSize: number; isOwner?: boolean; hasFilters?: boolean; }
+interface Props { products: ProductRow[]; total: number; page: number; pageSize: number; isOwner?: boolean; hasFilters?: boolean; showBlocked?: boolean; }
 
-export function ProductsTable({ products, total, page, pageSize, isOwner = false, hasFilters = false }: Props) {
+export function ProductsTable({ products, total, page, pageSize, isOwner = false, hasFilters = false, showBlocked = false }: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -77,6 +79,19 @@ export function ProductsTable({ products, total, page, pageSize, isOwner = false
 
   return (
     <div className="space-y-4">
+      {isOwner && (
+        <div className="flex items-center justify-end gap-2 text-xs">
+          {showBlocked ? (
+            <a href="?" className="text-slate-400 hover:text-slate-200 underline underline-offset-2">
+              Hide blocked ASINs
+            </a>
+          ) : (
+            <a href="?showBlocked=true" className="text-red-400 hover:text-red-300 underline underline-offset-2">
+              Show blocked ASINs
+            </a>
+          )}
+        </div>
+      )}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm" style={{ minWidth: '900px' }}>
@@ -95,7 +110,18 @@ export function ProductsTable({ products, total, page, pageSize, isOwner = false
                 const discounts = (p.availableDiscounts as Discount[] | null) ?? [];
                 return (
                   <React.Fragment key={p.id}>
-                    <tr className="cursor-pointer hover:bg-slate-800/40 transition-colors" onClick={() => setExpanded(isExp ? null : p.id)}>
+                    {p.hasIpComplaintHistory && (
+                      <tr className="bg-red-500/10 border-b border-red-500/20">
+                        <td colSpan={11} className="px-4 py-1.5">
+                          <div className="flex items-center gap-2 text-xs text-red-300 font-medium">
+                            <ShieldAlert className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                            <span>Blocked ASIN — IP complaint history · Not deliverable to customers</span>
+                            {p.ipComplaintNote && <span className="text-red-200/60">· {p.ipComplaintNote}</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    <tr className={cn('cursor-pointer hover:bg-slate-800/40 transition-colors', p.hasIpComplaintHistory && 'opacity-50')} onClick={() => setExpanded(isExp ? null : p.id)}>
                       <td className="table-td">
                         <div className="flex items-center gap-3" style={{ minWidth: '180px' }}>
                           <div className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center flex-shrink-0 overflow-hidden">

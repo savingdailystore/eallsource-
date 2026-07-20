@@ -21,6 +21,7 @@ export interface ProductRow {
   keepaLink?: string | null; score: number; createdAt: string;
   hasIpComplaintHistory?: boolean | null;
   ipComplaintNote?: string | null;
+  isBrandBlocked?: boolean | null;
 }
 
 function IpBadge({ score }: { score?: string | null }) {
@@ -121,7 +122,17 @@ export function ProductsTable({ products, total, page, pageSize, isOwner = false
                         </td>
                       </tr>
                     )}
-                    <tr className={cn('cursor-pointer hover:bg-slate-800/40 transition-colors', p.hasIpComplaintHistory && 'opacity-50')} onClick={() => setExpanded(isExp ? null : p.id)}>
+                    {p.isBrandBlocked && !p.hasIpComplaintHistory && (
+                      <tr className="bg-orange-500/10 border-b border-orange-500/20">
+                        <td colSpan={11} className="px-4 py-1.5">
+                          <div className="flex items-center gap-2 text-xs text-orange-300 font-medium">
+                            <ShieldAlert className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                            <span>Blocked Brand — brand-level block active · Not deliverable to customers</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    <tr className={cn('cursor-pointer hover:bg-slate-800/40 transition-colors', (p.hasIpComplaintHistory || p.isBrandBlocked) && 'opacity-50')} onClick={() => setExpanded(isExp ? null : p.id)}>
                       <td className="table-td">
                         <div className="flex items-center gap-3" style={{ minWidth: '180px' }}>
                           <div className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-900 flex items-center justify-center flex-shrink-0 overflow-hidden">

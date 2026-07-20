@@ -16,6 +16,7 @@
 
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
+import { normalizeBrand } from '@/lib/brand';
 import { getKeepaData } from '@/lib/keepa';
 import { getProductData, searchCatalogByUpc, searchCatalogByEan, searchCatalogByKeywords, getFeeEstimate } from '@/lib/amazon';
 import { calculateProfitability } from '@/engines/profitability';
@@ -51,6 +52,7 @@ export type PipelineResult =
   | { outcome: 'hazmat' }
   | { outcome: 'generic_brand' }
   | { outcome: 'ip_complaint_history' }
+  | { outcome: 'brand_blocked';      brand: string }
   | { outcome: 'error';             message: string };
 
 // Lightweight per-product diagnostic for debugging match quality — e.g. why
@@ -175,6 +177,22 @@ export async function processRetailerProduct(
 
     const resellPrice = lowestFbaPrice ?? buyBoxPrice ?? product.price;
     const category    = amazonCategory ?? product.category ?? 'Other';
+
+    // Brand blocklist gate — checked after Amazon brand is known so we use the
+    // authoritative Amazon brand, not the retailer-supplied one (which can differ).
+    // Never bypassed by force: a brand block is a confirmed legal/IP decision
+    // that applies to the entire brand catalogue, not a per-product heuristic.
+    const brandKey = normalizeBrand(amazonBrand ?? product.brand);
+    if (brandKey) {
+      const blockedBrand = await prisma.brandBlock.findFirst({
+        where:  { normalizedBrand: brandKey, isActive: true },
+        select: { id: true },
+      });
+      if (blockedBrand) {
+        emitDiag('brand_blocked', amazonTitle);
+        return { outcome: 'brand_blocked', brand: amazonBrand ?? product.brand ?? brandKey };
+      }
+    }
 
     // Minimum resale-price floor: sub-$12 ASP items rarely clear the profit
     // floor after fees, and the per-unit labor (prep, ship, manage) isn't worth

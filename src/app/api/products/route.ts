@@ -30,8 +30,9 @@ export async function GET(req: NextRequest) {
 
   const where: any = {
     orgId,
-    // Hide IP-flagged products from all users by default; privileged users may opt in.
-    ...(showBlocked ? {} : { hasIpComplaintHistory: false }),
+    // Hide IP-flagged and brand-blocked products from all users by default;
+    // privileged users may opt in to see them via showBlocked=true.
+    ...(showBlocked ? {} : { hasIpComplaintHistory: false, isBrandBlocked: false }),
     ...(search    ? { OR: [{ title: { contains: search, mode: 'insensitive' } }, { asin: { contains: search } }] } : {}),
     ...(category  ? { category:      { equals: category, mode: 'insensitive' } } : {}),
     ...(retailer  ? { sourceRetailer:{ equals: retailer, mode: 'insensitive' } } : {}),

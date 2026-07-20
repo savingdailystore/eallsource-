@@ -287,6 +287,12 @@ model Product {
   hasIpComplaintHistory Boolean @default(false)
   ipComplaintNote       String?
 
+  // Set to true when this product's brand is in the active BrandBlock list.
+  // Maintained by the brand-block API: set on block creation, cleared on block
+  // deactivation. Prevents brand-blocked products from appearing in the default
+  // customer Products view (same showBlocked opt-in as hasIpComplaintHistory).
+  isBrandBlocked Boolean @default(false)
+
   // Demand & price stability
   demandLevel    DemandLevel @default(MEDIUM)
   priceStability String?
@@ -874,4 +880,37 @@ model SaleAdjustmentRecord {
   @@index([orgId, saleRecordId])
   @@index([orgId, orderItemCode])
   @@map("sale_adjustment_records")
+}
+
+// ─── Brand Blocklist ────────────────────────────────────────────────────────
+//
+// Global (cross-org) brand-level safety list. When a brand is blocked:
+//   • future pipeline leads are rejected with outcome: 'brand_blocked'
+//   • all active leads for that brand are marked REJECTED across all orgs
+//   • Products with that brand get isBrandBlocked=true and are hidden from
+//     the default customer Products view (same showBlocked opt-in as ASIN blocks)
+//
+// Records are NEVER deleted; deactivated via isActive=false + clearedAt so
+// the full block/clear history is preserved for audit.
+// normalizedBrand (lowercase+trimmed) is the deduplication key — re-blocking
+// a cleared brand reactivates the existing row rather than inserting a duplicate.
+
+model BrandBlock {
+  id              String    @id @default(cuid())
+  brand           String    // original brand name as entered by admin
+  normalizedBrand String    @unique // LOWER(TRIM(brand)) — dedup + pipeline lookup key
+  reason          String?   // short public reason (e.g. "Private label — Astercook")
+  note            String?   // optional operator-only note
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdByUserId String?
+  createdByEmail  String?
+  clearedAt       DateTime?
+  clearedByUserId String?
+  clearedByEmail  String?
+
+  @@index([isActive])
+  @@index([normalizedBrand, isActive])
+  @@map("brand_blocks")
 }

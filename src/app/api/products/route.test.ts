@@ -142,4 +142,39 @@ describe('GET /api/products', () => {
     expect(body.data).toHaveLength(1);
     expect(body.total).toBe(1);
   });
+
+  // ── 8. isBrandBlocked default filter ─────────────────────────────────────
+
+  it('excludes isBrandBlocked=true products by default', async () => {
+    mockAuth.mockResolvedValue({ user: { orgId: 'org1', role: 'ADMIN', email: 'user@org.com' } });
+
+    await GET(makeReq());
+
+    expect(productFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isBrandBlocked: false }),
+      }),
+    );
+  });
+
+  it('omits isBrandBlocked filter when OWNER requests showBlocked=true', async () => {
+    mockAuth.mockResolvedValue({ user: { orgId: 'org1', role: 'OWNER', email: 'owner@org.com' } });
+
+    await GET(makeReq({ showBlocked: 'true' }));
+
+    const callArg = productFindMany.mock.calls[0][0] as { where: Record<string, unknown> };
+    expect(callArg.where).not.toHaveProperty('isBrandBlocked');
+  });
+
+  it('still excludes isBrandBlocked products when non-OWNER non-admin passes showBlocked=true', async () => {
+    mockAuth.mockResolvedValue({ user: { orgId: 'org1', role: 'ANALYST', email: 'analyst@org.com' } });
+
+    await GET(makeReq({ showBlocked: 'true' }));
+
+    expect(productFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isBrandBlocked: false }),
+      }),
+    );
+  });
 });

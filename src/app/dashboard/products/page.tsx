@@ -25,7 +25,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   const where: any = {
     orgId,
-    ...(showBlocked ? {} : { hasIpComplaintHistory: false }),
+    ...(showBlocked ? {} : { hasIpComplaintHistory: false, isBrandBlocked: false }),
     ...(search   ? { OR: [{ title: { contains: search, mode: 'insensitive' } }, { asin: { contains: search } }] } : {}),
     ...(category ? { category: { equals: category, mode: 'insensitive' } } : {}),
     ...(retailer ? { sourceRetailer: { equals: retailer, mode: 'insensitive' } } : {}),

@@ -12,6 +12,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { normalizeBrand } from '@/lib/brand';
 import type { Lead, Product } from '@prisma/client';
 import { PLAN_LIMITS } from '@/types';
 import type { Plan } from '@/types';
@@ -140,6 +141,19 @@ export async function broadcastLeads(sourceOrgId: string, leadIds: string[]): Pr
   });
   if (sourceLeads.length === 0) return 0;
 
+  // Defensive brand-block filter: the pipeline gate prevents new leads from blocked
+  // brands entering the source org, but a brand may have been blocked after a lead
+  // was already created. Exclude those leads from this broadcast run.
+  const activeBlocks = await prisma.brandBlock.findMany({
+    where:  { isActive: true },
+    select: { normalizedBrand: true },
+  });
+  const blockedBrandSet = new Set(activeBlocks.map(b => b.normalizedBrand));
+  const filteredLeads = sourceLeads.filter(l => {
+    const nb = normalizeBrand(l.product.brand);
+    return !nb || !blockedBrandSet.has(nb);
+  });
+
   const targetOrgs = await prisma.organization.findMany({
     where:  { receiveBroadcast: true, id: { not: sourceOrgId } },
     select: { id: true, plan: true },
@@ -169,7 +183,7 @@ export async function broadcastLeads(sourceOrgId: string, leadIds: string[]): Pr
     });
     const alreadyEntitled = new Set(existing.map(e => e.leadId));
 
-    const eligible = sourceLeads
+    const eligible = filteredLeads
       .filter(l => allowedTiers.includes(l.leadTier as string as 'BASIC' | 'PRO' | 'PREMIUM'));
 
     // Iterate through all eligible candidates; skip those the org already owns.
@@ -247,8 +261,19 @@ export async function backfillOrgFromSource(targetOrgId: string): Promise<number
 
   if (sourceLeads.length === 0) return 0;
 
+  // Defensive brand-block filter for backfill (same rationale as broadcastLeads).
+  const backfillBlocks = await prisma.brandBlock.findMany({
+    where:  { isActive: true },
+    select: { normalizedBrand: true },
+  });
+  const backfillBlockedSet = new Set(backfillBlocks.map(b => b.normalizedBrand));
+  const eligibleLeads = sourceLeads.filter(l => {
+    const nb = normalizeBrand(l.product.brand);
+    return !nb || !backfillBlockedSet.has(nb);
+  });
+
   let count = 0;
-  for (const lead of sourceLeads) {
+  for (const lead of eligibleLeads) {
     const copiedLeadId = await copyLeadToOrg(targetOrgId, lead);
 
     await prisma.leadEntitlement.upsert({

@@ -11,6 +11,7 @@ const leadCreate           = vi.fn();
 const leadUpdate           = vi.fn();
 const entitlementUpsert    = vi.fn();
 const entitlementFindMany  = vi.fn();
+const brandBlockFindMany   = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -18,6 +19,7 @@ vi.mock('@/lib/prisma', () => ({
     organization:    { findMany: (...a: unknown[]) => orgFindMany(...a), findFirst: (...a: unknown[]) => orgFindFirst(...a), findUnique: (...a: unknown[]) => orgFindUnique(...a) },
     product:         { upsert: (...a: unknown[]) => productUpsert(...a) },
     leadEntitlement: { upsert: (...a: unknown[]) => entitlementUpsert(...a), findMany: (...a: unknown[]) => entitlementFindMany(...a) },
+    brandBlock:      { findMany: (...a: unknown[]) => brandBlockFindMany(...a) },
   },
 }));
 
@@ -83,6 +85,7 @@ describe('broadcastLeads', () => {
     entitlementFindMany.mockResolvedValue([]); // no pre-existing entitlements
     getWeeklyLeadUsageMock.mockResolvedValue(0);
     allowedLeadTiersForPlanMock.mockReturnValue(['BASIC', 'PRO']);
+    brandBlockFindMany.mockResolvedValue([]); // no active brand blocks by default
   });
 
   it('returns 0 for empty leadIds', async () => {
@@ -334,6 +337,7 @@ describe('backfillOrgFromSource', () => {
     leadUpdate.mockResolvedValue({});
     entitlementUpsert.mockResolvedValue({});
     allowedLeadTiersForPlanMock.mockReturnValue(['BASIC', 'PRO']);
+    brandBlockFindMany.mockResolvedValue([]); // no active brand blocks by default
   });
 
   it('returns 0 if source org not found', async () => {

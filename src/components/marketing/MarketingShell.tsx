@@ -53,9 +53,10 @@ export default function MarketingShell({ children }: { children: React.ReactNode
         <div className="max-w-5xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
           <p className="text-slate-500">© {new Date().getFullYear()} EALLsource. All rights reserved.</p>
           <nav className="flex items-center gap-5">
+            <Link href="/pricing" className="text-slate-400 hover:text-slate-200 transition-colors">Pricing</Link>
             <Link href="/privacy" className="text-slate-400 hover:text-slate-200 transition-colors">Privacy Policy</Link>
             <Link href="/terms"   className="text-slate-400 hover:text-slate-200 transition-colors">Terms of Service</Link>
-            <Link href="/contact" className="text-slate-400 hover:text-slate-200 transition-colors">Contact</Link>
+            <Link href="/support" className="text-slate-400 hover:text-slate-200 transition-colors">Support</Link>
             <a href={`mailto:${SUPPORT_EMAIL}`} className="text-slate-400 hover:text-slate-200 transition-colors">{SUPPORT_EMAIL}</a>
           </nav>
         </div>

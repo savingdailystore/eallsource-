@@ -158,18 +158,16 @@ export default async function AmazonPage({ searchParams: searchParamsPromise }: 
           <h2 className="font-semibold text-slate-50 mb-4">Available Integrations</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
-              ['Inventory Sync', 'Pull current FBA inventory levels', true],
-              ['Listings API', 'Update listing prices and quantities', true],
-              ['Orders API', 'Track sales and fulfilled orders', true],
-              ['Reports API', 'Download settlement and inventory reports', false],
-            ].map(([name, desc, active]) => (
+              ['Inventory Sync', 'Pull current FBA inventory levels'],
+              ['Listings API', 'Update listing prices and quantities'],
+              ['Reports API', 'Download settlement and reimbursement reports'],
+            ].map(([name, desc]) => (
               <div
                 key={name as string}
-                className={`rounded-xl border p-4 ${active ? 'border-green-500/30 bg-green-500/10' : 'border-slate-800 bg-slate-800/40 opacity-60'}`}
+                className="rounded-xl border p-4 border-green-500/30 bg-green-500/10"
               >
                 <div className="font-medium text-slate-100 text-sm">{name as string}</div>
                 <div className="text-xs text-slate-400 mt-1">{desc as string}</div>
-                {!active && <div className="text-xs text-amber-400 mt-2">Coming soon</div>}
               </div>
             ))}
           </div>

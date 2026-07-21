@@ -30,6 +30,12 @@ export async function GET(req: NextRequest) {
   const minRoi    = sp.get('minRoi')    ? Number(sp.get('minRoi'))    : undefined;
   const minProfit = sp.get('minProfit') ? Number(sp.get('minProfit')) : undefined;
   const sortBy    = sp.get('sortBy') ?? 'score';
+  const rawDateFilter = sp.get('dateFilter');
+  const dateFilter = rawDateFilter === 'today' || rawDateFilter === 'week' ? rawDateFilter : undefined;
+  const now = Date.now();
+  const dateBoundary = dateFilter === 'today' ? new Date(now - 24 * 60 * 60 * 1000)
+                     : dateFilter === 'week'  ? new Date(now - 7 * 24 * 60 * 60 * 1000)
+                     : undefined;
 
   const org = await prisma.organization.findUnique({
     where:  { id: orgId },
@@ -42,6 +48,7 @@ export async function GET(req: NextRequest) {
     ...(status
       ? { status }
       : { status: { notIn: ['REJECTED', 'EXPIRED'] } }),
+    ...(dateBoundary ? { createdAt: { gte: dateBoundary } } : {}),
     product: {
       validationPassed: true,
       ...(minRoi    != null ? { roi:    { gte: minRoi    } } : {}),
@@ -52,9 +59,10 @@ export async function GET(req: NextRequest) {
   const orderBy =
     sortBy === 'roi'    ? { product: { roi:    'desc' as const } } :
     sortBy === 'profit' ? { product: { profit: 'desc' as const } } :
-    { score: 'desc' as const };
+    dateFilter          ? { createdAt: 'desc' as const }
+    : { score: 'desc' as const };
 
-  const cacheKey = `leads:${orgId}:${page}:${pageSize}:${status}:${minRoi}:${minProfit}:${sortBy}`;
+  const cacheKey = `leads:${orgId}:${page}:${pageSize}:${status}:${minRoi}:${minProfit}:${sortBy}:${dateFilter}`;
 
   const result = await getCached(cacheKey, async () => {
     const skip = (page - 1) * pageSize;

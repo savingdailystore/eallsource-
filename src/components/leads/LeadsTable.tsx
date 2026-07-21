@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   ChevronDown, ChevronUp, ExternalLink, TrendingUp,
   ShieldCheck, ShieldAlert, ShieldX, Bookmark, BookmarkCheck,
-  Package, Check, X, Minus, ChevronLeft, ChevronRight, Trash2, Loader2,
+  Package, Check, X, Minus, ChevronLeft, ChevronRight, Trash2, Loader2, Sparkles,
 } from 'lucide-react';
 import { formatCurrency, formatPercent, cn } from '@/lib/utils';
 import { discountUrl } from '@/lib/discount-urls';
@@ -62,6 +62,20 @@ export interface LeadRow {
     urlScore?: number | null;
     priceScore?: number | null;
     inventoryScore?: number | null;
+  };
+}
+
+const MS_24H = 24 * 60 * 60 * 1000;
+const MS_48H = 48 * 60 * 60 * 1000;
+
+function formatLeadDate(createdAt: string): { label: string; isNew: boolean } {
+  const diff = Date.now() - new Date(createdAt).getTime();
+  if (diff < MS_24H) return { label: 'Today', isNew: true };
+  if (diff < MS_48H) return { label: 'Yesterday', isNew: false };
+  const d = new Date(createdAt);
+  return {
+    label: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    isNew: false,
   };
 }
 
@@ -267,9 +281,11 @@ interface LeadsTableProps {
   orgPlan: Plan;
   isOwner?: boolean;
   hasFilters?: boolean;
+  dateFilter?: string;
+  baseHref?: string;
 }
 
-export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = false, hasFilters = false }: LeadsTableProps) {
+export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = false, hasFilters = false, dateFilter, baseHref = '/dashboard/leads' }: LeadsTableProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<string | null>(null);
   const totalPages = Math.ceil(total / pageSize);
@@ -303,9 +319,15 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = fa
     return (
       <div className="card py-16 text-center">
         <TrendingUp className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-        <p className="text-slate-400 font-medium">No leads match these filters</p>
+        <p className="text-slate-400 font-medium">
+          {dateFilter === 'today' ? 'No new leads in the last 24 hours'
+           : dateFilter === 'week' ? 'No new leads in the last 7 days'
+           : 'No leads match these filters'}
+        </p>
         <p className="text-sm text-slate-500 mt-1">
-          Try clearing filters or turning off <strong className="text-slate-400">Sellable Only</strong>.
+          {dateFilter
+            ? 'Try expanding the time window or viewing all time.'
+            : <>Try clearing filters or turning off <strong className="text-slate-400">Sellable Only</strong>.</>}
         </p>
         <Link href="/dashboard/leads" className="btn-secondary text-sm mt-4 inline-flex items-center">
           Clear filters
@@ -356,6 +378,16 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = fa
                                 🏷 SALE{p.sourceListPrice != null ? ` · was ${formatCurrency(p.sourceListPrice)}` : ''}
                               </span>
                             )}
+                            {(() => {
+                              const { label, isNew } = formatLeadDate(lead.createdAt);
+                              return isNew ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 mt-0.5 ml-2">
+                                  <Sparkles className="w-3 h-3" />New
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-600 mt-0.5 ml-2">{label}</span>
+                              );
+                            })()}
                           </div>
                         </div>
                       </td>
@@ -441,14 +473,14 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = fa
           </span>
           <div className="flex items-center gap-2">
             <a
-              href={`?page=${page - 1}`}
+              href={`${baseHref}${baseHref.includes('?') ? '&' : '?'}page=${page - 1}`}
               className={cn('btn-secondary text-xs py-1.5', page <= 1 && 'pointer-events-none opacity-40')}
             >
               <ChevronLeft className="w-3.5 h-3.5" />Prev
             </a>
             <span className="text-slate-300 px-2">Page {page} of {totalPages}</span>
             <a
-              href={`?page=${page + 1}`}
+              href={`${baseHref}${baseHref.includes('?') ? '&' : '?'}page=${page + 1}`}
               className={cn('btn-secondary text-xs py-1.5', page >= totalPages && 'pointer-events-none opacity-40')}
             >
               Next<ChevronRight className="w-3.5 h-3.5" />

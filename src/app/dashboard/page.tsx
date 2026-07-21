@@ -389,7 +389,7 @@ export default async function DashboardPage() {
       icon:  TrendingUp,
       color: 'text-blue-400',
       bg:    'bg-blue-500/10',
-      href:  '/dashboard/leads',
+      href:  leadSummary.newToday > 0 ? '/dashboard/leads?dateFilter=today' : '/dashboard/leads',
     },
     {
       label: 'Purchased Leads',

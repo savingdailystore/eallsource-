@@ -8,7 +8,7 @@ import Link from 'next/link';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Lead Feed' };
 
-interface SearchParams { page?: string; status?: string; minRoi?: string; sortBy?: string; gating?: string; }
+interface SearchParams { page?: string; status?: string; minRoi?: string; sortBy?: string; gating?: string; dateFilter?: string; }
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const session = await auth();
@@ -27,8 +27,24 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const minRoi   = sp.minRoi ? Number(sp.minRoi) : undefined;
   const sortBy   = sp.sortBy ?? 'score';
   const gating   = sp.gating; // 'sellable' = hide restricted + approval-needed
+  const rawDateFilter = sp.dateFilter;
+  const dateFilter = rawDateFilter === 'today' || rawDateFilter === 'week' ? rawDateFilter : undefined;
 
-  const hasFilters = gating === 'sellable' || !!status || minRoi != null;
+  const now = Date.now();
+  const dateBoundary = dateFilter === 'today' ? new Date(now - 24 * 60 * 60 * 1000)
+                     : dateFilter === 'week'  ? new Date(now - 7 * 24 * 60 * 60 * 1000)
+                     : undefined;
+
+  const hasFilters = gating === 'sellable' || !!status || minRoi != null || !!dateFilter;
+
+  // Build base href for pagination (all params except page)
+  const paginationQs = new URLSearchParams();
+  if (status) paginationQs.set('status', status);
+  if (sp.minRoi) paginationQs.set('minRoi', sp.minRoi);
+  if (sortBy !== 'score') paginationQs.set('sortBy', sortBy);
+  if (gating) paginationQs.set('gating', gating);
+  if (dateFilter) paginationQs.set('dateFilter', dateFilter);
+  const baseHref = `/dashboard/leads${paginationQs.toString() ? `?${paginationQs.toString()}` : ''}`;
 
   // Build the product filter in one place so multiple conditions compose
   // (previously a second `product:` key silently clobbered the minRoi filter).
@@ -44,6 +60,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const where = {
     ...leadAccessWhere({ orgId, isBroadcastSource }),
     ...(status ? { status: status as any } : { status: { notIn: ['REJECTED', 'EXPIRED'] as any[] } }),
+    ...(dateBoundary ? { createdAt: { gte: dateBoundary } } : {}),
     product: productWhere,
   };
 
@@ -52,10 +69,12 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       where,
       orderBy: sortBy === 'roi'    ? { product: { roi: 'desc' } }
              : sortBy === 'profit' ? { product: { profit: 'desc' } }
+             : dateFilter          ? { createdAt: 'desc' as const }
              : { score: 'desc' },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: {
+      select: {
+        id: true, score: true, status: true, createdAt: true,
         product: {
           select: {
             id: true, asin: true, title: true, brand: true, category: true,
@@ -100,22 +119,47 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
-      {/* Ungating filter */}
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-xs text-slate-500">Show:</span>
-        <Link
-          href="/dashboard/leads"
-          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${gating !== 'sellable' ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
-        >
-          All leads
-        </Link>
-        <Link
-          href="/dashboard/leads?gating=sellable"
-          className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${gating === 'sellable' ? 'bg-green-600 border-green-600 text-white' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
-        >
-          Sellable only
-        </Link>
-        <span className="text-xs text-slate-500 hidden sm:inline">— hides restricted brands, gated categories &amp; hazmat</span>
+      {/* Filters row */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
+        {/* Ungating filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">Show:</span>
+          <Link
+            href={dateFilter ? `/dashboard/leads?dateFilter=${dateFilter}` : '/dashboard/leads'}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${gating !== 'sellable' ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+          >
+            All leads
+          </Link>
+          <Link
+            href={dateFilter ? `/dashboard/leads?gating=sellable&dateFilter=${dateFilter}` : '/dashboard/leads?gating=sellable'}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${gating === 'sellable' ? 'bg-green-600 border-green-600 text-white' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+          >
+            Sellable only
+          </Link>
+        </div>
+
+        {/* Date filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">When:</span>
+          <Link
+            href={gating === 'sellable' ? '/dashboard/leads?gating=sellable' : '/dashboard/leads'}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${!dateFilter ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+          >
+            All time
+          </Link>
+          <Link
+            href={gating === 'sellable' ? '/dashboard/leads?gating=sellable&dateFilter=today' : '/dashboard/leads?dateFilter=today'}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${dateFilter === 'today' ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+          >
+            Today
+          </Link>
+          <Link
+            href={gating === 'sellable' ? '/dashboard/leads?gating=sellable&dateFilter=week' : '/dashboard/leads?dateFilter=week'}
+            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${dateFilter === 'week' ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+          >
+            This week
+          </Link>
+        </div>
       </div>
 
       <LeadsTable
@@ -126,6 +170,8 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         orgPlan={session!.user.plan}
         isOwner={session!.user.role === 'OWNER'}
         hasFilters={hasFilters}
+        dateFilter={dateFilter}
+        baseHref={baseHref}
       />
     </div>
   );

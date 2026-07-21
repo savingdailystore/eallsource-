@@ -137,6 +137,83 @@ describe('GET /api/leads — entitlement enforcement', () => {
   });
 });
 
+describe('GET /api/leads — dateFilter param', () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    orgFindUnique.mockReset();
+    leadFindMany.mockReset();
+    leadCount.mockReset();
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    leadFindMany.mockResolvedValue([{ id: 'l1', score: 80, status: 'NEW', createdAt: new Date().toISOString(), product: { asin: 'B001' } }]);
+    leadCount.mockResolvedValue(1);
+  });
+
+  it('dateFilter=today applies createdAt gte boundary (approx 24h)', async () => {
+    const before = new Date(Date.now() - 24 * 60 * 60 * 1000 - 5000);
+    await GET(makeGet({ dateFilter: 'today' }));
+    const [call] = leadFindMany.mock.calls;
+    const boundary: Date = call[0].where.createdAt?.gte;
+    expect(boundary).toBeInstanceOf(Date);
+    expect(boundary.getTime()).toBeGreaterThan(before.getTime());
+  });
+
+  it('dateFilter=week applies createdAt gte boundary (approx 7 days)', async () => {
+    const before = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000 - 5000);
+    await GET(makeGet({ dateFilter: 'week' }));
+    const [call] = leadFindMany.mock.calls;
+    const boundary: Date = call[0].where.createdAt?.gte;
+    expect(boundary).toBeInstanceOf(Date);
+    expect(boundary.getTime()).toBeGreaterThan(before.getTime());
+    // week boundary is more than 24h ago
+    expect(boundary.getTime()).toBeLessThan(Date.now() - 24 * 60 * 60 * 1000);
+  });
+
+  it('no dateFilter means no createdAt filter applied', async () => {
+    await GET(makeGet());
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].where).not.toHaveProperty('createdAt');
+  });
+
+  it('invalid dateFilter is ignored', async () => {
+    await GET(makeGet({ dateFilter: 'yesterday' }));
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].where).not.toHaveProperty('createdAt');
+  });
+
+  it('dateFilter=today uses createdAt desc sort (newest first)', async () => {
+    await GET(makeGet({ dateFilter: 'today' }));
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].orderBy).toEqual({ createdAt: 'desc' });
+  });
+
+  it('dateFilter=today with sortBy=roi uses roi sort (explicit sort wins)', async () => {
+    await GET(makeGet({ dateFilter: 'today', sortBy: 'roi' }));
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].orderBy).toEqual({ product: { roi: 'desc' } });
+  });
+
+  it('response includes createdAt on lead records', async () => {
+    const res  = await GET(makeGet({ dateFilter: 'today' }));
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.data[0]).toHaveProperty('createdAt');
+  });
+
+  it('REJECTED leads remain excluded when dateFilter=today', async () => {
+    await GET(makeGet({ dateFilter: 'today' }));
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].where.status).toMatchObject({ notIn: ['REJECTED', 'EXPIRED'] });
+  });
+
+  it('dateFilter and sellable filter compose (both in where)', async () => {
+    await GET(makeGet({ dateFilter: 'today', minRoi: '30' }));
+    const [call] = leadFindMany.mock.calls;
+    expect(call[0].where).toHaveProperty('createdAt');
+    expect(call[0].where.product).toMatchObject({ roi: { gte: 30 } });
+  });
+});
+
 describe('PATCH /api/leads — entitlement enforcement', () => {
   beforeEach(() => {
     authMock.mockReset();

@@ -8,9 +8,10 @@ import {
   LayoutDashboard, TrendingUp, Package, BarChart3,
   RefreshCw, Link2, CreditCard, Settings,
   LogOut, ChevronRight, Zap, Radar, ShieldCheck, ShoppingCart, DollarSign,
-  Menu, X, LifeBuoy,
+  Menu, X, LifeBuoy, ShieldAlert, SquareTerminal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { showAdminNav } from '@/lib/nav-auth';
 import type { Plan, Role } from '@/types';
 
 interface NavItem {
@@ -35,6 +36,11 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Sales & Profit',  href: '/dashboard/sales',     icon: DollarSign,  plan: 'PRO' },
 ];
 
+const ADMIN_NAV: NavItem[] = [
+  { label: 'Admin Dashboard',  href: '/admin',                        icon: SquareTerminal },
+  { label: 'Brand Blocklist',  href: '/dashboard/admin/brand-blocks', icon: ShieldAlert },
+];
+
 const BOTTOM_NAV: NavItem[] = [
   { label: 'Amazon SP-API',  href: '/dashboard/amazon',   icon: Link2 },
   { label: 'Billing',        href: '/dashboard/billing',  icon: CreditCard, ownerOrAdminOnly: true },
@@ -49,11 +55,12 @@ const PLAN_COLORS: Record<Plan, string> = {
 };
 
 interface SidebarProps {
-  plan:          Plan;
-  role:          Role;
-  orgName:       string;
-  userEmail:     string;
-  canManualLead: boolean;
+  plan:             Plan;
+  role:             Role;
+  orgName:          string;
+  userEmail:        string;
+  canManualLead:    boolean;
+  isPlatformAdmin?: boolean;
 }
 
 function BrandIcon({ gradientId = 'eall-g' }: { gradientId?: string }) {
@@ -74,7 +81,7 @@ function BrandIcon({ gradientId = 'eall-g' }: { gradientId?: string }) {
   );
 }
 
-export function Sidebar({ plan, role, orgName: _orgName, userEmail, canManualLead }: SidebarProps) {
+export function Sidebar({ plan, role, orgName: _orgName, userEmail, canManualLead, isPlatformAdmin = false }: SidebarProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -93,6 +100,8 @@ export function Sidebar({ plan, role, orgName: _orgName, userEmail, canManualLea
     document.body.style.overflow = isOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
+
+  const isAdmin = showAdminNav(role, isPlatformAdmin);
 
   const visibleNav = NAV_ITEMS.filter((item) => {
     if (item.ownerOnly) return role === 'OWNER' || (item.allowManualLead && canManualLead);
@@ -217,6 +226,18 @@ export function Sidebar({ plan, role, orgName: _orgName, userEmail, canManualLea
           {visibleBottom.map((item) => (
             <NavLink key={item.href} item={item} />
           ))}
+
+          {isAdmin && (
+            <>
+              <div className="my-3 border-t border-slate-800" />
+              <p className="px-3 pb-1 text-[10px] font-semibold tracking-widest text-slate-600 uppercase">
+                Admin
+              </p>
+              {ADMIN_NAV.map((item) => (
+                <NavLink key={item.href} item={item} />
+              ))}
+            </>
+          )}
         </nav>
 
         {/* User footer */}

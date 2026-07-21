@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { prisma } from '@/lib/prisma';
+import { isPlatformAdmin } from '@/lib/admin';
 import { isPasswordExpired } from '@/lib/password';
 import { AlertTriangle } from 'lucide-react';
 
@@ -31,6 +32,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         orgName={org?.name ?? 'My Organization'}
         userEmail={session.user.email}
         canManualLead={!!(session.user as any).canManualLead}
+        isPlatformAdmin={isPlatformAdmin(session.user.email)}
       />
       <main className="flex-1 overflow-auto lg:ml-[240px] pt-14 lg:pt-0">
         {passwordExpired && (

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/amazon?error=missing_credentials', req.url));
   }
 
-  void prisma.auditLog.create({
+  await prisma.auditLog.create({
     data: {
       orgId:    session.user.orgId,
       userId:   session.user.id,
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       resource: 'AmazonCredential',
       metadata: { plan: session.user.plan },
     },
-  }).catch(() => {});
+  }).catch(() => null);
 
   const state = crypto.randomBytes(32).toString('hex');
 

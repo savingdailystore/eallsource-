@@ -100,7 +100,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   events: {
     async signIn({ user }) {
       if (!user.id || !(user as any).orgId) return;
-      void prisma.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           orgId:    (user as any).orgId,
           userId:   user.id,
@@ -108,7 +108,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           resource: 'User',
           metadata: { email: user.email },
         },
-      }).catch(() => {});
+      }).catch(() => null);
     },
   },
 });

@@ -249,9 +249,9 @@ describe('PATCH /api/leads — entitlement enforcement', () => {
   it('customer: PATCH proceeds when entitlement exists', async () => {
     authMock.mockResolvedValue(ADMIN_SESSION);
     orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
-    const fakeLead = { id: 'claaaaaaaaaaaaaaaaaaaaaa', orgId: 'cust-org-1', status: 'NEW' };
+    const fakeLead = { status: 'NEW', product: { asin: 'B001TEST001' } };
     leadFindFirst.mockResolvedValue(fakeLead);
-    leadUpdate.mockResolvedValue({ ...fakeLead, status: 'SAVED' });
+    leadUpdate.mockResolvedValue({ id: 'claaaaaaaaaaaaaaaaaaaaaa', orgId: 'cust-org-1', status: 'SAVED' });
     const res = await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
     expect(res.status).toBe(200);
   });
@@ -268,6 +268,8 @@ describe('PATCH /api/leads — entitlement enforcement', () => {
 });
 
 describe('PATCH /api/leads — CUSTOMER_LEAD_STATUS_UPDATE audit', () => {
+  const FAKE_LEAD = { status: 'NEW', product: { asin: 'B001TEST001' } };
+
   beforeEach(() => {
     authMock.mockReset();
     orgFindUnique.mockReset();
@@ -275,14 +277,13 @@ describe('PATCH /api/leads — CUSTOMER_LEAD_STATUS_UPDATE audit', () => {
     leadUpdate.mockReset();
     auditLogCreate.mockReset();
     auditLogCreate.mockResolvedValue({});
+    leadUpdate.mockResolvedValue({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' });
   });
 
-  it('writes CUSTOMER_LEAD_STATUS_UPDATE on successful status change', async () => {
+  it('writes CUSTOMER_LEAD_STATUS_UPDATE with asin, before, after on successful status change', async () => {
     authMock.mockResolvedValue(ADMIN_SESSION);
     orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
-    const fakeLead = { id: 'claaaaaaaaaaaaaaaaaaaaaa', orgId: 'cust-org-1', status: 'NEW' };
-    leadFindFirst.mockResolvedValue(fakeLead);
-    leadUpdate.mockResolvedValue({ ...fakeLead, status: 'SAVED' });
+    leadFindFirst.mockResolvedValue(FAKE_LEAD);
 
     await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
 
@@ -293,7 +294,12 @@ describe('PATCH /api/leads — CUSTOMER_LEAD_STATUS_UPDATE audit', () => {
           resource: 'Lead',
           orgId:    'cust-org-1',
           userId:   'u2',
-          metadata: expect.objectContaining({ before: 'NEW', after: 'SAVED' }),
+          metadata: expect.objectContaining({
+            leadId: 'claaaaaaaaaaaaaaaaaaaaaa',
+            asin:   'B001TEST001',
+            before: 'NEW',
+            after:  'SAVED',
+          }),
         }),
       }),
     );
@@ -308,5 +314,28 @@ describe('PATCH /api/leads — CUSTOMER_LEAD_STATUS_UPDATE audit', () => {
 
     expect(res.status).toBe(404);
     expect(auditLogCreate).not.toHaveBeenCalled();
+  });
+
+  it('audit failure does not break customer PATCH response', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    leadFindFirst.mockResolvedValue(FAKE_LEAD);
+    auditLogCreate.mockRejectedValue(new Error('DB timeout'));
+
+    const res = await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
+
+    expect(res.status).toBe(200);
+  });
+
+  it('metadata does not contain full product payload', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    leadFindFirst.mockResolvedValue(FAKE_LEAD);
+
+    await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
+
+    const [call] = auditLogCreate.mock.calls;
+    const meta = call[0].data.metadata;
+    expect(Object.keys(meta)).toEqual(['leadId', 'asin', 'before', 'after']);
   });
 });

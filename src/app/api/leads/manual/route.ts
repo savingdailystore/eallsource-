@@ -114,15 +114,15 @@ export async function POST(req: NextRequest) {
   if (result.outcome === 'lead_created' || result.outcome === 'lead_updated') {
     const leadId = (result as { leadId: string }).leadId;
 
-    void prisma.auditLog.create({
+    await prisma.auditLog.create({
       data: {
         orgId:    orgId,
         userId:   session.user.id,
         action:   'CUSTOMER_MANUAL_LEAD_CREATED',
         resource: 'Lead',
-        metadata: { asin, retailer, sourcePrice, outcome: result.outcome },
+        metadata: { leadId, asin, retailer, sourcePrice, outcome: result.outcome },
       },
-    }).catch(() => {});
+    }).catch(() => null);
 
     if (org?.isBroadcastSource) {
       // Source org: lead is added to the internal source pool and will be eligible

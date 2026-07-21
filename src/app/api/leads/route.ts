@@ -95,7 +95,8 @@ export async function PATCH(req: NextRequest) {
   });
 
   const lead = await prisma.lead.findFirst({
-    where: { id, ...leadAccessWhere({ orgId: patchOrgId, isBroadcastSource: patchOrg?.isBroadcastSource ?? false }) },
+    where:  { id, ...leadAccessWhere({ orgId: patchOrgId, isBroadcastSource: patchOrg?.isBroadcastSource ?? false }) },
+    select: { status: true, product: { select: { asin: true } } },
   });
   if (!lead) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
@@ -108,15 +109,15 @@ export async function PATCH(req: NextRequest) {
     },
   });
 
-  void prisma.auditLog.create({
+  await prisma.auditLog.create({
     data: {
       orgId:    patchOrgId,
       userId:   session.user.id,
       action:   'CUSTOMER_LEAD_STATUS_UPDATE',
       resource: 'Lead',
-      metadata: { leadId: id, before: lead.status, after: status },
+      metadata: { leadId: id, asin: lead.product.asin, before: lead.status, after: status },
     },
-  }).catch(() => {});
+  }).catch(() => null);
 
   return NextResponse.json({ success: true, data: updated });
 }

@@ -160,4 +160,25 @@ describe('GET /api/export — CUSTOMER_EXPORT_USED audit', () => {
       }),
     );
   });
+
+  it('audit failure does not break export response', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    auditLogCreate.mockRejectedValue(new Error('DB timeout'));
+
+    const res = await GET(makeGet({ type: 'leads', format: 'json' }));
+
+    expect(res.status).toBe(200);
+  });
+
+  it('metadata does not contain exported row contents', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+
+    await GET(makeGet({ type: 'leads', format: 'json' }));
+
+    const [call] = auditLogCreate.mock.calls;
+    const meta = call[0].data.metadata;
+    expect(Object.keys(meta)).toEqual(['type', 'format', 'rowCount']);
+  });
 });

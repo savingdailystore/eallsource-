@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
     }));
   }
 
-  void prisma.auditLog.create({
+  await prisma.auditLog.create({
     data: {
       orgId:    orgId,
       userId:   session.user.id,
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
       resource: 'Export',
       metadata: { type, format, rowCount: rows.length },
     },
-  }).catch(() => {});
+  }).catch(() => null);
 
   if (format === 'csv') {
     if (!rows.length) {

@@ -5,6 +5,41 @@ import { useRouter } from 'next/navigation';
 import { Radar, Loader2, CheckCircle2, XCircle, Clock, Play, ChevronDown, ChevronUp } from 'lucide-react';
 import React from 'react';
 
+interface MatchMethodBreakdown {
+  upc?:        number;
+  ean?:        number;
+  brandModel?: number;
+  title?:      number;
+  unknown?:    number;
+}
+
+interface RiskGateBreakdown {
+  brandBlocked?:        number;
+  ipComplaintHistory?:  number;
+  privateLabel?:        number;
+  hazmat?:              number;
+  genericBrand?:        number;
+  amazonSellsIt?:       number;
+  priceUnstable?:       number;
+  gating?:              number;
+  validationFailed?:    number;
+}
+
+interface ScraperMetrics {
+  retailer?:           string;
+  query?:              string;
+  productsFound?:      number;
+  productsWithUpc?:    number;
+  productsWithoutUpc?: number;
+  hitProductCap?:      boolean;
+}
+
+interface TimingMetrics {
+  totalRuntimeMs?:    number;
+  scraperRuntimeMs?:  number;
+  pipelineRuntimeMs?: number;
+}
+
 interface ScanResult {
   found?:   number;
   created?: number;
@@ -31,9 +66,17 @@ interface ScanResult {
     matchConfidence?: number;
     upc?:             string;
   }>;
+  // Phase 17.1 additions — optional so old ScanJob records don't break
+  matchMethodBreakdown?:  MatchMethodBreakdown;
+  avgMatchConfidence?:    number;
+  lowConfidenceMatches?:  number;
+  highConfidenceMatches?: number;
+  riskGateBreakdown?:     RiskGateBreakdown;
+  scraperMetrics?:        ScraperMetrics;
+  timingMetrics?:         TimingMetrics;
 }
 
-// Human labels for each skip reason, in a sensible reading order.
+// Human labels for each named skip reason shown in the primary grid.
 const SKIP_LABELS: Array<{ key: keyof ScanResult; label: string }> = [
   { key: 'noMatch',          label: 'No Amazon match' },
   { key: 'noPricing',        label: 'No Amazon pricing data' },
@@ -44,6 +87,18 @@ const SKIP_LABELS: Array<{ key: keyof ScanResult; label: string }> = [
   { key: 'noBuyBox',         label: 'No buy box' },
   { key: 'priceDeclining',   label: 'Price declining' },
   { key: 'validationFailed', label: 'Failed validation' },
+];
+
+// Detailed risk gate labels (Phase 17.1). Shown when riskGateBreakdown is present.
+const RISK_GATE_LABELS: Array<{ key: keyof RiskGateBreakdown; label: string }> = [
+  { key: 'brandBlocked',       label: 'Brand blocked' },
+  { key: 'ipComplaintHistory', label: 'IP complaint history' },
+  { key: 'privateLabel',       label: 'Amazon private label' },
+  { key: 'hazmat',             label: 'Hazmat / dangerous goods' },
+  { key: 'genericBrand',       label: 'Generic / unbranded' },
+  { key: 'amazonSellsIt',      label: 'Amazon sells it' },
+  { key: 'priceUnstable',      label: 'Price volatile' },
+  { key: 'gating',             label: 'Other risk gates' },
 ];
 
 interface Job {
@@ -63,6 +118,10 @@ const STATUS_STYLE: Record<string, { cls: string; icon: React.ComponentType<{ cl
   DONE:    { cls: 'bg-green-500/15 text-green-400',   icon: CheckCircle2 },
   FAILED:  { cls: 'bg-red-500/15 text-red-400',       icon: XCircle },
 };
+
+function fmt(n: number | undefined): string {
+  return n != null ? String(n) : '0';
+}
 
 export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: Job[] }) {
   const router = useRouter();
@@ -190,9 +249,14 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                   const r        = job.result;
                   const skipped  = r?.skipped ?? 0;
                   const namedSkips = SKIP_LABELS.reduce((sum, { key }) => sum + (Number(r?.[key]) || 0), 0);
-                  const otherSkips = Math.max(0, skipped - namedSkips);
+                  // For old records without riskGateBreakdown, show the aggregate "other" count
+                  const hasRiskBreakdown = !!r?.riskGateBreakdown;
+                  const riskGateTotal    = hasRiskBreakdown
+                    ? RISK_GATE_LABELS.reduce((sum, { key }) => sum + (Number(r!.riskGateBreakdown![key]) || 0), 0)
+                    : Math.max(0, skipped - namedSkips);
                   const hasDiag    = Array.isArray(r?.diagnostics) && r!.diagnostics!.length > 0;
-                  const canExpand  = hasStats && (skipped > 0 || hasDiag);
+                  const hasNewMetrics = !!(r?.matchMethodBreakdown || r?.riskGateBreakdown || r?.scraperMetrics);
+                  const canExpand  = hasStats && (skipped > 0 || hasDiag || hasNewMetrics);
                   const isExp      = expanded === job.id;
                   return (
                     <React.Fragment key={job.id}>
@@ -224,37 +288,150 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                             : <span className="flex items-center gap-1">{skipped > 0 ? `${skipped} filtered` : 'details'}<ChevronDown className="w-3.5 h-3.5" /></span>)}
                         </td>
                       </tr>
+
                       {isExp && r && (
                         <tr className="bg-slate-800/40">
-                          <td colSpan={7} className="px-5 py-3">
-                            <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">
-                              Why {skipped} product{skipped === 1 ? '' : 's'} didn’t become leads
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5">
-                              {SKIP_LABELS.filter(({ key }) => (Number(r[key]) || 0) > 0).map(({ key, label }) => (
-                                <div key={key} className="flex items-center justify-between text-xs">
-                                  <span className="text-slate-400">{label}</span>
-                                  <span className="font-mono text-slate-200">{Number(r[key]) || 0}</span>
+                          <td colSpan={7} className="px-5 py-3 space-y-4">
+
+                            {/* ── Skip reasons ─────────────────────────────── */}
+                            {skipped > 0 && (
+                              <div>
+                                <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">
+                                  Why {skipped} product{skipped === 1 ? '' : 's'} didn't become leads
                                 </div>
-                              ))}
-                              {otherSkips > 0 && (
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="text-slate-400">Other risk gates</span>
-                                  <span className="font-mono text-slate-200">{otherSkips}</span>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5">
+                                  {SKIP_LABELS.filter(({ key }) => (Number(r[key]) || 0) > 0).map(({ key, label }) => (
+                                    <div key={key} className="flex items-center justify-between text-xs">
+                                      <span className="text-slate-400">{label}</span>
+                                      <span className="font-mono text-slate-200">{Number(r[key]) || 0}</span>
+                                    </div>
+                                  ))}
+
+                                  {/* Risk gate breakdown — detailed when available, aggregate for old records */}
+                                  {hasRiskBreakdown ? (
+                                    RISK_GATE_LABELS.filter(({ key }) => (Number(r.riskGateBreakdown![key]) || 0) > 0).map(({ key, label }) => (
+                                      <div key={key} className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-400">{label}</span>
+                                        <span className="font-mono text-slate-200">{Number(r.riskGateBreakdown![key]) || 0}</span>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    riskGateTotal > 0 && (
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-400">Other risk gates</span>
+                                        <span className="font-mono text-slate-200">{riskGateTotal}</span>
+                                      </div>
+                                    )
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                            {otherSkips > 0 && (
-                              <p className="text-[10px] text-slate-500 mt-2">
-                                “Other risk gates” = Amazon-on-listing, suppressed-by-volatility, hazmat, private/generic brand, IP history, etc.
-                              </p>
+                                {!hasRiskBreakdown && riskGateTotal > 0 && (
+                                  <p className="text-[10px] text-slate-500 mt-2">
+                                    "Other risk gates" = Amazon-on-listing, suppressed-by-volatility, hazmat, private/generic brand, IP history, etc.
+                                  </p>
+                                )}
+                              </div>
                             )}
 
+                            {/* ── Match quality metrics (Phase 17.1) ───────── */}
+                            {r.matchMethodBreakdown && (
+                              <div className="pt-3 border-t border-slate-800">
+                                <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2 flex items-center gap-3 flex-wrap">
+                                  <span>Match quality</span>
+                                  {r.avgMatchConfidence != null && r.avgMatchConfidence > 0 && (
+                                    <span className={`badge text-[10px] ${r.avgMatchConfidence >= 90 ? 'bg-green-500/15 text-green-400' : r.avgMatchConfidence >= 70 ? 'bg-blue-500/15 text-blue-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                                      avg {r.avgMatchConfidence}% confidence
+                                    </span>
+                                  )}
+                                  {r.scraperMetrics?.productsWithUpc != null && r.scraperMetrics.productsFound != null && (
+                                    <span className={`badge text-[10px] ${r.scraperMetrics.productsWithUpc > 0 ? 'bg-blue-500/15 text-blue-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                                      {r.scraperMetrics.productsWithUpc}/{r.scraperMetrics.productsFound} had UPC
+                                    </span>
+                                  )}
+                                  {/* Fallback UPC badge for old records */}
+                                  {!r.scraperMetrics && r.upcCount != null && r.found != null && (
+                                    <span className={`badge text-[10px] ${r.upcCount > 0 ? 'bg-blue-500/15 text-blue-400' : 'bg-amber-500/15 text-amber-400'}`}>
+                                      {r.upcCount}/{r.found} had a UPC
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5">
+                                  {(r.matchMethodBreakdown.upc ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-blue-400">UPC matched</span>
+                                      <span className="font-mono text-slate-200">{fmt(r.matchMethodBreakdown.upc)}</span>
+                                    </div>
+                                  )}
+                                  {(r.matchMethodBreakdown.ean ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-blue-400">EAN matched</span>
+                                      <span className="font-mono text-slate-200">{fmt(r.matchMethodBreakdown.ean)}</span>
+                                    </div>
+                                  )}
+                                  {(r.matchMethodBreakdown.brandModel ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-slate-400">Brand + model</span>
+                                      <span className="font-mono text-slate-200">{fmt(r.matchMethodBreakdown.brandModel)}</span>
+                                    </div>
+                                  )}
+                                  {(r.matchMethodBreakdown.title ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-amber-400">Title match</span>
+                                      <span className="font-mono text-slate-200">{fmt(r.matchMethodBreakdown.title)}</span>
+                                    </div>
+                                  )}
+                                  {(r.matchMethodBreakdown.unknown ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-slate-500">Manual / unknown</span>
+                                      <span className="font-mono text-slate-200">{fmt(r.matchMethodBreakdown.unknown)}</span>
+                                    </div>
+                                  )}
+                                  {(r.lowConfidenceMatches ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-amber-400">Low confidence (&lt;70%)</span>
+                                      <span className="font-mono text-slate-200">{fmt(r.lowConfidenceMatches)}</span>
+                                    </div>
+                                  )}
+                                  {(r.highConfidenceMatches ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-green-400">High confidence (≥90%)</span>
+                                      <span className="font-mono text-slate-200">{fmt(r.highConfidenceMatches)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {(r.matchMethodBreakdown.title ?? 0) > 0 && (
+                                  <p className="text-[10px] text-slate-500 mt-2">
+                                    Blue = exact barcode match, amber = fuzzy title. High title-match counts with low confidence (&lt;70%) may indicate mismatches — verify in diagnostics below.
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            {/* ── Scraper metrics (Phase 17.1) ─────────────── */}
+                            {r.scraperMetrics && (r.scraperMetrics.hitProductCap || r.timingMetrics) && (
+                              <div className="pt-3 border-t border-slate-800">
+                                <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2">Scraper</div>
+                                <div className="flex flex-wrap gap-3 text-[10px]">
+                                  {r.scraperMetrics.hitProductCap && (
+                                    <span className="badge bg-amber-500/15 text-amber-400">Hit product cap — more results may exist</span>
+                                  )}
+                                  {r.timingMetrics?.totalRuntimeMs != null && (
+                                    <span className="text-slate-500">
+                                      {(r.timingMetrics.totalRuntimeMs / 1000).toFixed(1)}s total
+                                      {r.timingMetrics.scraperRuntimeMs != null && ` · ${(r.timingMetrics.scraperRuntimeMs / 1000).toFixed(1)}s scraper`}
+                                      {r.timingMetrics.pipelineRuntimeMs != null && ` · ${(r.timingMetrics.pipelineRuntimeMs / 1000).toFixed(1)}s pipeline`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ── Match diagnostics (existing, unchanged) ───── */}
                             {Array.isArray(r.diagnostics) && r.diagnostics.length > 0 && (
-                              <div className="mt-4 pt-3 border-t border-slate-800">
+                              <div className="pt-3 border-t border-slate-800">
                                 <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2 flex items-center gap-2 flex-wrap">
                                   <span>Match diagnostics — compare source vs. matched Amazon listing</span>
-                                  {r.upcCount != null && r.found != null && (
+                                  {/* Show UPC badge from old records that lack scraperMetrics */}
+                                  {!r.scraperMetrics && !r.matchMethodBreakdown && r.upcCount != null && r.found != null && (
                                     <span className={`badge text-[10px] ${r.upcCount > 0 ? 'bg-blue-500/15 text-blue-400' : 'bg-amber-500/15 text-amber-400'}`}>
                                       {r.upcCount}/{r.found} had a UPC
                                     </span>
@@ -285,7 +462,7 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                                               <span className="text-slate-400"> {d.amazonTitle ?? ''}</span>
                                             </>
                                           ) : (
-                                            <span className="text-slate-600 italic">no ASIN matched{d.upc ? ' (had a UPC — barcode didn’t resolve)' : ''}</span>
+                                            <span className="text-slate-600 italic">no ASIN matched{d.upc ? ' (had a UPC — barcode didn\'t resolve)' : ''}</span>
                                           )}
                                         </div>
                                       </div>
@@ -297,6 +474,7 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                                 </p>
                               </div>
                             )}
+
                           </td>
                         </tr>
                       )}

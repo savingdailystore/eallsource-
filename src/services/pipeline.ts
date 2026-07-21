@@ -122,7 +122,11 @@ export async function processRetailerProduct(
       where:  { asin, hasIpComplaintHistory: true },
       select: { id: true },
     });
-    if (flaggedAsin) return { outcome: 'ip_complaint_history' };
+    if (flaggedAsin) {
+      // emitDiag is defined after market data; fire directly here since we exit early.
+      opts.onDiagnostic?.({ sourceTitle: product.title, outcome: 'ip_complaint_history', asin, matchMethod, matchConfidence, upc: product.upc });
+      return { outcome: 'ip_complaint_history' };
+    }
 
     // ── 2. Get market data ────────────────────────────────────────────────────
     // Try SP-API first (requires connected cred), fall back to Keepa
@@ -225,6 +229,7 @@ export async function processRetailerProduct(
     // more predictive "don't buy" signals — a margin computed off today's
     // snapshot price is unreliable if the price has been swinging.
     if (!opts.force && priceStability === 'VOLATILE') {
+      emitDiag('price_unstable', amazonTitle);
       return { outcome: 'price_unstable' };
     }
 
@@ -232,6 +237,7 @@ export async function processRetailerProduct(
     // means today's margin erodes over your sell-through window — distinct from
     // volatility, which is noise rather than direction.
     if (!opts.force && priceTrend === 'DECLINING') {
+      emitDiag('price_declining', amazonTitle);
       return { outcome: 'price_declining', trendPct: priceTrendPct ?? 0 };
     }
 
@@ -240,19 +246,27 @@ export async function processRetailerProduct(
     // Velocity reject gets its own outcome so it's distinguishable from a plain
     // weak-BSR rejection in the scan stats.
     if (!opts.force && demandResult.velocityTooLow) {
+      emitDiag('velocity_too_low', amazonTitle);
       return { outcome: 'velocity_too_low', expectedUnits: demandResult.expectedUnitsPerSeller ?? 0 };
     }
     // LOW now only fires for a confirmed negative signal (weak BSR, saturation).
     // Missing BSR data returns UNKNOWN, which is never rejected here — we don't
     // reject a lead just because Amazon didn't return a rank.
     if (!opts.force && demandResult.level === 'LOW') {
+      emitDiag('demand_too_low', amazonTitle);
       return { outcome: 'demand_too_low', bsr };
     }
 
     // ── 4. Gating risk ────────────────────────────────────────────────────────
+    // Use the Amazon title for gating assessment where available — it is the
+    // authoritative product description and may contain hazmat keywords (e.g.
+    // "Rechargeable Battery") that the retailer title omits or abbreviates.
+    // Falls back to product.title when no Amazon data was returned.
+    // hasHazmat stays false: no SP-API hazmat classification is extracted yet;
+    // the keyword check inside assessGating covers title-based detection.
     const gatingResult = assessGating({
-      title:  product.title,
-      brand:  product.brand   ?? amazonBrand,
+      title:     amazonTitle ?? product.title,
+      brand:     product.brand ?? amazonBrand,
       category,
       hasHazmat: false,
     });
@@ -260,18 +274,21 @@ export async function processRetailerProduct(
     // Private-label gate: Amazon's own brands have no buy box to win — a hard
     // reject, not just a risk flag, since the lead can never actually be sold.
     if (!opts.force && gatingResult.isPrivateLabel) {
+      emitDiag('private_label', amazonTitle);
       return { outcome: 'private_label' };
     }
 
     // Hazmat / dangerous goods gate: requires special FBA approval/handling —
     // rarely worth it for arbitrage, hard reject.
     if (!opts.force && gatingResult.hasHazmat) {
+      emitDiag('hazmat', amazonTitle);
       return { outcome: 'hazmat' };
     }
 
     // Generic/unbranded gate: no real manufacturer backing the listing means
     // higher IP-complaint exposure and unreliable supply — hard reject.
     if (!opts.force && gatingResult.isGenericBrand) {
+      emitDiag('generic_brand', amazonTitle);
       return { outcome: 'generic_brand' };
     }
 

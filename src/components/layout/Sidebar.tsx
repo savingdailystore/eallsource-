@@ -37,7 +37,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { label: 'Admin Dashboard',  href: '/admin',                        icon: SquareTerminal },
+  { label: 'Admin Dashboard',  href: '/dashboard/admin',              icon: SquareTerminal },
   { label: 'Brand Blocklist',  href: '/dashboard/admin/brand-blocks', icon: ShieldAlert },
 ];
 

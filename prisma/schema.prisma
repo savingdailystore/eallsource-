@@ -43,6 +43,13 @@ enum GatingRisk {
   HIGH
 }
 
+enum UpcCacheStatus {
+  HIT     // detail actor returned a valid UPC
+  MISS    // actor succeeded but the item genuinely has no UPC in the feed
+  FAILED  // actor threw or returned malformed data
+  TIMEOUT // actor call exceeded UPC_TIMEOUT_MS
+}
+
 enum POStatus {
   DRAFT
   ORDERED
@@ -880,6 +887,54 @@ model SaleAdjustmentRecord {
   @@index([orgId, saleRecordId])
   @@index([orgId, orderItemCode])
   @@map("sale_adjustment_records")
+}
+
+// ─── Retailer UPC Cache ─────────────────────────────────────────────────────
+//
+// Global (cross-org) cache of Walmart UPC enrichment results. Each record
+// stores the outcome of one pratikdani/walmart-product-scraper call so
+// repeated scans of the same Walmart URL avoid re-calling the detail actor.
+//
+// Lookup order:
+//   1. retailer + retailerItemId  (preferred — stable across slug changes)
+//   2. retailer + normalizedSourceUrl  (fallback when itemId extraction fails)
+//
+// retailerItemId is nullable — Postgres treats two NULLs as distinct in a
+// unique constraint, so rows without an itemId are only deduplicated by URL.
+// Writes use the itemId key when itemId is present, URL key otherwise.
+
+model RetailerUpcCache {
+  id                  String         @id @default(cuid())
+
+  retailer            String
+  retailerItemId      String?        // Walmart numeric item ID (last URL path segment)
+  normalizedSourceUrl String         // url.split('?')[0].toLowerCase() — always set
+
+  // Enriched data — null when not returned by the actor
+  upc                 String?
+  ean                 String?
+  model               String?
+  brand               String?
+  title               String?
+
+  status              UpcCacheStatus
+  failureReason       String?        // error summary for FAILED / TIMEOUT entries
+
+  fetchedAt           DateTime       // when the actor call completed (or timed out)
+  expiresAt           DateTime       // fetchedAt + TTL (30d HIT, 7d MISS, 3d FAILED/TIMEOUT)
+
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  // Primary key: retailer + itemId (only when itemId is non-null — NULLs are distinct)
+  @@unique([retailer, retailerItemId])
+  // Fallback key: retailer + normalised URL (covers cases without a parseable itemId)
+  @@unique([retailer, normalizedSourceUrl])
+
+  @@index([retailer, retailerItemId])
+  @@index([retailer, normalizedSourceUrl])
+  @@index([expiresAt])
+  @@map("retailer_upc_cache")
 }
 
 // ─── Brand Blocklist ────────────────────────────────────────────────────────

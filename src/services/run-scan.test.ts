@@ -548,5 +548,47 @@ describe('runScanJob — result stored in ScanJob.result', () => {
     expect(stored).toHaveProperty('scraperMetrics');
     expect(stored).toHaveProperty('timingMetrics');
     expect(stored).toHaveProperty('avgMatchConfidence');
+    expect(stored).toHaveProperty('upcEnrichmentMetrics');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('runScanJob — upcEnrichmentMetrics initialisation', () => {
+  beforeEach(() => {
+    scanJobUpdate.mockReset().mockResolvedValue({});
+    getRetailer.mockReset();
+    processRetailerProduct.mockReset();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('all upcEnrichmentMetrics fields initialise to zero on an empty scan', async () => {
+    getRetailer.mockReturnValue(mockPlugin([]));
+
+    const result = await runScanJob({ retailer: 'Target', query: 'q', orgId: 'org' });
+
+    const m = result.upcEnrichmentMetrics;
+    expect(m.upcCacheHits).toBe(0);
+    expect(m.upcCacheMisses).toBe(0);
+    expect(m.upcCacheWrites).toBe(0);
+    expect(m.upcCacheFailures).toBe(0);
+    expect(m.upcActorCallsAvoided).toBe(0);
+    expect(m.upcEnrichmentAttempted).toBe(0);
+    expect(m.upcEnrichmentSucceeded).toBe(0);
+    expect(m.upcEnrichmentFailed).toBe(0);
+    expect(m.upcEnrichmentTimedOut).toBe(0);
+  });
+
+  it('upcEnrichmentMetrics is present in the DONE ScanJob.result payload', async () => {
+    getRetailer.mockReturnValue(mockPlugin([]));
+
+    await runScanJob({ retailer: 'Target', query: 'q', orgId: 'org', scanJobId: 'job_upc_1' });
+
+    const doneCall = scanJobUpdate.mock.calls.find(([a]) => a.data.status === 'DONE');
+    expect(doneCall).toBeTruthy();
+    const stored = doneCall![0].data.result;
+    expect(stored).toHaveProperty('upcEnrichmentMetrics');
+    expect(stored.upcEnrichmentMetrics).toMatchObject({
+      upcCacheHits: 0, upcCacheMisses: 0, upcEnrichmentAttempted: 0,
+    });
   });
 });

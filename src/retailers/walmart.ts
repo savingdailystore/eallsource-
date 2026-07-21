@@ -1,6 +1,8 @@
 import { BaseRetailer } from './base';
 import { runApifyActor } from '@/lib/apify';
+import { lookupUpcCache, writeUpcCache, isValidUpc } from '@/lib/upc-cache';
 import type { RetailerProduct } from '@/types';
+import type { UpcEnrichmentMetrics } from '@/services/run-scan';
 
 // Apify actor handles Walmart's PerimeterX bot-detection/proxy rotation for us.
 // https://apify.com/automation-lab/walmart-scraper
@@ -41,21 +43,112 @@ interface PratikItem {
 }
 
 // Best-effort UPC/model enrichment for the top N products, in parallel batches.
-// Failures are swallowed so the product simply falls back to title matching.
-async function enrichUpc(products: RetailerProduct[], limit: number): Promise<void> {
+// Checks the RetailerUpcCache before calling the detail actor — a cache HIT
+// skips the actor entirely. All failures are swallowed so the product falls
+// back to title matching. Metrics are accumulated into the provided accumulator.
+async function enrichUpc(
+  products:  RetailerProduct[],
+  limit:     number,
+  metrics:   UpcEnrichmentMetrics,
+): Promise<void> {
   const targets = products.slice(0, limit).filter((p) => p.url);
+
   for (let i = 0; i < targets.length; i += UPC_CONCURRENCY) {
     const batch = targets.slice(i, i + UPC_CONCURRENCY);
     await Promise.all(batch.map(async (p) => {
+      // ── Cache read ──────────────────────────────────────────────────────────
+      const cached = await lookupUpcCache('Walmart', p.url);
+
+      if (cached !== null) {
+        if (cached.status === 'HIT' && isValidUpc(cached.upc)) {
+          // Fresh HIT with valid UPC — use it, skip the actor
+          p.upc   = cached.upc!;
+          if (cached.model && !p.model) p.model = cached.model;
+          metrics.upcCacheHits++;
+          metrics.upcActorCallsAvoided++;
+          return;
+        }
+        if (cached.status === 'MISS') {
+          // Fresh MISS — item genuinely has no UPC; skip actor
+          metrics.upcCacheMisses++;
+          metrics.upcActorCallsAvoided++;
+          return;
+        }
+        // HIT with invalid UPC (shouldn't happen due to write-side validation,
+        // but handle defensively): fall through to actor call
+      }
+
+      // ── Actor call ──────────────────────────────────────────────────────────
+      metrics.upcEnrichmentAttempted++;
+      const url = p.url.split('?')[0]; // pratikdani fails on URL query params
+
+      let writeStatus: 'HIT' | 'MISS' | 'FAILED' | 'TIMEOUT' = 'MISS';
+      let writeUpc:    string | null = null;
+      let writeModel:  string | null = null;
+      let writeBrand:  string | null = null;
+      let writeTitle:  string | null = null;
+      let writeFailureReason: string | null = null;
+      let isTimeout = false;
+
       try {
-        const url   = p.url.split('?')[0]; // pratikdani fails on URL query params
         const items = await runApifyActor<PratikItem>(UPC_ACTOR, { url }, UPC_TIMEOUT_MS);
         const it    = items[0];
-        const upc   = it?.upc   ?? it?.product_identifiers?.upc;
-        const model = it?.model ?? it?.product_identifiers?.model;
-        if (upc)            p.upc   = String(upc);
-        if (model && !p.model) p.model = String(model);
-      } catch { /* best effort — fall back to title matching */ }
+        const rawUpc   = it?.upc   ?? it?.product_identifiers?.upc;
+        const rawModel = it?.model ?? it?.product_identifiers?.model;
+
+        const upcStr = rawUpc != null ? String(rawUpc) : null;
+        if (isValidUpc(upcStr)) {
+          p.upc = upcStr!;
+          if (rawModel && !p.model) p.model = String(rawModel);
+          writeStatus = 'HIT';
+          writeUpc    = upcStr;
+          writeModel  = rawModel != null ? String(rawModel) : null;
+          writeBrand  = p.brand ?? null;
+          writeTitle  = p.title ?? null;
+          metrics.upcEnrichmentSucceeded++;
+        } else {
+          // Actor succeeded but no valid UPC in the response
+          writeStatus = 'MISS';
+          metrics.upcCacheMisses++;
+        }
+      } catch (err: unknown) {
+        // Distinguish timeout from generic failure using the error message.
+        // runApifyActor rejects with a generic Error; the timeout path inside
+        // it produces a message containing "timed out" or "timeout".
+        const msg = err instanceof Error ? err.message.toLowerCase() : '';
+        isTimeout  = msg.includes('timeout') || msg.includes('timed out');
+
+        if (isTimeout) {
+          writeStatus = 'TIMEOUT';
+          writeFailureReason = 'timeout';
+          metrics.upcEnrichmentTimedOut++;
+        } else {
+          writeStatus = 'FAILED';
+          writeFailureReason = err instanceof Error ? err.message.slice(0, 200) : 'unknown error';
+          metrics.upcEnrichmentFailed++;
+        }
+      }
+
+      // ── Cache write ─────────────────────────────────────────────────────────
+      const wrote = await writeUpcCache('Walmart', p.url, {
+        status:        writeStatus,
+        upc:           writeUpc,
+        model:         writeModel,
+        brand:         writeBrand,
+        title:         writeTitle,
+        failureReason: writeFailureReason,
+      });
+      if (wrote) {
+        metrics.upcCacheWrites++;
+      } else if (writeStatus === 'HIT' || writeStatus === 'MISS') {
+        // A false return from writeUpcCache on a non-error status means the write
+        // was skipped (fresh HIT protection) or silently failed — count as failure
+        // only when the write was genuinely attempted and returned false on error.
+        // writeUpcCache returns false for "skipped to protect HIT" too — we cannot
+        // distinguish here without a richer return, so we just don't increment.
+      } else {
+        metrics.upcCacheFailures++;
+      }
     }));
   }
 }
@@ -65,7 +158,12 @@ export class WalmartRetailer extends BaseRetailer {
   baseUrl      = 'https://www.walmart.com';
   supportsApi  = false;
 
+  // Populated by the most recent search() call; consumed by run-scan.ts to
+  // merge into ScanRunResult.upcEnrichmentMetrics.
+  lastEnrichmentMetrics: UpcEnrichmentMetrics | null = null;
+
   async search(query: string, category?: string): Promise<RetailerProduct[]> {
+    this.lastEnrichmentMetrics = null;
     try {
       const term = category ? `${query} ${category}` : query;
       const items = await runApifyActor<ApifyWalmartItem>(ACTOR_ID, {
@@ -97,8 +195,17 @@ export class WalmartRetailer extends BaseRetailer {
       // SP-API calls per product) stays within the serverless time limit.
       const top = products.slice(0, MAX_PRODUCTS);
 
-      // Enrich with UPC so matching can use exact barcodes.
-      await enrichUpc(top, UPC_ENRICH_LIMIT);
+      // Enrich with UPC so matching can use exact barcodes. Metrics are
+      // accumulated into a local object and stored on the instance so
+      // run-scan.ts can merge them into ScanRunResult after search() returns.
+      const enrichMetrics: UpcEnrichmentMetrics = {
+        upcCacheHits: 0, upcCacheMisses: 0, upcCacheWrites: 0, upcCacheFailures: 0,
+        upcActorCallsAvoided: 0, upcEnrichmentAttempted: 0, upcEnrichmentSucceeded: 0,
+        upcEnrichmentFailed: 0, upcEnrichmentTimedOut: 0,
+      };
+      await enrichUpc(top, UPC_ENRICH_LIMIT, enrichMetrics);
+      this.lastEnrichmentMetrics = enrichMetrics;
+
       return top;
     } catch (err) {
       console.error('[walmart] search error:', err);

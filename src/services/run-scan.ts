@@ -7,6 +7,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { getRetailer } from '@/retailers';
+import { WalmartRetailer } from '@/retailers/walmart';
 import { processRetailerProduct } from '@/services/pipeline';
 import type { MatchDiagnostic } from '@/services/pipeline';
 import type { RetailerProduct } from '@/types';
@@ -73,6 +74,27 @@ export interface TimingMetrics {
   pipelineRuntimeMs: number;
 }
 
+export interface UpcEnrichmentMetrics {
+  /** Actor call skipped because a cached valid UPC was found. */
+  upcCacheHits:           number;
+  /** No fresh HIT in cache; actor was called or product had no UPC. */
+  upcCacheMisses:         number;
+  /** New or updated cache records successfully written. */
+  upcCacheWrites:         number;
+  /** Cache write attempts that threw a DB error (best-effort, non-fatal). */
+  upcCacheFailures:       number;
+  /** Actor calls completely avoided (HIT + fresh MISS both skip the actor). */
+  upcActorCallsAvoided:   number;
+  /** Products for which the detail actor was actually invoked. */
+  upcEnrichmentAttempted: number;
+  /** Actor returned a usable, valid UPC. */
+  upcEnrichmentSucceeded: number;
+  /** Actor threw a non-timeout error. */
+  upcEnrichmentFailed:    number;
+  /** Actor call exceeded UPC_TIMEOUT_MS. */
+  upcEnrichmentTimedOut:  number;
+}
+
 // ─── Main result type ─────────────────────────────────────────────────────────
 
 export interface ScanRunResult {
@@ -115,6 +137,8 @@ export interface ScanRunResult {
   scraperMetrics:        ScraperMetrics;
   /** Wall-time breakdown: total, scraper portion, pipeline portion. */
   timingMetrics:         TimingMetrics;
+  /** UPC enrichment cache stats — Walmart only; all zeros for Target. */
+  upcEnrichmentMetrics:  UpcEnrichmentMetrics;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -131,6 +155,14 @@ function matchMethodKey(method: string | undefined): keyof MatchMethodBreakdown 
 
 function emptyMatchMethodBreakdown(): MatchMethodBreakdown {
   return { upc: 0, ean: 0, brandModel: 0, title: 0, unknown: 0 };
+}
+
+function emptyUpcEnrichmentMetrics(): UpcEnrichmentMetrics {
+  return {
+    upcCacheHits: 0, upcCacheMisses: 0, upcCacheWrites: 0, upcCacheFailures: 0,
+    upcActorCallsAvoided: 0, upcEnrichmentAttempted: 0, upcEnrichmentSucceeded: 0,
+    upcEnrichmentFailed: 0, upcEnrichmentTimedOut: 0,
+  };
 }
 
 function emptyRiskGateBreakdown(): RiskGateBreakdown {
@@ -184,6 +216,7 @@ export async function runScanJob(args: {
       productsFound: 0, productsWithUpc: 0, productsWithoutUpc: 0, hitProductCap: false,
     },
     timingMetrics: { totalRuntimeMs: 0, scraperRuntimeMs: 0, pipelineRuntimeMs: 0 },
+    upcEnrichmentMetrics: emptyUpcEnrichmentMetrics(),
   };
 
   const diagnostics: MatchDiagnostic[] = [];
@@ -208,6 +241,11 @@ export async function runScanJob(args: {
       // Inferred: if the scraper returned exactly the cap, it likely has more
       hitProductCap: products.length >= RETAILER_PRODUCT_CAP,
     };
+
+    // ── Merge UPC enrichment metrics from WalmartRetailer ────────────────────
+    if (plugin instanceof WalmartRetailer && plugin.lastEnrichmentMetrics) {
+      result.upcEnrichmentMetrics = plugin.lastEnrichmentMetrics;
+    }
 
     // ── Pipeline ─────────────────────────────────────────────────────────────
     const pipelineStart = Date.now();

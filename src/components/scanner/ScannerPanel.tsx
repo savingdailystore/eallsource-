@@ -40,6 +40,18 @@ interface TimingMetrics {
   pipelineRuntimeMs?: number;
 }
 
+interface UpcEnrichmentMetrics {
+  upcCacheHits?:           number;
+  upcCacheMisses?:         number;
+  upcCacheWrites?:         number;
+  upcCacheFailures?:       number;
+  upcActorCallsAvoided?:   number;
+  upcEnrichmentAttempted?: number;
+  upcEnrichmentSucceeded?: number;
+  upcEnrichmentFailed?:    number;
+  upcEnrichmentTimedOut?:  number;
+}
+
 interface ScanResult {
   found?:   number;
   created?: number;
@@ -74,6 +86,8 @@ interface ScanResult {
   riskGateBreakdown?:     RiskGateBreakdown;
   scraperMetrics?:        ScraperMetrics;
   timingMetrics?:         TimingMetrics;
+  // Phase 17.2 additions — optional so old ScanJob records don't break
+  upcEnrichmentMetrics?:  UpcEnrichmentMetrics;
 }
 
 // Human labels for each named skip reason shown in the primary grid.
@@ -255,7 +269,7 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                     ? RISK_GATE_LABELS.reduce((sum, { key }) => sum + (Number(r!.riskGateBreakdown![key]) || 0), 0)
                     : Math.max(0, skipped - namedSkips);
                   const hasDiag    = Array.isArray(r?.diagnostics) && r!.diagnostics!.length > 0;
-                  const hasNewMetrics = !!(r?.matchMethodBreakdown || r?.riskGateBreakdown || r?.scraperMetrics);
+                  const hasNewMetrics = !!(r?.matchMethodBreakdown || r?.riskGateBreakdown || r?.scraperMetrics || r?.upcEnrichmentMetrics);
                   const canExpand  = hasStats && (skipped > 0 || hasDiag || hasNewMetrics);
                   const isExp      = expanded === job.id;
                   return (
@@ -420,6 +434,69 @@ export function ScannerPanel({ retailers, jobs }: { retailers: string[]; jobs: J
                                       {r.timingMetrics.scraperRuntimeMs != null && ` · ${(r.timingMetrics.scraperRuntimeMs / 1000).toFixed(1)}s scraper`}
                                       {r.timingMetrics.pipelineRuntimeMs != null && ` · ${(r.timingMetrics.pipelineRuntimeMs / 1000).toFixed(1)}s pipeline`}
                                     </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* ── UPC enrichment / cache metrics (Phase 17.2) ── */}
+                            {r.upcEnrichmentMetrics && (r.upcEnrichmentMetrics.upcEnrichmentAttempted ?? 0) + (r.upcEnrichmentMetrics.upcActorCallsAvoided ?? 0) > 0 && (
+                              <div className="pt-3 border-t border-slate-800">
+                                <div className="text-[10px] text-slate-500 uppercase font-semibold mb-2 flex items-center gap-3 flex-wrap">
+                                  <span>UPC enrichment</span>
+                                  {(r.upcEnrichmentMetrics.upcActorCallsAvoided ?? 0) > 0 && (
+                                    <span className="badge text-[10px] bg-green-500/15 text-green-400">
+                                      {r.upcEnrichmentMetrics.upcActorCallsAvoided} actor call{(r.upcEnrichmentMetrics.upcActorCallsAvoided ?? 0) === 1 ? '' : 's'} avoided
+                                    </span>
+                                  )}
+                                  {(r.upcEnrichmentMetrics.upcCacheHits ?? 0) > 0 && (
+                                    <span className="badge text-[10px] bg-blue-500/15 text-blue-400">
+                                      {r.upcEnrichmentMetrics.upcCacheHits} cache hit{(r.upcEnrichmentMetrics.upcCacheHits ?? 0) === 1 ? '' : 's'}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-1.5">
+                                  {(r.upcEnrichmentMetrics.upcCacheHits ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-green-400">Cache hits</span>
+                                      <span className="font-mono text-slate-200">{r.upcEnrichmentMetrics.upcCacheHits}</span>
+                                    </div>
+                                  )}
+                                  {(r.upcEnrichmentMetrics.upcCacheMisses ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-slate-400">Cache misses</span>
+                                      <span className="font-mono text-slate-200">{r.upcEnrichmentMetrics.upcCacheMisses}</span>
+                                    </div>
+                                  )}
+                                  {(r.upcEnrichmentMetrics.upcEnrichmentAttempted ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-slate-400">Actor calls</span>
+                                      <span className="font-mono text-slate-200">{r.upcEnrichmentMetrics.upcEnrichmentAttempted}</span>
+                                    </div>
+                                  )}
+                                  {(r.upcEnrichmentMetrics.upcEnrichmentSucceeded ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-blue-400">UPCs fetched</span>
+                                      <span className="font-mono text-slate-200">{r.upcEnrichmentMetrics.upcEnrichmentSucceeded}</span>
+                                    </div>
+                                  )}
+                                  {(r.upcEnrichmentMetrics.upcEnrichmentFailed ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-red-400">Actor errors</span>
+                                      <span className="font-mono text-slate-200">{r.upcEnrichmentMetrics.upcEnrichmentFailed}</span>
+                                    </div>
+                                  )}
+                                  {(r.upcEnrichmentMetrics.upcEnrichmentTimedOut ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-amber-400">Timeouts</span>
+                                      <span className="font-mono text-slate-200">{r.upcEnrichmentMetrics.upcEnrichmentTimedOut}</span>
+                                    </div>
+                                  )}
+                                  {(r.upcEnrichmentMetrics.upcCacheWrites ?? 0) > 0 && (
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="text-slate-500">Cache writes</span>
+                                      <span className="font-mono text-slate-200">{r.upcEnrichmentMetrics.upcCacheWrites}</span>
+                                    </div>
                                   )}
                                 </div>
                               </div>

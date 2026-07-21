@@ -108,5 +108,15 @@ export async function PATCH(req: NextRequest) {
     },
   });
 
+  void prisma.auditLog.create({
+    data: {
+      orgId:    patchOrgId,
+      userId:   session.user.id,
+      action:   'CUSTOMER_LEAD_STATUS_UPDATE',
+      resource: 'Lead',
+      metadata: { leadId: id, before: lead.status, after: status },
+    },
+  }).catch(() => {});
+
   return NextResponse.json({ success: true, data: updated });
 }

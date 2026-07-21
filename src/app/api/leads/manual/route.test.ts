@@ -9,12 +9,15 @@ const processRetailerProduct = vi.fn();
 const broadcastLeadsMock     = vi.fn();
 const getWeeklyLeadUsageMock = vi.fn();
 
+const auditLogCreate = vi.fn().mockResolvedValue({});
+
 vi.mock("@/lib/auth",   () => ({ auth: () => authMock() }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user:            { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     organization:    { findUnique: (...a: unknown[]) => orgFindUnique(...a) },
     leadEntitlement: { upsert:     (...a: unknown[]) => entitlementUpsert(...a) },
+    auditLog:        { create:     (...a: unknown[]) => auditLogCreate(...a) },
   },
 }));
 vi.mock("@/services/pipeline", () => ({

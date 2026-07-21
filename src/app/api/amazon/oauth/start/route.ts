@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,16 @@ export async function GET(req: NextRequest) {
   if (!clientId) {
     return NextResponse.redirect(new URL('/dashboard/amazon?error=missing_credentials', req.url));
   }
+
+  void prisma.auditLog.create({
+    data: {
+      orgId:    session.user.orgId,
+      userId:   session.user.id,
+      action:   'AMAZON_OAUTH_START_ATTEMPTED',
+      resource: 'AmazonCredential',
+      metadata: { plan: session.user.plan },
+    },
+  }).catch(() => {});
 
   const state = crypto.randomBytes(32).toString('hex');
 

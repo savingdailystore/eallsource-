@@ -62,6 +62,16 @@ export async function GET(req: NextRequest) {
     }));
   }
 
+  void prisma.auditLog.create({
+    data: {
+      orgId:    orgId,
+      userId:   session.user.id,
+      action:   'CUSTOMER_EXPORT_USED',
+      resource: 'Export',
+      metadata: { type, format, rowCount: rows.length },
+    },
+  }).catch(() => {});
+
   if (format === 'csv') {
     if (!rows.length) {
       return new NextResponse('No data', { status: 200, headers: { 'Content-Type': 'text/csv' } });

@@ -7,6 +7,7 @@ const leadFindMany   = vi.fn();
 const leadCount      = vi.fn();
 const leadFindFirst  = vi.fn();
 const leadUpdate     = vi.fn();
+const auditLogCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/auth',   () => ({ auth: () => authMock() }));
 vi.mock('@/lib/prisma', () => ({
@@ -18,6 +19,7 @@ vi.mock('@/lib/prisma', () => ({
       findFirst: (...a: unknown[]) => leadFindFirst(...a),
       update:    (...a: unknown[]) => leadUpdate(...a),
     },
+    auditLog: { create: (...a: unknown[]) => auditLogCreate(...a) },
   },
 }));
 // getCached calls through to the callback — no Redis in tests
@@ -262,5 +264,49 @@ describe('PATCH /api/leads — entitlement enforcement', () => {
     const [call] = leadFindFirst.mock.calls;
     expect(call[0].where.orgId).toBe('source-org');
     expect(call[0].where).not.toHaveProperty('entitlements');
+  });
+});
+
+describe('PATCH /api/leads — CUSTOMER_LEAD_STATUS_UPDATE audit', () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    orgFindUnique.mockReset();
+    leadFindFirst.mockReset();
+    leadUpdate.mockReset();
+    auditLogCreate.mockReset();
+    auditLogCreate.mockResolvedValue({});
+  });
+
+  it('writes CUSTOMER_LEAD_STATUS_UPDATE on successful status change', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    const fakeLead = { id: 'claaaaaaaaaaaaaaaaaaaaaa', orgId: 'cust-org-1', status: 'NEW' };
+    leadFindFirst.mockResolvedValue(fakeLead);
+    leadUpdate.mockResolvedValue({ ...fakeLead, status: 'SAVED' });
+
+    await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
+
+    expect(auditLogCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action:   'CUSTOMER_LEAD_STATUS_UPDATE',
+          resource: 'Lead',
+          orgId:    'cust-org-1',
+          userId:   'u2',
+          metadata: expect.objectContaining({ before: 'NEW', after: 'SAVED' }),
+        }),
+      }),
+    );
+  });
+
+  it('does NOT write audit log when lead is not found (404)', async () => {
+    authMock.mockResolvedValue(ADMIN_SESSION);
+    orgFindUnique.mockResolvedValue({ isBroadcastSource: false });
+    leadFindFirst.mockResolvedValue(null);
+
+    const res = await PATCH(makePatch({ id: 'claaaaaaaaaaaaaaaaaaaaaa', status: 'SAVED' }));
+
+    expect(res.status).toBe(404);
+    expect(auditLogCreate).not.toHaveBeenCalled();
   });
 });

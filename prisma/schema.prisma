@@ -44,10 +44,20 @@ enum GatingRisk {
 }
 
 enum UpcCacheStatus {
-  HIT     // detail actor returned a valid UPC
-  MISS    // actor succeeded but the item genuinely has no UPC in the feed
-  FAILED  // actor threw or returned malformed data
+  HIT // detail actor returned a valid UPC
+  MISS // actor succeeded but the item genuinely has no UPC in the feed
+  FAILED // actor threw or returned malformed data
   TIMEOUT // actor call exceeded UPC_TIMEOUT_MS
+}
+
+enum CandidateStatus {
+  RAW_CANDIDATE        // imported, no Amazon data yet
+  MATCHED              // SP-API + Keepa pulled, profitability computed
+  NEEDS_REVIEW         // passed pipeline gates — owner must certify before delivery
+  CERTIFIED            // owner approved and pushed through pipeline for broadcast
+  REJECTED             // owner rejected or hard pipeline failure
+  STALE                // rescan: gone / out of stock / could not fetch
+  NO_LONGER_PROFITABLE // rescan: spread collapsed
 }
 
 enum POStatus {
@@ -73,11 +83,11 @@ enum LeadTier {
 }
 
 enum EntitlementSource {
-  AUTO_BROADCAST  // weekly cron delivery to receiveBroadcast orgs
-  BACKFILL        // registration seed — does not count toward weekly limit
-  OWNER_GRANT     // manually granted by platform operator
+  AUTO_BROADCAST // weekly cron delivery to receiveBroadcast orgs
+  BACKFILL // registration seed — does not count toward weekly limit
+  OWNER_GRANT // manually granted by platform operator
   CUSTOMER_MANUAL // customer submitted via ManualLeadEntry
-  SUPPORT_BONUS   // support/recovery override — never counts toward weekly limit
+  SUPPORT_BONUS // support/recovery override — never counts toward weekly limit
 }
 
 // ─── Multi-Tenant Core ─────────────────────────────────────────────────────
@@ -112,6 +122,7 @@ model Organization {
   salesSyncs           SalesSync[]
   settlementRecords    SettlementRecord[]
   SaleAdjustmentRecord SaleAdjustmentRecord[]
+  sourceCandidates     SourceCandidate[]
 
   @@index([slug])
   @@map("organizations")
@@ -378,17 +389,17 @@ model Lead {
 // BACKFILL, OWNER_GRANT, and SUPPORT_BONUS entitlements set deliveryWeekStart
 // null (they are outside normal weekly-drop accounting).
 model LeadEntitlement {
-  id      String       @id @default(cuid())
-  orgId   String
-  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  leadId  String
-  lead    Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  id     String       @id @default(cuid())
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leadId String
+  lead   Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
-  deliverySource           EntitlementSource
-  countsTowardWeeklyLimit  Boolean           @default(true)
+  deliverySource          EntitlementSource
+  countsTowardWeeklyLimit Boolean           @default(true)
   // Snapshot of the lead's tier at delivery time — future tier changes on the
   // lead do not retroactively alter existing entitlements.
-  leadTierAtDelivery       LeadTier          @default(BASIC)
+  leadTierAtDelivery      LeadTier          @default(BASIC)
 
   // UTC timestamp of the Monday 06:00 Arizona-time anchor for the weekly drop
   // this entitlement belongs to. Null for BACKFILL, OWNER_GRANT, and
@@ -904,33 +915,32 @@ model SaleAdjustmentRecord {
 // Writes use the itemId key when itemId is present, URL key otherwise.
 
 model RetailerUpcCache {
-  id                  String         @id @default(cuid())
+  id String @id @default(cuid())
 
   retailer            String
-  retailerItemId      String?        // Walmart numeric item ID (last URL path segment)
-  normalizedSourceUrl String         // url.split('?')[0].toLowerCase() — always set
+  retailerItemId      String? // Walmart numeric item ID (last URL path segment)
+  normalizedSourceUrl String // url.split('?')[0].toLowerCase() — always set
 
   // Enriched data — null when not returned by the actor
-  upc                 String?
-  ean                 String?
-  model               String?
-  brand               String?
-  title               String?
+  upc   String?
+  ean   String?
+  model String?
+  brand String?
+  title String?
 
-  status              UpcCacheStatus
-  failureReason       String?        // error summary for FAILED / TIMEOUT entries
+  status        UpcCacheStatus
+  failureReason String? // error summary for FAILED / TIMEOUT entries
 
-  fetchedAt           DateTime       // when the actor call completed (or timed out)
-  expiresAt           DateTime       // fetchedAt + TTL (30d HIT, 7d MISS, 3d FAILED/TIMEOUT)
+  fetchedAt DateTime // when the actor call completed (or timed out)
+  expiresAt DateTime // fetchedAt + TTL (30d HIT, 7d MISS, 3d FAILED/TIMEOUT)
 
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Primary key: retailer + itemId (only when itemId is non-null — NULLs are distinct)
   @@unique([retailer, retailerItemId])
   // Fallback key: retailer + normalised URL (covers cases without a parseable itemId)
   @@unique([retailer, normalizedSourceUrl])
-
   @@index([retailer, retailerItemId])
   @@index([retailer, normalizedSourceUrl])
   @@index([expiresAt])
@@ -950,12 +960,88 @@ model RetailerUpcCache {
 // normalizedBrand (lowercase+trimmed) is the deduplication key — re-blocking
 // a cleared brand reactivates the existing row rather than inserting a duplicate.
 
+// ─── Source Candidate (Hybrid Sourcing Foundation — Phase 18.1) ────────────
+//
+// Pre-pipeline staging for VA imports, manual entries, and future Apify scans.
+// Sits between raw discovery and the existing Lead pipeline. The owner reviews
+// and certifies candidates here before they are pushed through processRetailerProduct
+// (with full safety gates — no force:true). Customers never see SourceCandidates
+// directly; they receive Leads via the normal weekly broadcast.
+
+model SourceCandidate {
+  id    String       @id @default(cuid())
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  // Identifiers
+  asin           String?
+  upc            String?
+  retailerItemId String? // Walmart item ID, Target DPCI, etc.
+
+  // URLs
+  retailerUrl           String // original URL as submitted
+  normalizedRetailerUrl String // url stripped of query params + trailing slash, lowercased
+
+  retailer String // "Walmart", "Target", etc.
+
+  // Product info
+  title String?
+  brand String?
+
+  // Source pricing at time of discovery
+  sourcePrice     Float?
+  sourceListPrice Float?
+  onSale          Boolean?
+
+  // Amazon pricing at last check (populated by enrichment job, not import)
+  buyBoxPrice     Float?
+  amazonCheckedAt DateTime?
+
+  // Profitability snapshot (populated by enrichment job, not import)
+  estimatedProfit Float?
+  estimatedRoi    Float?
+
+  // Sourcing attribution
+  sourceType String  // "VA_IMPORT" | "APIFY_SCAN" | "MANUAL" | "RESCAN"
+  sourceCost Float?  // estimated USD cost to discover this candidate (0 for VA_IMPORT)
+  scanJobId  String? // FK to ScanJob when sourceType = APIFY_SCAN
+
+  // VA/operator notes — free text attached at import time
+  vaNotes String?
+
+  // Certification workflow
+  certStatus  CandidateStatus @default(RAW_CANDIDATE)
+  certNotes   String?
+  certifiedAt DateTime?
+  certifiedBy String? // userId
+  rejectedAt  DateTime?
+  rejectedBy  String? // userId
+
+  // Staleness tracking (populated by in-house rescan — Phase 18.3)
+  lastCheckedAt DateTime?
+  staleAt       DateTime?
+
+  // FK to Product + Lead once certified and pipeline-processed (Phase 18.4+)
+  productId String?
+  leadId    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, normalizedRetailerUrl])
+  @@index([orgId, certStatus])
+  @@index([orgId, retailer])
+  @@index([orgId, sourceType])
+  @@index([orgId, createdAt])
+  @@map("source_candidates")
+}
+
 model BrandBlock {
   id              String    @id @default(cuid())
-  brand           String    // original brand name as entered by admin
+  brand           String // original brand name as entered by admin
   normalizedBrand String    @unique // LOWER(TRIM(brand)) — dedup + pipeline lookup key
-  reason          String?   // short public reason (e.g. "Private label — Astercook")
-  note            String?   // optional operator-only note
+  reason          String? // short public reason (e.g. "Private label — Astercook")
+  note            String? // optional operator-only note
   isActive        Boolean   @default(true)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

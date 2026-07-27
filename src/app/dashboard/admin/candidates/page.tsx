@@ -35,6 +35,37 @@ interface Candidate {
   createdAt:       string;
 }
 
+interface VaPreviewAccepted {
+  rowNumber:   number;
+  title:       string;
+  asin:        string | undefined;
+  retailer:    string;
+  retailerUrl: string;
+  sourcePrice: number;
+  vaNotes:     string | undefined;
+  meta: {
+    asinSource?:               string;
+    vaEstimatedBuyBox?:        number;
+    vaEstimatedProfit?:        number;
+    vaEstimatedRoi?:           string;
+    vaEstimatedSalesPerMonth?: number;
+    couponCode?:               string;
+  };
+  warnings: { code: string; message: string }[];
+}
+
+interface VaPreviewResult {
+  ok:               boolean;
+  totalInputRows:   number;
+  acceptedCount:    number;
+  skippedCount:     number;
+  cleanupCount:     number;
+  acceptedRows:     VaPreviewAccepted[];
+  skippedRows:      { rowNumber: number; rawTitle: string; reason: string }[];
+  needsCleanupRows: { rowNumber: number; rawTitle: string; issue: string }[];
+  parseErrors:      string[];
+}
+
 const STATUS_COLORS: Record<CandidateStatus, string> = {
   RAW_CANDIDATE:       'bg-slate-700 text-slate-300',
   MATCHED:             'bg-blue-900/60 text-blue-300',
@@ -75,6 +106,12 @@ export default function CandidatesPage() {
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
   const [importError,  setImportError]  = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // VA format mode
+  const [importMode,   setImportMode]   = useState<'standard' | 'va'>('standard');
+  const [previewing,   setPreviewing]   = useState(false);
+  const [vaPreview,    setVaPreview]    = useState<VaPreviewResult | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   // Reject
   const [rejectingId,  setRejectingId]  = useState<string | null>(null);
@@ -136,6 +173,53 @@ export default function CandidatesPage() {
       if (!res.ok) throw new Error(data.error ?? 'Import failed');
       setImportResult(data);
       setCsvText('');
+      loadCandidates(1);
+    } catch (e) {
+      setImportError((e as Error).message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleVaPreview() {
+    if (!csvText.trim()) return;
+    setPreviewing(true);
+    setVaPreview(null);
+    setPreviewError(null);
+    setImportResult(null);
+    setImportError(null);
+    try {
+      const res  = await fetch('/api/admin/candidates/va-preview', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ csv: csvText }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Preview failed');
+      setVaPreview(data as VaPreviewResult);
+    } catch (e) {
+      setPreviewError((e as Error).message);
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
+  async function handleVaImport() {
+    if (!csvText.trim() || !vaPreview || vaPreview.acceptedCount === 0) return;
+    setImporting(true);
+    setImportResult(null);
+    setImportError(null);
+    try {
+      const res  = await fetch('/api/admin/candidates/va-import', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ csv: csvText }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Import failed');
+      setImportResult(data);
+      setCsvText('');
+      setVaPreview(null);
       loadCandidates(1);
     } catch (e) {
       setImportError((e as Error).message);
@@ -277,14 +361,50 @@ export default function CandidatesPage() {
 
       {/* CSV Import */}
       <div className="card p-5 mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Upload className="w-4 h-4 text-blue-400" />
-          <span className="text-sm font-semibold text-slate-200">Import VA CSV</span>
+        <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Upload className="w-4 h-4 text-blue-400" />
+            <span className="text-sm font-semibold text-slate-200">Import VA CSV</span>
+          </div>
+          {/* Mode toggle */}
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => { setImportMode('standard'); setVaPreview(null); setPreviewError(null); }}
+              className={cn(
+                'text-xs px-3 py-1 rounded-lg border transition-colors',
+                importMode === 'standard'
+                  ? 'border-blue-500 bg-blue-500/20 text-blue-200'
+                  : 'border-slate-700 text-slate-400 hover:border-slate-500',
+              )}
+            >
+              Standard CSV
+            </button>
+            <button
+              onClick={() => { setImportMode('va'); setVaPreview(null); setPreviewError(null); }}
+              className={cn(
+                'text-xs px-3 py-1 rounded-lg border transition-colors',
+                importMode === 'va'
+                  ? 'border-purple-500 bg-purple-500/20 text-purple-200'
+                  : 'border-slate-700 text-slate-400 hover:border-slate-500',
+              )}
+            >
+              VA Format
+            </button>
+          </div>
         </div>
-        <p className="text-xs text-slate-500 mb-3">
-          Required columns: <code className="text-slate-400">retailer_url, retailer, source_price, title</code>.
-          Optional: <code className="text-slate-400">asin, upc, brand, source_list_price, on_sale, va_notes, retailer_item_id</code>.
-        </p>
+
+        {importMode === 'standard' ? (
+          <p className="text-xs text-slate-500 mb-3">
+            Required columns: <code className="text-slate-400">retailer_url, retailer, source_price, title</code>.
+            Optional: <code className="text-slate-400">asin, upc, brand, source_list_price, on_sale, va_notes, retailer_item_id</code>.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500 mb-3">
+            VA sheet format: <code className="text-slate-400">Product Name, ASIN, Category, Source URL, Amazon URL, Cost Price, Sales Price, Profit, R.O.I, Est Sales/M, Coupon Code, Note</code>.
+            Preview before import — VA economics (Profit, ROI) are discarded; EALLsource recalculates all economics via SP-API.
+          </p>
+        )}
+
         <div className="flex gap-3 flex-wrap mb-3">
           <input
             type="file"
@@ -307,26 +427,153 @@ export default function CandidatesPage() {
         </div>
         <textarea
           value={csvText}
-          onChange={e => setCsvText(e.target.value)}
+          onChange={e => { setCsvText(e.target.value); setVaPreview(null); }}
           placeholder="Or paste CSV text here…"
           rows={5}
           className="w-full text-xs font-mono bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-slate-300 placeholder:text-slate-600 focus:outline-none focus:border-blue-500 resize-y mb-3"
         />
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleImport}
-            disabled={!csvText.trim() || importing}
-            className="btn-primary text-sm py-2 px-5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {importing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Import
-          </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          {importMode === 'standard' ? (
+            <button
+              onClick={handleImport}
+              disabled={!csvText.trim() || importing}
+              className="btn-primary text-sm py-2 px-5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {importing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Import
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={handleVaPreview}
+                disabled={!csvText.trim() || previewing}
+                className="btn-secondary text-sm py-2 px-5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {previewing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Preview
+              </button>
+              {vaPreview && vaPreview.acceptedCount > 0 && (
+                <button
+                  onClick={handleVaImport}
+                  disabled={importing}
+                  className="btn-primary text-sm py-2 px-5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {importing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Confirm Import ({vaPreview.acceptedCount} rows)
+                </button>
+              )}
+            </>
+          )}
           {csvText && (
-            <button onClick={() => setCsvText('')} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
+            <button onClick={() => { setCsvText(''); setVaPreview(null); }} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
               Clear
             </button>
           )}
         </div>
+
+        {/* VA Preview results */}
+        {vaPreview && (
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-wrap gap-3 text-xs">
+              <span className="text-green-400"><strong>{vaPreview.acceptedCount}</strong> accepted</span>
+              <span className="text-amber-400"><strong>{vaPreview.skippedCount}</strong> skipped</span>
+              {vaPreview.cleanupCount > 0 && (
+                <span className="text-orange-400"><strong>{vaPreview.cleanupCount}</strong> need cleanup</span>
+              )}
+              <span className="text-slate-500">of {vaPreview.totalInputRows} input rows</span>
+            </div>
+
+            {/* Accepted rows */}
+            {vaPreview.acceptedRows.length > 0 && (
+              <div className="overflow-x-auto rounded-xl border border-slate-700/50">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr className="border-b border-slate-700/50 bg-slate-800/50">
+                      {['#', 'Title', 'ASIN', 'Retailer', 'Cost', 'VA Buy Box', 'VA ROI', 'Warnings'].map(h => (
+                        <th key={h} className="text-left px-2 py-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/30">
+                    {vaPreview.acceptedRows.map(r => (
+                      <tr key={r.rowNumber} className={cn('hover:bg-slate-800/30', r.warnings.length > 0 ? 'bg-amber-900/5' : '')}>
+                        <td className="px-2 py-1.5 text-slate-500">{r.rowNumber}</td>
+                        <td className="px-2 py-1.5 max-w-[180px]">
+                          <a href={r.retailerUrl} target="_blank" rel="noopener noreferrer"
+                            className="text-blue-400 hover:underline line-clamp-2">{r.title}</a>
+                        </td>
+                        <td className="px-2 py-1.5 font-mono text-slate-400 whitespace-nowrap">
+                          {r.asin ?? '—'}
+                          {r.meta.asinSource === 'AMAZON_URL' && (
+                            <span className="text-amber-500 ml-1" title="ASIN from Amazon URL">↗</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5 text-slate-300 whitespace-nowrap">{r.retailer}</td>
+                        <td className="px-2 py-1.5 text-slate-300 whitespace-nowrap">${r.sourcePrice.toFixed(2)}</td>
+                        <td className="px-2 py-1.5 text-slate-500 whitespace-nowrap">
+                          {r.meta.vaEstimatedBuyBox ? `$${r.meta.vaEstimatedBuyBox.toFixed(2)}` : '—'}
+                        </td>
+                        <td className="px-2 py-1.5 text-slate-500 whitespace-nowrap">{r.meta.vaEstimatedRoi ?? '—'}</td>
+                        <td className="px-2 py-1.5">
+                          {r.warnings.length === 0 ? (
+                            <span className="text-green-600 text-[10px]">✓ clean</span>
+                          ) : (
+                            <div className="space-y-0.5">
+                              {r.warnings.map((w, i) => (
+                                <div key={i} className="text-amber-500/80 text-[10px]" title={w.message}>{w.code}</div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Skipped rows */}
+            {vaPreview.skippedRows.length > 0 && (
+              <details className="text-xs">
+                <summary className="text-slate-500 cursor-pointer hover:text-slate-300">
+                  {vaPreview.skippedRows.length} skipped rows
+                </summary>
+                <ul className="mt-2 space-y-1 pl-3">
+                  {vaPreview.skippedRows.map(r => (
+                    <li key={r.rowNumber} className="text-slate-500">
+                      Row {r.rowNumber}: <span className="text-slate-400">{r.rawTitle}</span>
+                      <span className="text-red-500/70 ml-2">— {r.reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
+            {/* Needs cleanup rows */}
+            {vaPreview.needsCleanupRows.length > 0 && (
+              <details className="text-xs">
+                <summary className="text-orange-500/80 cursor-pointer hover:text-orange-400">
+                  {vaPreview.needsCleanupRows.length} rows need cleanup
+                </summary>
+                <ul className="mt-2 space-y-1 pl-3">
+                  {vaPreview.needsCleanupRows.map(r => (
+                    <li key={r.rowNumber} className="text-slate-500">
+                      Row {r.rowNumber}: <span className="text-slate-400">{r.rawTitle}</span>
+                      <span className="text-orange-500/70 ml-2">— {r.issue}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+
+        {previewError && (
+          <div className="mt-3 flex items-start gap-2 text-xs text-red-400 bg-red-900/20 border border-red-800/50 rounded-xl px-3 py-2.5">
+            <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+            {previewError}
+          </div>
+        )}
 
         {importResult && (
           <div className="mt-3 flex items-start gap-2 text-xs text-green-400 bg-green-900/20 border border-green-800/50 rounded-xl px-3 py-2.5">

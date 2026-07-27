@@ -47,6 +47,11 @@ import type { CandidateStatus } from '@prisma/client';
 import type { AmazonMatch } from '@/types';
 
 const MIN_RESALE_PRICE = 12;
+// Buy box prices above this threshold signal catalog anomalies (e.g. third-party
+// sellers listing at $10,000+). Using them for profitability math would produce
+// wildly inflated ROI and could result in a MATCHED/CERTIFIED record with
+// non-existent economics. Route to NEEDS_REVIEW instead.
+const MAX_BUYBOX_PRICE = 5_000;
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -195,7 +200,9 @@ export async function evaluateCandidate(
   const rawBuyBoxPrice    = sp?.buyBoxPrice    ?? keepa?.buyBoxPrice    ?? null;
   const rawLowestFbaPrice = sp?.lowestFbaPrice ?? keepa?.lowestNewPrice ?? null;
   // A $0 buy box signals suppression or Amazon-exclusive listing, not a real price.
-  const buyBoxPrice    = rawBuyBoxPrice    != null && rawBuyBoxPrice    > 0 ? rawBuyBoxPrice    : null;
+  // A buy box above MAX_BUYBOX_PRICE is treated as a catalog anomaly (see guard below).
+  const buyBoxAnomalous = rawBuyBoxPrice != null && rawBuyBoxPrice > MAX_BUYBOX_PRICE;
+  const buyBoxPrice    = rawBuyBoxPrice    != null && rawBuyBoxPrice    > 0 && !buyBoxAnomalous ? rawBuyBoxPrice    : null;
   const lowestFbaPrice = rawLowestFbaPrice != null && rawLowestFbaPrice > 0 ? rawLowestFbaPrice : null;
   const fbaSellers     = (sp?.fbaSellers   || null) ?? keepa?.fbaSellers   ?? 0;
   const totalSellers   = (sp?.totalSellers || null) ?? keepa?.totalSellers ?? 0;
@@ -205,6 +212,15 @@ export async function evaluateCandidate(
   const priceStability = keepa?.priceStability ?? 'UNKNOWN';
   const priceTrend     = keepa?.priceTrend     ?? 'UNKNOWN';
   const priceTrendPct  = keepa?.priceTrendPct;
+
+  // ── 4a. Anomalous buy box price guard ────────────────────────────────────────
+  if (buyBoxAnomalous) {
+    return done(
+      'NEEDS_REVIEW',
+      `Anomalous Amazon buy box price $${rawBuyBoxPrice!.toFixed(2)} — catalog data unreliable; manual review required`,
+      asin, matchMethod, matchConfidence,
+    );
+  }
 
   if (buyBoxPrice == null && lowestFbaPrice == null) {
     return done('NEEDS_REVIEW', 'ASIN matched but reliable Amazon pricing was unavailable', asin, matchMethod, matchConfidence);

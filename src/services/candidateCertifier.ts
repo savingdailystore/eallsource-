@@ -33,6 +33,10 @@ import type { CandidateStatus } from '@prisma/client';
 
 // Minimum ROI required to certify. estimatedRoi is stored as decimal fraction (0.30 = 30%).
 const MIN_CERTIFICATION_ROI = 0.30;
+// Safety backstop: a buy box above this threshold signals a catalog anomaly
+// (same constant as evaluator). Certification must be blocked even if the
+// record somehow passed evaluation with an anomalous price stored.
+const MAX_BUYBOX_PRICE = 5_000;
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -74,6 +78,9 @@ function assertEligible(c: EligibilityInput): void {
   }
   if (c.buyBoxPrice == null || c.buyBoxPrice <= 0) {
     throw new Error('Candidate has no valid buy box price');
+  }
+  if (c.buyBoxPrice > MAX_BUYBOX_PRICE) {
+    throw new Error(`Candidate buy box price $${c.buyBoxPrice.toFixed(2)} is anomalously high — catalog data unreliable; cannot certify`);
   }
   if (c.estimatedProfit == null || c.estimatedProfit <= 0) {
     throw new Error('Candidate has no positive estimated profit');

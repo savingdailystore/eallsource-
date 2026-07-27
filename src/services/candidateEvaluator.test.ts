@@ -547,3 +547,57 @@ describe('evaluateCandidate — gate ordering (Phase 18.2e)', () => {
     expect(result.estimatedRoi).toBeGreaterThan(0);
   });
 });
+
+// ─── Price anomaly guard (Phase 18.4a) ───────────────────────────────────────
+
+describe('evaluateCandidate — anomalous buy box price guard (Phase 18.4a)', () => {
+  it('NEEDS_REVIEW when buyBoxPrice is $81,735 (catalog anomaly)', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 81_735.42 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 81_735.42 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NEEDS_REVIEW');
+    expect(result.certNotes).toContain('Anomalous Amazon buy box price');
+    expect(result.certNotes).toContain('catalog data unreliable');
+  });
+
+  it('does not store estimatedProfit or estimatedRoi for anomalous buy box', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 10_000.00 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 10_000.00 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.estimatedProfit).toBeNull();
+    expect(result.estimatedRoi).toBeNull();
+  });
+
+  it('does not reach MATCHED when buyBoxPrice exceeds MAX_BUYBOX_PRICE', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 5_001.00 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 5_001.00 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).not.toBe('MATCHED');
+    expect(result.newStatus).not.toBe('CERTIFIED');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('buyBoxPrice exactly at $5,000 is treated as normal (boundary)', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 5_000.00 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 5_000.00 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    // $5,000 is at the boundary — treated as valid (> 0, not > 5_000)
+    expect(result.certNotes ?? '').not.toContain('Anomalous');
+  });
+});

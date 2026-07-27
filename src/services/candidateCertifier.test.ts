@@ -108,6 +108,13 @@ describe('certifyCandidate — eligibility guards', () => {
     await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('buy box price');
   });
 
+  it('throws if buyBoxPrice is $10,000 (anomalously high — catalog anomaly guard)', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ buyBoxPrice: 10_000 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('anomalously high');
+  });
+
   it('throws if estimatedProfit is null or zero', async () => {
     (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
       matchedCandidate({ estimatedProfit: 0 }),

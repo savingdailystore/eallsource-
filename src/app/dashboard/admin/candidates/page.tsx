@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Upload, RefreshCw, Loader2, AlertCircle, CheckCircle2,
-  ChevronLeft, ChevronRight, Filter, XCircle,
+  ChevronLeft, ChevronRight, Filter, XCircle, Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CandidateStatus } from '@prisma/client';
@@ -28,6 +28,7 @@ interface Candidate {
   estimatedRoi:    number | null;
   buyBoxPrice:     number | null;
   lastCheckedAt:   string | null;
+  amazonCheckedAt: string | null;
   createdAt:       string;
 }
 
@@ -46,10 +47,12 @@ const ALL_STATUSES: CandidateStatus[] = [
   'REJECTED', 'STALE', 'NO_LONGER_PROFITABLE',
 ];
 
-const fmt  = (n: number | null | undefined, d = 2) =>
+const fmt    = (n: number | null | undefined, d = 2) =>
   n == null ? '—' : `$${n.toFixed(d)}`;
-const fmtPct = (n: number | null | undefined) =>
+const fmtRoi = (n: number | null | undefined) =>
   n == null ? '—' : `${(n * 100).toFixed(0)}%`;
+const fmtDate = (s: string | null | undefined) =>
+  s ? new Date(s).toLocaleDateString() : '—';
 
 export default function CandidatesPage() {
   const [candidates,   setCandidates]   = useState<Candidate[]>([]);
@@ -64,16 +67,22 @@ export default function CandidatesPage() {
   const [sourceTypeFilter, setSourceTypeFilter] = useState('');
 
   // Import
-  const [csvText,       setCsvText]       = useState('');
-  const [importing,     setImporting]     = useState(false);
-  const [importResult,  setImportResult]  = useState<Record<string, unknown> | null>(null);
-  const [importError,   setImportError]   = useState<string | null>(null);
+  const [csvText,      setCsvText]      = useState('');
+  const [importing,    setImporting]    = useState(false);
+  const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null);
+  const [importError,  setImportError]  = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reject
   const [rejectingId,  setRejectingId]  = useState<string | null>(null);
   const [rejectNotes,  setRejectNotes]  = useState('');
   const [rejectLoading, setRejectLoading] = useState(false);
+
+  // Evaluate
+  const [evaluatingId,  setEvaluatingId]  = useState<string | null>(null);
+  const [batchEvaluating, setBatchEvaluating] = useState(false);
+  const [batchResult,     setBatchResult]     = useState<Record<string, unknown> | null>(null);
+  const [batchError,      setBatchError]      = useState<string | null>(null);
 
   const LIMIT = 50;
 
@@ -156,17 +165,72 @@ export default function CandidatesPage() {
     }
   }
 
+  async function handleEvaluate(id: string) {
+    setEvaluatingId(id);
+    try {
+      const res  = await fetch(`/api/admin/candidates/${id}/evaluate`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Evaluation failed');
+      loadCandidates(page);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setEvaluatingId(null);
+    }
+  }
+
+  async function handleBatchEvaluate() {
+    setBatchEvaluating(true);
+    setBatchResult(null);
+    setBatchError(null);
+    try {
+      const res  = await fetch('/api/admin/candidates/evaluate-pending', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Batch evaluation failed');
+      setBatchResult(data);
+      loadCandidates(1);
+    } catch (e) {
+      setBatchError((e as Error).message);
+    } finally {
+      setBatchEvaluating(false);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-50">Candidate Queue</h1>
-        <p className="text-slate-400 text-sm mt-1">
-          VA-imported sourcing candidates. Import CSV, review, and reject as needed.
-          Certification is Phase 18.4+.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-50">Candidate Queue</h1>
+          <p className="text-slate-400 text-sm mt-1">
+            VA-imported sourcing candidates. Import CSV, evaluate against Amazon, review, and reject as needed.
+            Certification is Phase 18.4+.
+          </p>
+        </div>
+        {/* Batch evaluate */}
+        <div className="flex flex-col items-end gap-1.5">
+          <button
+            onClick={handleBatchEvaluate}
+            disabled={batchEvaluating}
+            className="flex items-center gap-2 text-sm px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {batchEvaluating
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <Zap className="w-3.5 h-3.5" />
+            }
+            Evaluate Pending (≤3)
+          </button>
+          {batchResult && (
+            <span className="text-xs text-green-400">
+              Evaluated {String((batchResult as { evaluated?: number }).evaluated ?? 0)} candidates
+            </span>
+          )}
+          {batchError && (
+            <span className="text-xs text-red-400">{batchError}</span>
+          )}
+        </div>
       </div>
 
       {/* Status counts */}
@@ -301,13 +365,14 @@ export default function CandidatesPage() {
         </button>
       </div>
 
-      {/* Table */}
+      {/* Error */}
       {error && (
         <div className="card p-4 mb-4 text-red-400 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4" /> {error}
         </div>
       )}
 
+      {/* Table */}
       {loading ? (
         <div className="flex items-center justify-center py-16 text-slate-500">
           <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading candidates…
@@ -325,7 +390,7 @@ export default function CandidatesPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-700/50 bg-slate-800/50">
-                  {['Created', 'Retailer', 'Title', 'Source $', 'Buy Box', 'Est. Profit', 'Est. ROI', 'ASIN / UPC', 'Status', 'Source', 'Actions'].map(h => (
+                  {['Created', 'Retailer', 'Title', 'Source $', 'Buy Box', 'Est. Profit', 'Est. ROI', 'ASIN / UPC', 'Status', 'Checked', 'Actions'].map(h => (
                     <th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -339,7 +404,7 @@ export default function CandidatesPage() {
                       {new Date(c.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-3 py-2.5 text-slate-300 whitespace-nowrap">{c.retailer}</td>
-                    <td className="px-3 py-2.5 max-w-[220px]">
+                    <td className="px-3 py-2.5 max-w-[200px]">
                       <a
                         href={c.retailerUrl}
                         target="_blank"
@@ -349,7 +414,19 @@ export default function CandidatesPage() {
                       >
                         {c.title ?? '—'}
                       </a>
-                      {c.vaNotes && (
+                      {c.certNotes && (
+                        <p className={cn(
+                          'text-[10px] mt-0.5 truncate',
+                          c.certStatus === 'REJECTED' || c.certStatus === 'NO_LONGER_PROFITABLE'
+                            ? 'text-red-500/70'
+                            : c.certStatus === 'NEEDS_REVIEW'
+                              ? 'text-amber-500/70'
+                              : 'text-slate-600',
+                        )} title={c.certNotes}>
+                          {c.certNotes}
+                        </p>
+                      )}
+                      {!c.certNotes && c.vaNotes && (
                         <p className="text-slate-600 text-[10px] mt-0.5 truncate" title={c.vaNotes}>
                           {c.vaNotes}
                         </p>
@@ -367,7 +444,7 @@ export default function CandidatesPage() {
                         {fmt(c.estimatedProfit)}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap">{fmtPct(c.estimatedRoi)}</td>
+                    <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap">{fmtRoi(c.estimatedRoi)}</td>
                     <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap font-mono text-[10px]">
                       {c.asin && <div>ASIN: {c.asin}</div>}
                       {c.upc  && <div>UPC: {c.upc}</div>}
@@ -378,44 +455,64 @@ export default function CandidatesPage() {
                         {c.certStatus.replace(/_/g, ' ')}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap text-[10px]">{c.sourceType}</td>
+                    <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap text-[10px]">
+                      {c.lastCheckedAt ? fmtDate(c.lastCheckedAt) : '—'}
+                    </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
-                      {c.certStatus !== 'REJECTED' && c.certStatus !== 'CERTIFIED' && (
-                        rejectingId === c.id ? (
-                          <div className="flex flex-col gap-1.5 min-w-[180px]">
-                            <input
-                              type="text"
-                              value={rejectNotes}
-                              onChange={e => setRejectNotes(e.target.value)}
-                              placeholder="Reason (optional)"
-                              className="text-[11px] bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-slate-300 focus:outline-none focus:border-red-500"
-                            />
-                            <div className="flex gap-1.5">
-                              <button
-                                onClick={() => handleReject(c.id)}
-                                disabled={rejectLoading}
-                                className="text-[11px] px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg disabled:opacity-50 flex items-center gap-1"
-                              >
-                                {rejectLoading && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => { setRejectingId(null); setRejectNotes(''); }}
-                                className="text-[11px] px-2 py-1 text-slate-400 hover:text-white rounded-lg"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
+                      <div className="flex flex-col gap-1">
+                        {/* Evaluate button — available for any non-CERTIFIED, non-REJECTED status */}
+                        {c.certStatus !== 'CERTIFIED' && (
                           <button
-                            onClick={() => { setRejectingId(c.id); setRejectNotes(''); }}
-                            className="text-[11px] text-red-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                            onClick={() => handleEvaluate(c.id)}
+                            disabled={evaluatingId === c.id}
+                            className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
+                            title="Run SP-API + Keepa evaluation"
                           >
-                            Reject
+                            {evaluatingId === c.id
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <Zap className="w-3 h-3" />
+                            }
+                            Evaluate
                           </button>
-                        )
-                      )}
+                        )}
+                        {/* Reject */}
+                        {c.certStatus !== 'REJECTED' && c.certStatus !== 'CERTIFIED' && (
+                          rejectingId === c.id ? (
+                            <div className="flex flex-col gap-1.5 min-w-[160px]">
+                              <input
+                                type="text"
+                                value={rejectNotes}
+                                onChange={e => setRejectNotes(e.target.value)}
+                                placeholder="Reason (optional)"
+                                className="text-[11px] bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-slate-300 focus:outline-none focus:border-red-500"
+                              />
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => handleReject(c.id)}
+                                  disabled={rejectLoading}
+                                  className="text-[11px] px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg disabled:opacity-50 flex items-center gap-1"
+                                >
+                                  {rejectLoading && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => { setRejectingId(null); setRejectNotes(''); }}
+                                  className="text-[11px] px-2 py-1 text-slate-400 hover:text-white rounded-lg"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setRejectingId(c.id); setRejectNotes(''); }}
+                              className="text-[11px] text-red-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              Reject
+                            </button>
+                          )
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

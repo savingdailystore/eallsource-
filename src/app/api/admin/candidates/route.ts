@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
         estimatedRoi:   true,
         buyBoxPrice:    true,
         lastCheckedAt:  true,
+        amazonCheckedAt: true,
         createdAt:      true,
         updatedAt:      true,
       },

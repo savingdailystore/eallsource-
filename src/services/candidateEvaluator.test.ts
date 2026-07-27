@@ -308,7 +308,7 @@ describe('evaluateCandidate — NEEDS_REVIEW', () => {
     const result = await evaluateCandidate(CAND_ID, ORG_ID);
 
     expect(result.newStatus).toBe('NEEDS_REVIEW');
-    expect(result.certNotes).toContain('no Amazon pricing data');
+    expect(result.certNotes).toContain('reliable Amazon pricing was unavailable');
   });
 });
 
@@ -353,5 +353,89 @@ describe('evaluateCandidate — source price missing', () => {
 
     expect(result.newStatus).toBe('NEEDS_REVIEW');
     expect(result.certNotes).toContain('Source price missing');
+  });
+});
+
+describe('evaluateCandidate — data quality guards (Phase 18.2c)', () => {
+  it('NEEDS_REVIEW when buyBoxPrice = 0 (suppressed/Amazon-exclusive)', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 0, lowestFbaPrice: 0 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 0, lowestNewPrice: 0 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NEEDS_REVIEW');
+    expect(result.certNotes).toContain('reliable Amazon pricing was unavailable');
+  });
+
+  it('does not store estimatedProfit when buyBoxPrice = 0', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 0, lowestFbaPrice: 0 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 0, lowestNewPrice: 0 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.estimatedProfit).toBeNull();
+    expect(result.estimatedRoi).toBeNull();
+  });
+
+  it('does not set amazonCheckedAt when buyBoxPrice = 0', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 0, lowestFbaPrice: 0 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 0, lowestNewPrice: 0 } as any);
+
+    await evaluateCandidate(CAND_ID, ORG_ID);
+
+    const updateCall = (prisma.sourceCandidate.update as MockedFunction<typeof prisma.sourceCandidate.update>).mock.calls[0][0];
+    expect((updateCall as any).data.amazonCheckedAt).toBeUndefined();
+  });
+
+  it('NEEDS_REVIEW when fee estimate fails', async () => {
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockRejectedValue(new Error('Decryption failed'));
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NEEDS_REVIEW');
+    expect(result.certNotes).toContain('Fee estimate unavailable');
+  });
+
+  it('does not store estimatedProfit or estimatedRoi when fee estimate fails', async () => {
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockRejectedValue(new Error('Decryption failed'));
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.estimatedProfit).toBeNull();
+    expect(result.estimatedRoi).toBeNull();
+  });
+
+  it('valid pricing + valid fee estimate can still become MATCHED', async () => {
+    // default beforeEach already provides good product data and fee estimate
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('MATCHED');
+    expect(result.estimatedProfit).toBeGreaterThan(0);
+    expect(result.estimatedRoi).toBeGreaterThan(0);
+    expect(result.buyBoxPrice).toBe(45.00);
+    expect(result.newStatus).not.toBe('CERTIFIED');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+    expect(prisma.leadEntitlement.create).not.toHaveBeenCalled();
+  });
+
+  it('force:true is never used — sourceCandidate.update is the only write', async () => {
+    await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+    expect(prisma.lead.update).not.toHaveBeenCalled();
+    expect(prisma.leadEntitlement.create).not.toHaveBeenCalled();
+    expect(prisma.leadEntitlement.upsert).not.toHaveBeenCalled();
+    expect(prisma.sourceCandidate.update).toHaveBeenCalledOnce();
+    // Verify no force:true in the update payload
+    const updateCall = (prisma.sourceCandidate.update as MockedFunction<typeof prisma.sourceCandidate.update>).mock.calls[0][0];
+    expect(JSON.stringify(updateCall)).not.toContain('"force":true');
   });
 });

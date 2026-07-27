@@ -187,8 +187,11 @@ export async function evaluateCandidate(
   const amazonTitle    = sp?.title    ?? keepa?.title    ?? candidate.title ?? '';
   const amazonBrand    = sp?.brand    ?? keepa?.brand    ?? candidate.brand;
   const amazonCategory = sp?.category ?? keepa?.category ?? 'Other';
-  const buyBoxPrice    = sp?.buyBoxPrice    ?? keepa?.buyBoxPrice    ?? null;
-  const lowestFbaPrice = sp?.lowestFbaPrice ?? keepa?.lowestNewPrice ?? null;
+  const rawBuyBoxPrice    = sp?.buyBoxPrice    ?? keepa?.buyBoxPrice    ?? null;
+  const rawLowestFbaPrice = sp?.lowestFbaPrice ?? keepa?.lowestNewPrice ?? null;
+  // A $0 buy box signals suppression or Amazon-exclusive listing, not a real price.
+  const buyBoxPrice    = rawBuyBoxPrice    != null && rawBuyBoxPrice    > 0 ? rawBuyBoxPrice    : null;
+  const lowestFbaPrice = rawLowestFbaPrice != null && rawLowestFbaPrice > 0 ? rawLowestFbaPrice : null;
   const fbaSellers     = (sp?.fbaSellers   || null) ?? keepa?.fbaSellers   ?? 0;
   const totalSellers   = (sp?.totalSellers || null) ?? keepa?.totalSellers ?? 0;
   const amazonIsSeller = sp?.amazonIsSeller ?? keepa?.amazonIsSeller ?? false;
@@ -199,7 +202,7 @@ export async function evaluateCandidate(
   const priceTrendPct  = keepa?.priceTrendPct;
 
   if (buyBoxPrice == null && lowestFbaPrice == null) {
-    return done('NEEDS_REVIEW', 'ASIN matched but no Amazon pricing data available', asin, matchMethod, matchConfidence);
+    return done('NEEDS_REVIEW', 'ASIN matched but reliable Amazon pricing was unavailable', asin, matchMethod, matchConfidence);
   }
 
   const resellPrice      = lowestFbaPrice ?? buyBoxPrice!;
@@ -241,9 +244,16 @@ export async function evaluateCandidate(
   // ── 7. Fee estimation ─────────────────────────────────────────────────────
   let referralFee: number | undefined;
   let fbaFee:      number | undefined;
+  let feeEstimateOk = false;
   if (resellPrice > 0) {
     const fees = await getFeeEstimate(orgId, asin, resellPrice).catch(() => null);
-    if (fees) { referralFee = fees.referralFee; fbaFee = fees.fbaFee; }
+    if (fees) { referralFee = fees.referralFee; fbaFee = fees.fbaFee; feeEstimateOk = true; }
+  }
+
+  // Without a real fee estimate, profit/ROI would be based on default rates that
+  // may not reflect this ASIN's category, size tier, or weight — too unreliable to store.
+  if (!feeEstimateOk) {
+    return done('NEEDS_REVIEW', 'Fee estimate unavailable; manual review required', asin, matchMethod, matchConfidence, buyBoxPrice);
   }
 
   // ── 8. Profitability ──────────────────────────────────────────────────────

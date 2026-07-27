@@ -29,6 +29,9 @@ interface Candidate {
   buyBoxPrice:     number | null;
   lastCheckedAt:   string | null;
   amazonCheckedAt: string | null;
+  certifiedAt:     string | null;
+  productId:       string | null;
+  leadId:          string | null;
   createdAt:       string;
 }
 
@@ -77,6 +80,11 @@ export default function CandidatesPage() {
   const [rejectingId,  setRejectingId]  = useState<string | null>(null);
   const [rejectNotes,  setRejectNotes]  = useState('');
   const [rejectLoading, setRejectLoading] = useState(false);
+
+  // Certify
+  const [certifyingId,   setCertifyingId]   = useState<string | null>(null);
+  const [certifyLoading, setCertifyLoading] = useState(false);
+  const [certifyConfirm, setCertifyConfirm] = useState<string | null>(null);
 
   // Evaluate
   const [evaluatingId,  setEvaluatingId]  = useState<string | null>(null);
@@ -148,10 +156,10 @@ export default function CandidatesPage() {
   async function handleReject(id: string) {
     setRejectLoading(true);
     try {
-      const res  = await fetch(`/api/admin/candidates/${id}`, {
-        method:  'PATCH',
+      const res  = await fetch(`/api/admin/candidates/${id}/reject`, {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ action: 'REJECT', certNotes: rejectNotes || undefined }),
+        body:    JSON.stringify({ certNotes: rejectNotes || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Reject failed');
@@ -162,6 +170,22 @@ export default function CandidatesPage() {
       alert((e as Error).message);
     } finally {
       setRejectLoading(false);
+    }
+  }
+
+  async function handleCertify(id: string) {
+    setCertifyLoading(true);
+    try {
+      const res  = await fetch(`/api/admin/candidates/${id}/certify`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Certification failed');
+      setCertifyingId(null);
+      setCertifyConfirm(null);
+      loadCandidates(page);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setCertifyLoading(false);
     }
   }
 
@@ -205,8 +229,7 @@ export default function CandidatesPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-50">Candidate Queue</h1>
           <p className="text-slate-400 text-sm mt-1">
-            VA-imported sourcing candidates. Import CSV, evaluate against Amazon, review, and reject as needed.
-            Certification is Phase 18.4+.
+            VA-imported sourcing candidates. Import CSV, evaluate against Amazon, certify MATCHED leads, and reject as needed.
           </p>
         </div>
         {/* Batch evaluate */}
@@ -460,6 +483,49 @@ export default function CandidatesPage() {
                     </td>
                     <td className="px-3 py-2.5 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
+                        {/* Certify — MATCHED only */}
+                        {c.certStatus === 'MATCHED' && (
+                          certifyingId === c.id ? (
+                            <div className="flex flex-col gap-1.5 min-w-[160px]">
+                              <p className="text-[10px] text-amber-400">
+                                Create Product + Lead. Cannot be undone.
+                              </p>
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => handleCertify(c.id)}
+                                  disabled={certifyLoading}
+                                  className="text-[11px] px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded-lg disabled:opacity-50 flex items-center gap-1"
+                                >
+                                  {certifyLoading && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
+                                  Confirm
+                                </button>
+                                <button
+                                  onClick={() => { setCertifyingId(null); setCertifyConfirm(null); }}
+                                  className="text-[11px] px-2 py-1 text-slate-400 hover:text-white rounded-lg"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setCertifyingId(c.id); setCertifyConfirm(c.id); }}
+                              className="flex items-center gap-1 text-[11px] text-green-400 hover:text-green-300 transition-colors"
+                              title="Certify this candidate — creates Product + Lead"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              Certify
+                            </button>
+                          )
+                        )}
+                        {/* CERTIFIED — show productId/leadId */}
+                        {c.certStatus === 'CERTIFIED' && (
+                          <div className="text-[10px] text-green-500 space-y-0.5">
+                            <div>Certified {c.certifiedAt ? fmtDate(c.certifiedAt) : ''}</div>
+                            {c.productId && <div className="font-mono truncate max-w-[120px]" title={c.productId}>P: {c.productId.slice(-8)}</div>}
+                            {c.leadId    && <div className="font-mono truncate max-w-[120px]" title={c.leadId}>L: {c.leadId.slice(-8)}</div>}
+                          </div>
+                        )}
                         {/* Evaluate button — available for any non-CERTIFIED, non-REJECTED status */}
                         {c.certStatus !== 'CERTIFIED' && (
                           <button

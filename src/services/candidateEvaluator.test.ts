@@ -1,12 +1,17 @@
 /**
- * Phase 18.2 — Candidate Evaluator Tests
+ * Phase 18.2 / 18.2c / 18.2e — Candidate Evaluator Tests
  *
  * Key invariants verified:
  * - evaluateCandidate writes to sourceCandidate ONLY (no Product/Lead/Entitlement)
  * - All hard-reject safety gates work (brand block, private-label, hazmat, IP history)
+ * - Hard gates reject EVEN WHEN fee estimate would fail (Phase 18.2e)
+ * - Advisory signals collected before fee estimation (Phase 18.2e)
+ * - Fee estimate failure → NEEDS_REVIEW with advisory signals appended (Phase 18.2e)
  * - Not-profitable → NO_LONGER_PROFITABLE (not REJECTED)
  * - Profitable + clean match → MATCHED (never CERTIFIED)
  * - Advisory warnings → NEEDS_REVIEW
+ * - buyBoxPrice <= 0 is not reliable pricing (Phase 18.2c)
+ * - Fee estimate failure does not produce confident profit/ROI (Phase 18.2c)
  * - Missing ASIN/UPC/title → safe REJECTED (no_match)
  * - CERTIFIED candidate → throws (never overwrites)
  * - force:true is never called
@@ -437,5 +442,108 @@ describe('evaluateCandidate — data quality guards (Phase 18.2c)', () => {
     // Verify no force:true in the update payload
     const updateCall = (prisma.sourceCandidate.update as MockedFunction<typeof prisma.sourceCandidate.update>).mock.calls[0][0];
     expect(JSON.stringify(updateCall)).not.toContain('"force":true');
+  });
+});
+
+describe('evaluateCandidate — gate ordering (Phase 18.2e)', () => {
+  it('BrandBlock REJECTED even when fee estimate would fail', async () => {
+    (prisma.brandBlock.findFirst as MockedFunction<typeof prisma.brandBlock.findFirst>)
+      .mockResolvedValue({ id: 'block-1' } as any);
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockRejectedValue(new Error('Decryption failed'));
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('REJECTED');
+    expect(result.certNotes?.toLowerCase()).toContain('brand blocked');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('private-label REJECTED even when fee estimate would fail', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), brand: 'Solimo' } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), brand: 'Solimo' } as any);
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockRejectedValue(new Error('Decryption failed'));
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('REJECTED');
+    expect(result.certNotes).toContain('private-label');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('hazmat REJECTED even when fee estimate would fail', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), title: 'Lithium Battery Pack 10000mAh' } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), title: 'Lithium Battery Pack 10000mAh' } as any);
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockRejectedValue(new Error('Decryption failed'));
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('REJECTED');
+    expect(result.certNotes).toContain('Hazmat');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('IP complaint history REJECTED even when fee estimate would fail', async () => {
+    (prisma.product.findFirst as MockedFunction<typeof prisma.product.findFirst>)
+      .mockResolvedValue({ id: 'prod-flagged' } as any);
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockRejectedValue(new Error('Decryption failed'));
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('REJECTED');
+    expect(result.certNotes).toContain('IP complaint history');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('fee estimate failure certNotes includes advisory signals when present', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), amazonIsSeller: true } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), amazonIsSeller: true, priceStability: 'VOLATILE' } as any);
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockRejectedValue(new Error('Decryption failed'));
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NEEDS_REVIEW');
+    expect(result.certNotes).toContain('Fee estimate unavailable');
+    expect(result.certNotes).toContain('Amazon holds buy box');
+    expect(result.certNotes).toContain('Volatile price history');
+    // No profit/ROI stored
+    expect(result.estimatedProfit).toBeNull();
+    expect(result.estimatedRoi).toBeNull();
+  });
+
+  it('fee estimate failure without advisory signals uses plain fee note', async () => {
+    // default setup: no advisory signals (amazonIsSeller=false, priceStability=STABLE)
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockRejectedValue(new Error('Decryption failed'));
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NEEDS_REVIEW');
+    expect(result.certNotes).toBe('Fee estimate unavailable; manual review required');
+  });
+
+  it('AmazonSellsIt advisory preserved when fee estimate succeeds', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), amazonIsSeller: true } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), amazonIsSeller: true } as any);
+    // fee estimate succeeds (default beforeEach mock)
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NEEDS_REVIEW');
+    expect(result.certNotes).toContain('Amazon holds buy box');
+    expect(result.estimatedProfit).toBeGreaterThan(0);
+    expect(result.estimatedRoi).toBeGreaterThan(0);
   });
 });

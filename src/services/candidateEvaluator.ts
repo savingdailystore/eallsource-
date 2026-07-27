@@ -12,18 +12,23 @@
  * - force: true             → not used anywhere
  * - Only DB write: prisma.sourceCandidate.update
  *
- * Status transitions:
- *   no_match               → REJECTED
- *   ip_complaint_history   → REJECTED
- *   brand_blocked          → REJECTED
- *   private_label          → REJECTED
- *   hazmat                 → REJECTED
- *   generic_brand          → REJECTED
- *   price_too_low          → NO_LONGER_PROFITABLE
- *   not_profitable         → NO_LONGER_PROFITABLE
- *   advisory warnings      → NEEDS_REVIEW
- *   profitable + clean     → MATCHED  (requires owner CERTIFY in Phase 18.4)
- *   CERTIFIED              → never set here
+ * Evaluation order (Phase 18.2e):
+ *   0. source price missing        → NEEDS_REVIEW
+ *   1. ASIN resolve                → REJECTED (no_match)
+ *   2. IP complaint history        → REJECTED       ← hard gate
+ *   3. Market data (SP-API+Keepa)
+ *   4. Pricing guard (null/zero)   → NEEDS_REVIEW
+ *   5. Brand block                 → REJECTED       ← hard gate
+ *   6. Price floor                 → NO_LONGER_PROFITABLE
+ *   7. Gating (PL/hazmat/generic)  → REJECTED       ← hard gate
+ *   8. Advisory signal collection  ← runs regardless of fee availability
+ *   9. Fee estimation              → NEEDS_REVIEW (fee note + advisory signals appended)
+ *  10. Profitability               → NO_LONGER_PROFITABLE
+ *  11. Advisory warnings present   → NEEDS_REVIEW
+ *  12. Profitable + clean          → MATCHED  (owner must CERTIFY in Phase 18.4)
+ *      CERTIFIED                  → never set here
+ *
+ * certNotes priority: hard reject > no pricing > fee unavailable > advisory warnings
  */
 
 import { prisma } from '@/lib/prisma';
@@ -241,7 +246,25 @@ export async function evaluateCandidate(
     return done('REJECTED', 'Generic / unbranded product — elevated IP and quality risk', asin, matchMethod, matchConfidence, buyBoxPrice);
   }
 
-  // ── 7. Fee estimation ─────────────────────────────────────────────────────
+  // ── 7. Advisory signal collection ─────────────────────────────────────────
+  // Collected here — before fee estimation — so they are available to append
+  // to the fee-unavailable note. Hard gates above already exited if triggered.
+  const warnings: string[] = [];
+  if (amazonIsSeller)                warnings.push('Amazon holds buy box');
+  if (buyBoxSuppressed)              warnings.push('Buy box suppressed');
+  if (priceStability === 'VOLATILE') warnings.push('Volatile price history');
+  if (priceTrend === 'DECLINING')    warnings.push(`Declining price${priceTrendPct != null ? ` (${priceTrendPct.toFixed(1)}%)` : ''}`);
+  if (gating.risk === 'HIGH')        warnings.push('High IP / gating risk');
+  if (gating.risk === 'MEDIUM')      warnings.push('Medium IP / gating risk');
+  if (matchMethod === 'TITLE_SIMILARITY' && (matchConfidence ?? 100) < 80) {
+    warnings.push(`Low-confidence title match (${matchConfidence}%)`);
+  }
+
+  const demand = assessDemand({ bsr, category, fbaSellers, totalSellers, monthlySales });
+  if (demand.velocityTooLow) warnings.push(`Low velocity (${demand.expectedUnitsPerSeller?.toFixed(1) ?? '?'} units/seller/mo)`);
+  if (demand.level === 'LOW') warnings.push('Weak demand signal');
+
+  // ── 8. Fee estimation ─────────────────────────────────────────────────────
   let referralFee: number | undefined;
   let fbaFee:      number | undefined;
   let feeEstimateOk = false;
@@ -252,11 +275,15 @@ export async function evaluateCandidate(
 
   // Without a real fee estimate, profit/ROI would be based on default rates that
   // may not reflect this ASIN's category, size tier, or weight — too unreliable to store.
+  // Advisory signals are appended so the owner sees the full picture in one pass.
   if (!feeEstimateOk) {
-    return done('NEEDS_REVIEW', 'Fee estimate unavailable; manual review required', asin, matchMethod, matchConfidence, buyBoxPrice);
+    const advisoryNote = warnings.length > 0 ? `; also noted: ${warnings.join('; ')}` : '';
+    return done('NEEDS_REVIEW',
+      `Fee estimate unavailable; manual review required${advisoryNote}`,
+      asin, matchMethod, matchConfidence, buyBoxPrice);
   }
 
-  // ── 8. Profitability ──────────────────────────────────────────────────────
+  // ── 9. Profitability ──────────────────────────────────────────────────────
   const profitResult = calculateProfitability({
     sourcePrice:     candidate.sourcePrice,
     discounts:       [],
@@ -271,22 +298,7 @@ export async function evaluateCandidate(
     return done('NO_LONGER_PROFITABLE', note, asin, matchMethod, matchConfidence, buyBoxPrice, profitResult.profit, profitResult.roi / 100);
   }
 
-  // ── 9. Advisory warnings → NEEDS_REVIEW ──────────────────────────────────
-  const warnings: string[] = [];
-  if (amazonIsSeller)                 warnings.push('Amazon holds buy box');
-  if (buyBoxSuppressed)               warnings.push('Buy box suppressed');
-  if (priceStability === 'VOLATILE')  warnings.push('Volatile price history');
-  if (priceTrend === 'DECLINING')     warnings.push(`Declining price${priceTrendPct != null ? ` (${priceTrendPct.toFixed(1)}%)` : ''}`);
-  if (gating.risk === 'HIGH')         warnings.push('High IP / gating risk');
-  if (gating.risk === 'MEDIUM')       warnings.push('Medium IP / gating risk');
-  if (matchMethod === 'TITLE_SIMILARITY' && matchConfidence < 80) {
-    warnings.push(`Low-confidence title match (${matchConfidence}%)`);
-  }
-
-  const demand = assessDemand({ bsr, category, fbaSellers, totalSellers, monthlySales });
-  if (demand.velocityTooLow) warnings.push(`Low velocity (${demand.expectedUnitsPerSeller?.toFixed(1) ?? '?'} units/seller/mo)`);
-  if (demand.level === 'LOW') warnings.push('Weak demand signal');
-
+  // ── 10. Advisory warnings → NEEDS_REVIEW ─────────────────────────────────
   if (warnings.length > 0) {
     return done(
       'NEEDS_REVIEW',
@@ -296,7 +308,7 @@ export async function evaluateCandidate(
     );
   }
 
-  // ── 10. Profitable + clean — MATCHED ──────────────────────────────────────
+  // ── 11. Profitable + clean — MATCHED ──────────────────────────────────────
   // Owner must CERTIFY (Phase 18.4) before this candidate becomes a deliverable lead.
   return done('MATCHED', null, asin, matchMethod, matchConfidence, buyBoxPrice, profitResult.profit, profitResult.roi / 100);
 }

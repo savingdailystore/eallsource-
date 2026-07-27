@@ -336,6 +336,11 @@ model Product {
   // Final lead score (0–100)
   score Float @default(0)
 
+  // Freshness tracking — Phase 19.1
+  priceCheckedAt  DateTime? // last Amazon buy box + fee verification
+  sourceCheckedAt DateTime? // last retailer price verification
+  freshnessStatus String    @default("NEEDS_RECHECK") // FRESH | NEEDS_RECHECK | STALE | NO_LONGER_PROFITABLE | OUT_OF_STOCK | PRICE_CHANGED | RISK_CHANGED
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -346,6 +351,7 @@ model Product {
   @@index([orgId, score])
   @@index([orgId, roi])
   @@index([orgId, createdAt])
+  @@index([orgId, freshnessStatus])
   @@map("products")
 }
 
@@ -362,6 +368,10 @@ model Lead {
   savedAt  DateTime?
   notes    String?
 
+  // Freshness tracking — Phase 19.1
+  freshnessStatus    String    @default("NEEDS_RECHECK") // FRESH | NEEDS_RECHECK | STALE | NO_LONGER_PROFITABLE | OUT_OF_STOCK | PRICE_CHANGED | RISK_CHANGED
+  freshnessCheckedAt DateTime? // last time this lead's underlying economics were verified
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -371,6 +381,7 @@ model Lead {
   @@index([orgId, status])
   @@index([orgId, score])
   @@index([orgId, leadTier])
+  @@index([orgId, freshnessStatus])
   @@map("leads")
 }
 

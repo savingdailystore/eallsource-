@@ -115,6 +115,20 @@ describe('certifyCandidate — eligibility guards', () => {
     await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('estimated profit');
   });
 
+  it('throws if estimatedRoi is 0.01 (below 30% threshold)', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ estimatedRoi: 0.01 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('below minimum 30%');
+  });
+
+  it('throws if estimatedRoi is 0.299 (just below 30% threshold)', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ estimatedRoi: 0.299 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('below minimum 30%');
+  });
+
   it('throws if amazonCheckedAt is null', async () => {
     (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
       matchedCandidate({ amazonCheckedAt: null }),
@@ -135,7 +149,7 @@ describe('certifyCandidate — eligibility guards', () => {
 
 describe('certifyCandidate — happy path', () => {
 
-  it('creates Product + Lead and stamps CERTIFIED on the candidate', async () => {
+  it('succeeds when estimatedRoi is exactly 0.30 (meets 30% threshold) and creates Product + Lead', async () => {
     (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
       matchedCandidate(),
     );

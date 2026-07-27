@@ -31,6 +31,9 @@
 import { prisma } from '@/lib/prisma';
 import type { CandidateStatus } from '@prisma/client';
 
+// Minimum ROI required to certify. estimatedRoi is stored as decimal fraction (0.30 = 30%).
+const MIN_CERTIFICATION_ROI = 0.30;
+
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 export interface CertifyResult {
@@ -75,8 +78,8 @@ function assertEligible(c: EligibilityInput): void {
   if (c.estimatedProfit == null || c.estimatedProfit <= 0) {
     throw new Error('Candidate has no positive estimated profit');
   }
-  if (c.estimatedRoi == null || c.estimatedRoi <= 0) {
-    throw new Error('Candidate has no positive estimated ROI');
+  if (c.estimatedRoi == null || c.estimatedRoi < MIN_CERTIFICATION_ROI) {
+    throw new Error(`Candidate ROI ${c.estimatedRoi == null ? 'missing' : `${(c.estimatedRoi * 100).toFixed(1)}%`} is below minimum ${(MIN_CERTIFICATION_ROI * 100).toFixed(0)}% required for certification`);
   }
   if (!c.amazonCheckedAt) {
     throw new Error('Candidate has not been Amazon-checked; re-evaluate before certifying');

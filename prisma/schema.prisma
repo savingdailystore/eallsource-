@@ -368,6 +368,12 @@ model Lead {
   savedAt  DateTime?
   notes    String?
 
+  // Lead purpose — Phase 20.1
+  // Why this lead exists. Separate from leadTier (entitlement/delivery tier).
+  // Allowed values: STARTER_SALES | PROFIT | PREMIUM | WATCHLIST
+  // Default PROFIT: all historical leads were generated under the profit-first model.
+  leadPurpose String @default("PROFIT")
+
   // Freshness tracking — Phase 19.1
   freshnessStatus    String    @default("NEEDS_RECHECK") // FRESH | NEEDS_RECHECK | STALE | NO_LONGER_PROFITABLE | OUT_OF_STOCK | PRICE_CHANGED | RISK_CHANGED
   freshnessCheckedAt DateTime? // last time this lead's underlying economics were verified

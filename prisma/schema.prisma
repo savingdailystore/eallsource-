@@ -1026,6 +1026,12 @@ model SourceCandidate {
   // VA/operator notes — free text attached at import time
   vaNotes String?
 
+  // Intended lead purpose — set before evaluation to select evaluation thresholds.
+  // Allowed values: PROFIT | STARTER_SALES
+  // Default PROFIT: all existing candidates were evaluated under the profit-first model.
+  // STARTER_SALES enables lower resale floor ($5), lower profit floor ($1), no ROI floor.
+  targetLeadPurpose String @default("PROFIT")
+
   // Certification workflow
   certStatus  CandidateStatus @default(RAW_CANDIDATE)
   certNotes   String?

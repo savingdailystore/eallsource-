@@ -689,8 +689,14 @@ export default function CandidatesPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-700/50 bg-slate-800/50">
-                  {['Created', 'Retailer', 'Title', 'Source $', 'Buy Box', 'Est. Profit', 'Est. ROI', 'ASIN / UPC', 'Status', 'Purpose', 'Checked', 'Actions'].map(h => (
-                    <th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                  {['Date', 'Retailer', 'Title / Notes', 'Src $', 'BB $', 'Profit', 'ROI', 'Status & Purpose', 'Actions'].map(h => (
+                    <th
+                      key={h}
+                      className={cn(
+                        'text-left px-2 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap',
+                        h === 'Actions' && 'sticky right-0 bg-slate-800 px-3',
+                      )}
+                    >
                       {h}
                     </th>
                   ))}
@@ -699,29 +705,47 @@ export default function CandidatesPage() {
               <tbody className="divide-y divide-slate-700/30">
                 {candidates.map(c => (
                   <tr key={c.id} className="hover:bg-slate-800/30 transition-colors group">
-                    <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+
+                    {/* Date */}
+                    <td className="px-2 py-2.5 text-slate-500 whitespace-nowrap text-[10px]">
                       {new Date(c.createdAt).toLocaleDateString()}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-300 whitespace-nowrap">{c.retailer}</td>
-                    <td className="px-3 py-2.5 max-w-[200px]">
+
+                    {/* Retailer */}
+                    <td className="px-2 py-2.5 text-slate-300 whitespace-nowrap max-w-[80px]">
+                      <span className="block truncate" title={c.retailer}>{c.retailer}</span>
+                    </td>
+
+                    {/* Title + ASIN/UPC + notes (folded in — removes separate ASIN/UPC column) */}
+                    <td className="px-2 py-2.5 max-w-[220px]">
                       <a
                         href={c.retailerUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-400 hover:text-blue-300 hover:underline line-clamp-2"
+                        className="text-blue-400 hover:text-blue-300 hover:underline line-clamp-2 block"
                         title={c.title ?? undefined}
                       >
                         {c.title ?? '—'}
                       </a>
+                      {(c.asin || c.upc) && (
+                        <div className="font-mono text-[10px] text-slate-500 mt-0.5">
+                          {c.asin && <span>ASIN: {c.asin}</span>}
+                          {c.asin && c.upc && <span className="mx-1">·</span>}
+                          {c.upc  && <span>UPC: {c.upc}</span>}
+                        </div>
+                      )}
                       {c.certNotes && (
-                        <p className={cn(
-                          'text-[10px] mt-0.5 truncate',
-                          c.certStatus === 'REJECTED' || c.certStatus === 'NO_LONGER_PROFITABLE'
-                            ? 'text-red-500/70'
-                            : c.certStatus === 'NEEDS_REVIEW'
-                              ? 'text-amber-500/70'
-                              : 'text-slate-600',
-                        )} title={c.certNotes}>
+                        <p
+                          className={cn(
+                            'text-[10px] mt-0.5 truncate',
+                            c.certStatus === 'REJECTED' || c.certStatus === 'NO_LONGER_PROFITABLE'
+                              ? 'text-red-500/70'
+                              : c.certStatus === 'NEEDS_REVIEW'
+                                ? 'text-amber-500/70'
+                                : 'text-slate-600',
+                          )}
+                          title={c.certNotes}
+                        >
                           {c.certNotes}
                         </p>
                       )}
@@ -731,82 +755,89 @@ export default function CandidatesPage() {
                         </p>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-300 whitespace-nowrap">
+
+                    {/* Source $ */}
+                    <td className="px-2 py-2.5 text-slate-300 whitespace-nowrap">
                       {fmt(c.sourcePrice)}
                       {c.sourceListPrice && (
-                        <span className="text-slate-500 ml-1 line-through">{fmt(c.sourceListPrice)}</span>
+                        <span className="text-slate-500 ml-1 line-through text-[10px]">{fmt(c.sourceListPrice)}</span>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap">{fmt(c.buyBoxPrice)}</td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
+
+                    {/* Buy Box $ */}
+                    <td className="px-2 py-2.5 text-slate-400 whitespace-nowrap">{fmt(c.buyBoxPrice)}</td>
+
+                    {/* Profit */}
+                    <td className="px-2 py-2.5 whitespace-nowrap">
                       <span className={cn(c.estimatedProfit != null && c.estimatedProfit >= 0 ? 'text-green-400' : 'text-slate-400')}>
                         {fmt(c.estimatedProfit)}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap">{fmtRoi(c.estimatedRoi)}</td>
-                    <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap font-mono text-[10px]">
-                      {c.asin && <div>ASIN: {c.asin}</div>}
-                      {c.upc  && <div>UPC: {c.upc}</div>}
-                      {!c.asin && !c.upc && '—'}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      <span className={cn('px-2 py-0.5 rounded-lg text-[10px] font-semibold', STATUS_COLORS[c.certStatus])}>
-                        {c.certStatus.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    {/* Purpose column */}
-                    <td className="px-3 py-2.5 whitespace-nowrap">
-                      {UPDATABLE_STATUSES.has(c.certStatus) ? (
-                        <div className="flex flex-col gap-1">
-                          <select
-                            value={c.targetLeadPurpose}
-                            onChange={e => handleSetPurpose(c.id, e.target.value as 'PROFIT' | 'STARTER_SALES')}
-                            disabled={purposeLoadingId === c.id}
-                            aria-label={`Purpose for ${c.id}`}
-                            className="text-[11px] bg-slate-800 border border-slate-600 rounded-lg px-1.5 py-0.5 text-slate-300 focus:outline-none focus:border-blue-500 disabled:opacity-50 cursor-pointer"
-                          >
-                            <option value="PROFIT">PROFIT</option>
-                            <option value="STARTER_SALES">STARTER SALES</option>
-                          </select>
-                          {purposeLoadingId === c.id && (
-                            <Loader2 className="w-3 h-3 animate-spin text-slate-500" />
-                          )}
-                          {purposeError?.id === c.id && (
-                            <span className="text-[10px] text-red-400 max-w-[140px] leading-tight">
-                              {purposeError.message}
-                            </span>
-                          )}
-                          {c.targetLeadPurpose === 'STARTER_SALES' && purposeLoadingId !== c.id && (
-                            <span className="text-[10px] text-amber-400/80 max-w-[140px] leading-tight">
-                              Starter Sales uses lower profit thresholds for beginner-friendly velocity leads. Evaluate again after changing purpose.
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span
-                          className={cn(
-                            'px-1.5 py-0.5 rounded text-[10px] font-semibold',
-                            c.targetLeadPurpose === 'STARTER_SALES'
-                              ? 'bg-purple-900/50 text-purple-300'
-                              : 'bg-slate-700 text-slate-400',
-                          )}
-                          title={c.certStatus === 'MATCHED' || c.certStatus === 'CERTIFIED'
-                            ? 'Re-evaluate to change purpose'
-                            : undefined}
-                        >
-                          {c.targetLeadPurpose === 'STARTER_SALES' ? 'STARTER' : 'PROFIT'}
+
+                    {/* ROI */}
+                    <td className="px-2 py-2.5 text-slate-400 whitespace-nowrap">{fmtRoi(c.estimatedRoi)}</td>
+
+                    {/* Status & Purpose — combined (removes two separate columns) */}
+                    <td className="px-2 py-2.5 whitespace-nowrap">
+                      <div className="flex flex-col gap-1.5">
+                        {/* Status badge */}
+                        <span className={cn('px-2 py-0.5 rounded-lg text-[10px] font-semibold w-fit', STATUS_COLORS[c.certStatus])}>
+                          {c.certStatus.replace(/_/g, ' ')}
                         </span>
-                      )}
+                        {/* Last checked — folded from separate Checked column */}
+                        {c.lastCheckedAt && (
+                          <span className="text-[10px] text-slate-600">{fmtDate(c.lastCheckedAt)}</span>
+                        )}
+                        {/* Purpose select or badge */}
+                        {UPDATABLE_STATUSES.has(c.certStatus) ? (
+                          <div className="flex flex-col gap-0.5">
+                            <select
+                              value={c.targetLeadPurpose}
+                              onChange={e => handleSetPurpose(c.id, e.target.value as 'PROFIT' | 'STARTER_SALES')}
+                              disabled={purposeLoadingId === c.id}
+                              aria-label={`Purpose for ${c.id}`}
+                              title={c.targetLeadPurpose === 'STARTER_SALES'
+                                ? 'Starter Sales: lower profit thresholds for beginner-friendly velocity leads. Re-evaluate after changing.'
+                                : 'Set evaluation purpose: PROFIT or STARTER SALES'}
+                              className="text-[11px] bg-slate-800 border border-slate-600 rounded-lg px-1.5 py-0.5 text-slate-300 focus:outline-none focus:border-blue-500 disabled:opacity-50 cursor-pointer w-fit"
+                            >
+                              <option value="PROFIT">PROFIT</option>
+                              <option value="STARTER_SALES">STARTER SALES</option>
+                            </select>
+                            {purposeLoadingId === c.id && (
+                              <Loader2 className="w-3 h-3 animate-spin text-slate-500" />
+                            )}
+                            {purposeError?.id === c.id && (
+                              <span className="text-[10px] text-red-400 max-w-[130px] leading-tight">
+                                {purposeError.message}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span
+                            className={cn(
+                              'px-1.5 py-0.5 rounded text-[10px] font-semibold w-fit',
+                              c.targetLeadPurpose === 'STARTER_SALES'
+                                ? 'bg-purple-900/50 text-purple-300'
+                                : 'bg-slate-700 text-slate-400',
+                            )}
+                            title={c.certStatus === 'MATCHED' || c.certStatus === 'CERTIFIED'
+                              ? 'Re-evaluate to change purpose'
+                              : undefined}
+                          >
+                            {c.targetLeadPurpose === 'STARTER_SALES' ? 'STARTER' : 'PROFIT'}
+                          </span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap text-[10px]">
-                      {c.lastCheckedAt ? fmtDate(c.lastCheckedAt) : '—'}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
+
+                    {/* Actions — sticky right so it's always visible */}
+                    <td className="px-3 py-2.5 whitespace-nowrap sticky right-0 bg-slate-900/95 group-hover:bg-slate-800/90 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.5)]">
                       <div className="flex flex-col gap-1">
                         {/* Certify — MATCHED only */}
                         {c.certStatus === 'MATCHED' && (
                           certifyingId === c.id ? (
-                            <div className="flex flex-col gap-1.5 min-w-[160px]">
+                            <div className="flex flex-col gap-1.5 min-w-[140px]">
                               <p className="text-[10px] text-amber-400">
                                 Create Product + Lead. Cannot be undone.
                               </p>
@@ -830,7 +861,7 @@ export default function CandidatesPage() {
                           ) : (
                             <button
                               onClick={() => { setCertifyingId(c.id); setCertifyConfirm(c.id); }}
-                              className="flex items-center gap-1 text-[11px] text-green-400 hover:text-green-300 transition-colors"
+                              className="flex items-center gap-1 text-[11px] text-green-400 hover:text-green-300 transition-colors font-semibold"
                               title="Certify this candidate — creates Product + Lead"
                             >
                               <CheckCircle2 className="w-3 h-3" />
@@ -842,11 +873,11 @@ export default function CandidatesPage() {
                         {c.certStatus === 'CERTIFIED' && (
                           <div className="text-[10px] text-green-500 space-y-0.5">
                             <div>Certified {c.certifiedAt ? fmtDate(c.certifiedAt) : ''}</div>
-                            {c.productId && <div className="font-mono truncate max-w-[120px]" title={c.productId}>P: {c.productId.slice(-8)}</div>}
-                            {c.leadId    && <div className="font-mono truncate max-w-[120px]" title={c.leadId}>L: {c.leadId.slice(-8)}</div>}
+                            {c.productId && <div className="font-mono truncate max-w-[100px]" title={c.productId}>P: {c.productId.slice(-8)}</div>}
+                            {c.leadId    && <div className="font-mono truncate max-w-[100px]" title={c.leadId}>L: {c.leadId.slice(-8)}</div>}
                           </div>
                         )}
-                        {/* Evaluate button — available for any non-CERTIFIED, non-REJECTED status */}
+                        {/* Evaluate */}
                         {c.certStatus !== 'CERTIFIED' && (
                           <button
                             onClick={() => handleEvaluate(c.id)}
@@ -864,7 +895,7 @@ export default function CandidatesPage() {
                         {/* Reject */}
                         {c.certStatus !== 'REJECTED' && c.certStatus !== 'CERTIFIED' && (
                           rejectingId === c.id ? (
-                            <div className="flex flex-col gap-1.5 min-w-[160px]">
+                            <div className="flex flex-col gap-1.5 min-w-[140px]">
                               <input
                                 type="text"
                                 value={rejectNotes}
@@ -900,6 +931,7 @@ export default function CandidatesPage() {
                         )}
                       </div>
                     </td>
+
                   </tr>
                 ))}
               </tbody>

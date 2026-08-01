@@ -54,22 +54,67 @@ const ORG_ID = 'org-test-1';
 const CAND_ID = 'cand-test-1';
 
 function makeCandidate(overrides: Partial<{
-  certStatus: string;
-  asin: string | null;
-  upc: string | null;
-  title: string | null;
-  brand: string | null;
-  sourcePrice: number | null;
+  certStatus:        string;
+  asin:              string | null;
+  upc:               string | null;
+  title:             string | null;
+  brand:             string | null;
+  sourcePrice:       number | null;
+  targetLeadPurpose: string | null;
 }> = {}) {
   return {
-    id:          CAND_ID,
-    certStatus:  'RAW_CANDIDATE',
-    asin:        null,
-    upc:         null,
-    title:       'Test Product',
-    brand:       'TestBrand',
-    sourcePrice: 15.00,
+    id:                CAND_ID,
+    certStatus:        'RAW_CANDIDATE',
+    asin:              null,
+    upc:               null,
+    title:             'Test Product',
+    brand:             'TestBrand',
+    sourcePrice:       15.00,
+    targetLeadPurpose: null,
     ...overrides,
+  };
+}
+
+function makeStarterCandidate(overrides: Partial<{
+  certStatus:  string;
+  asin:        string | null;
+  sourcePrice: number | null;
+  brand:       string | null;
+  title:       string | null;
+}> = {}) {
+  return makeCandidate({ targetLeadPurpose: 'STARTER_SALES', sourcePrice: 8.00, ...overrides });
+}
+
+// Product data with resale $20 — sits well within STARTER_SALES $5–$25 range.
+// sourcePrice $8 + these fees → profit depends on fee mock (see tests).
+function starterProductData() {
+  return {
+    title:          'Starter Test Product',
+    brand:          'TestBrand',
+    category:       'Home & Kitchen',
+    buyBoxPrice:    20.00,
+    lowestFbaPrice: 20.00,
+    fbaSellers:     3,
+    totalSellers:   5,
+    amazonIsSeller: false,
+    bsr:            50000,
+  };
+}
+
+function starterKeepaData() {
+  return {
+    title:          'Starter Test Product',
+    brand:          'TestBrand',
+    category:       'Home & Kitchen',
+    buyBoxPrice:    20.00,
+    lowestNewPrice: 20.00,
+    fbaSellers:     3,
+    totalSellers:   5,
+    amazonIsSeller: false,
+    bsr:            50000,
+    priceStability: 'STABLE' as const,
+    priceTrend:     'FLAT'   as const,
+    monthlySales:   50,
   };
 }
 
@@ -599,5 +644,245 @@ describe('evaluateCandidate — anomalous buy box price guard (Phase 18.4a)', ()
 
     // $5,000 is at the boundary — treated as valid (> 0, not > 5_000)
     expect(result.certNotes ?? '').not.toContain('Anomalous');
+  });
+});
+
+// ─── PROFIT path unchanged by targetLeadPurpose (Phase 20.2D) ────────────────
+// These confirm that null/undefined/unknown targetLeadPurpose still uses
+// the existing PROFIT thresholds without modification.
+
+describe('evaluateCandidate — PROFIT path unaffected by targetLeadPurpose (Phase 20.2D)', () => {
+  it('resale below $12 still NO_LONGER_PROFITABLE when targetLeadPurpose is null', async () => {
+    // makeCandidate defaults targetLeadPurpose: null → PROFIT behavior
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 10.00, lowestFbaPrice: 10.00 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 10.00, lowestNewPrice: 10.00 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('floor');
+    expect(result.certNotes).not.toContain('STARTER_SALES');
+  });
+
+  it('profit below $8 still NO_LONGER_PROFITABLE when targetLeadPurpose is null', async () => {
+    // resell $16, fees eat margin → profit < $8
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 16.00, lowestFbaPrice: 16.00 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 16.00, lowestNewPrice: 16.00 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('Not profitable');
+    expect(result.certNotes).not.toContain('STARTER_SALES');
+  });
+
+  it('ROI below 30% still NO_LONGER_PROFITABLE when targetLeadPurpose is null', async () => {
+    // resell $20, sourcePrice $15 → low ROI even if profit > $1
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 20.00, lowestFbaPrice: 20.00 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 20.00, lowestNewPrice: 20.00 } as any);
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue({ referralFee: 3.00, fbaFee: 4.30 });
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    // sourcePrice $15, resell $20, low ROI → NO_LONGER_PROFITABLE via PROFIT path
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('Not profitable');
+    expect(result.certNotes).not.toContain('STARTER_SALES');
+  });
+
+  it('unknown targetLeadPurpose value uses PROFIT behavior (resale $10 still fails $12 floor)', async () => {
+    (prisma.sourceCandidate.findUnique as MockedFunction<typeof prisma.sourceCandidate.findUnique>)
+      .mockResolvedValue(makeCandidate({ asin: 'B0TEST12345', targetLeadPurpose: 'WATCHLIST' }) as any);
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), buyBoxPrice: 10.00, lowestFbaPrice: 10.00 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), buyBoxPrice: 10.00, lowestNewPrice: 10.00 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    // 'WATCHLIST' is not 'STARTER_SALES' → falls through to PROFIT path → $10 < $12 floor
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('floor');
+    expect(result.certNotes).not.toContain('STARTER_SALES');
+  });
+});
+
+// ─── STARTER_SALES evaluator path (Phase 20.2D) ──────────────────────────────
+
+describe('evaluateCandidate — STARTER_SALES: resale price gates', () => {
+  beforeEach(() => {
+    (prisma.sourceCandidate.findUnique as MockedFunction<typeof prisma.sourceCandidate.findUnique>)
+      .mockResolvedValue(makeStarterCandidate({ asin: 'B0TEST12345' }) as any);
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue(starterProductData() as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue(starterKeepaData() as any);
+    // profit = $2.00 at resell $20, sourcePrice $8 (see profit math comment above)
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue({ referralFee: 3.00, fbaFee: 4.30 });
+  });
+
+  it('resale $4.99 fails — below STARTER_SALES $5 floor', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...starterProductData(), buyBoxPrice: 4.99, lowestFbaPrice: 4.99 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...starterKeepaData(), buyBoxPrice: 4.99, lowestNewPrice: 4.99 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('STARTER_SALES floor');
+  });
+
+  it('resale $5.00 passes the STARTER_SALES resale floor (not rejected by floor gate)', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...starterProductData(), buyBoxPrice: 5.00, lowestFbaPrice: 5.00 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...starterKeepaData(), buyBoxPrice: 5.00, lowestNewPrice: 5.00 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    // Did not fail the resale floor gate specifically
+    expect(result.certNotes ?? '').not.toContain('STARTER_SALES floor');
+    expect(result.newStatus).not.toBe('REJECTED');
+  });
+
+  it('resale $25.01 fails — exceeds STARTER_SALES $25 ceiling', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...starterProductData(), buyBoxPrice: 25.01, lowestFbaPrice: 25.01 } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...starterKeepaData(), buyBoxPrice: 25.01, lowestNewPrice: 25.01 } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('STARTER_SALES ceiling');
+  });
+});
+
+describe('evaluateCandidate — STARTER_SALES: source price gate', () => {
+  it('source price $15.01 fails STARTER_SALES ceiling', async () => {
+    (prisma.sourceCandidate.findUnique as MockedFunction<typeof prisma.sourceCandidate.findUnique>)
+      .mockResolvedValue(makeStarterCandidate({ asin: 'B0TEST12345', sourcePrice: 15.01 }) as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('STARTER_SALES ceiling');
+    // Exits before ASIN resolve — no market data calls needed
+    expect(amazon.getProductData).not.toHaveBeenCalled();
+  });
+});
+
+describe('evaluateCandidate — STARTER_SALES: profit gate (no ROI floor)', () => {
+  beforeEach(() => {
+    (prisma.sourceCandidate.findUnique as MockedFunction<typeof prisma.sourceCandidate.findUnique>)
+      .mockResolvedValue(makeStarterCandidate({ asin: 'B0TEST12345' }) as any);
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue(starterProductData() as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue(starterKeepaData() as any);
+  });
+
+  it('profit $0.99 fails STARTER_SALES $1 profit floor', async () => {
+    // resell $20, sourcePrice $8, fees → profit = 20 - (3.00 + 5.31 + 0.50) - 1.50 - 0.70 - 8 = $0.99
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue({ referralFee: 3.00, fbaFee: 5.31 });
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('Not profitable for STARTER_SALES');
+  });
+
+  it('profit $1.00 passes STARTER_SALES $1 profit floor', async () => {
+    // resell $20, sourcePrice $8, fees → profit = 20 - (3.00 + 5.30 + 0.50) - 1.50 - 0.70 - 8 = $1.00
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue({ referralFee: 3.00, fbaFee: 5.30 });
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    // Passes profit floor — outcome is MATCHED (no warnings in default setup)
+    expect(result.certNotes ?? '').not.toContain('Not profitable');
+    expect(result.newStatus).toBe('MATCHED');
+  });
+
+  it('profit $2.00 with ROI ~25% (below 30%) can reach MATCHED for STARTER_SALES', async () => {
+    // resell $20, sourcePrice $8, fees → profit = 20 - (3.00 + 4.30 + 0.50) - 1.50 - 0.70 - 8 = $2.00
+    // roi = 2.00 / 8 * 100 = 25% — fails PROFIT 30% ROI floor, passes STARTER_SALES
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue({ referralFee: 3.00, fbaFee: 4.30 });
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('MATCHED');
+    expect(result.estimatedProfit).toBeCloseTo(2.00, 1);
+    expect(result.estimatedRoi).toBeDefined();
+    // roi is stored as decimal fraction; 25% → ~0.25, well below PROFIT's 0.30 threshold
+    expect(result.estimatedRoi!).toBeLessThan(0.30);
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('evaluateCandidate — STARTER_SALES: gating risk gates', () => {
+  beforeEach(() => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue(starterProductData() as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue(starterKeepaData() as any);
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue({ referralFee: 3.00, fbaFee: 4.30 });
+  });
+
+  it('MEDIUM gating risk fails STARTER_SALES (KitchenAid brand → medium IP risk)', async () => {
+    // KitchenAid is in MEDIUM_IP_BRANDS → gating.risk = 'MEDIUM', no hard-reject gates
+    (prisma.sourceCandidate.findUnique as MockedFunction<typeof prisma.sourceCandidate.findUnique>)
+      .mockResolvedValue(makeStarterCandidate({ asin: 'B0TEST12345', brand: 'KitchenAid' }) as any);
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...starterProductData(), brand: 'KitchenAid' } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...starterKeepaData(), brand: 'KitchenAid' } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('STARTER_SALES: gating risk MEDIUM');
+  });
+
+  it('HIGH gating risk fails STARTER_SALES (Nike brand → high IP risk)', async () => {
+    // Nike is in HIGH_IP_BRANDS → gating.risk = 'HIGH' via isBrandRestricted (no hard-reject)
+    (prisma.sourceCandidate.findUnique as MockedFunction<typeof prisma.sourceCandidate.findUnique>)
+      .mockResolvedValue(makeStarterCandidate({ asin: 'B0TEST12345', brand: 'Nike' }) as any);
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...starterProductData(), brand: 'Nike' } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...starterKeepaData(), brand: 'Nike' } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('STARTER_SALES: gating risk HIGH');
+  });
+
+  it('meltable item fails STARTER_SALES (title contains "chocolate")', async () => {
+    // 'chocolate' triggers isMeltable=true; gating.risk stays LOW (not a hard-reject keyword)
+    (prisma.sourceCandidate.findUnique as MockedFunction<typeof prisma.sourceCandidate.findUnique>)
+      .mockResolvedValue(makeStarterCandidate({ asin: 'B0TEST12345', title: 'Dark Chocolate Bar 70%' }) as any);
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...starterProductData(), title: 'Dark Chocolate Bar 70%' } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...starterKeepaData(), title: 'Dark Chocolate Bar 70%' } as any);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NO_LONGER_PROFITABLE');
+    expect(result.certNotes).toContain('STARTER_SALES: meltable item');
   });
 });

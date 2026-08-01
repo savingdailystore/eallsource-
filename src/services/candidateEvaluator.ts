@@ -1,5 +1,5 @@
 /**
- * Candidate Evaluation Service — Phase 18.2
+ * Candidate Evaluation Service — Phase 18.2 / 20.2D
  *
  * Evaluates a SourceCandidate through the full safety gate stack and writes
  * enrichment data back to SourceCandidate ONLY. This service must never
@@ -12,21 +12,23 @@
  * - force: true             → not used anywhere
  * - Only DB write: prisma.sourceCandidate.update
  *
- * Evaluation order (Phase 18.2e):
- *   0. source price missing        → NEEDS_REVIEW
- *   1. ASIN resolve                → REJECTED (no_match)
- *   2. IP complaint history        → REJECTED       ← hard gate
+ * Evaluation order:
+ *   0. source price missing                 → NEEDS_REVIEW
+ *   0b. STARTER_SALES: source price ceiling → NO_LONGER_PROFITABLE  ← SS gate
+ *   1. ASIN resolve                         → REJECTED (no_match)
+ *   2. IP complaint history                 → REJECTED       ← hard gate
  *   3. Market data (SP-API+Keepa)
- *   4. Pricing guard (null/zero)   → NEEDS_REVIEW
- *   5. Brand block                 → REJECTED       ← hard gate
- *   6. Price floor                 → NO_LONGER_PROFITABLE
- *   7. Gating (PL/hazmat/generic)  → REJECTED       ← hard gate
- *   8. Advisory signal collection  ← runs regardless of fee availability
- *   9. Fee estimation              → NEEDS_REVIEW (fee note + advisory signals appended)
- *  10. Profitability               → NO_LONGER_PROFITABLE
- *  11. Advisory warnings present   → NEEDS_REVIEW
- *  12. Profitable + clean          → MATCHED  (owner must CERTIFY in Phase 18.4)
- *      CERTIFIED                  → never set here
+ *   4. Pricing guard (null/zero)            → NEEDS_REVIEW
+ *   5. Brand block                          → REJECTED       ← hard gate
+ *   6. Price floor/ceiling (purpose-aware)  → NO_LONGER_PROFITABLE
+ *   7. Gating (PL/hazmat/generic)           → REJECTED       ← hard gate
+ *   7b. STARTER_SALES: risk/meltable gates  → NO_LONGER_PROFITABLE  ← SS gate
+ *   8. Advisory signal collection           ← runs regardless of fee availability
+ *   9. Fee estimation                       → NEEDS_REVIEW (fee note + advisory signals appended)
+ *  10. Profitability (purpose-aware)        → NO_LONGER_PROFITABLE
+ *  11. Advisory warnings present            → NEEDS_REVIEW
+ *  12. Profitable + clean                   → MATCHED  (owner must CERTIFY in Phase 18.4)
+ *      CERTIFIED                           → never set here
  *
  * certNotes priority: hard reject > no pricing > fee unavailable > advisory warnings
  */
@@ -46,7 +48,15 @@ import { calculateProfitability } from '@/engines/profitability';
 import type { CandidateStatus } from '@prisma/client';
 import type { AmazonMatch } from '@/types';
 
+// PROFIT path thresholds (original)
 const MIN_RESALE_PRICE = 12;
+
+// STARTER_SALES path thresholds (Phase 20.2D)
+const SS_MIN_RESALE_PRICE  =  5;   // lower resale floor for starter products
+const SS_MAX_RESALE_PRICE  = 25;   // ceiling keeps products in beginner buy range
+const SS_MAX_SOURCE_PRICE  = 15;   // eliminates high-capital starter picks
+const SS_MIN_PROFIT        =  1;   // minimum net profit; no ROI floor
+
 // Buy box prices above this threshold signal catalog anomalies (e.g. third-party
 // sellers listing at $10,000+). Using them for profitability math would produce
 // wildly inflated ROI and could result in a MATCHED/CERTIFIED record with
@@ -136,6 +146,7 @@ export async function evaluateCandidate(
       id: true, certStatus: true,
       asin: true, upc: true, title: true, brand: true,
       sourcePrice: true,
+      targetLeadPurpose: true,
     },
   });
 
@@ -146,8 +157,10 @@ export async function evaluateCandidate(
     throw new Error(`Candidate ${candidateId} is already CERTIFIED — cannot re-evaluate`);
   }
 
-  const prevStatus = candidate.certStatus;
-  const now        = new Date();
+  const prevStatus     = candidate.certStatus;
+  const now            = new Date();
+  // Any value other than the exact string 'STARTER_SALES' falls through to PROFIT behavior.
+  const isStarterSales = candidate.targetLeadPurpose === 'STARTER_SALES';
 
   // Local shorthand: persist and return summary in one call
   async function done(
@@ -166,6 +179,10 @@ export async function evaluateCandidate(
 
   if (candidate.sourcePrice == null) {
     return done('NEEDS_REVIEW', 'Source price missing — cannot evaluate profitability');
+  }
+
+  if (isStarterSales && candidate.sourcePrice > SS_MAX_SOURCE_PRICE) {
+    return done('NO_LONGER_PROFITABLE', `Source price $${candidate.sourcePrice.toFixed(2)} exceeds $${SS_MAX_SOURCE_PRICE} STARTER_SALES ceiling`);
   }
 
   // ── 1. Resolve ASIN ───────────────────────────────────────────────────────
@@ -242,9 +259,18 @@ export async function evaluateCandidate(
     }
   }
 
-  // ── 5. Minimum resale-price floor ─────────────────────────────────────────
-  if (resellPrice < MIN_RESALE_PRICE) {
-    return done('NO_LONGER_PROFITABLE', `Amazon resale price $${resellPrice.toFixed(2)} below $${MIN_RESALE_PRICE} floor`, asin, matchMethod, matchConfidence, buyBoxPrice);
+  // ── 5. Resale price floor/ceiling (purpose-aware) ─────────────────────────
+  if (isStarterSales) {
+    if (resellPrice < SS_MIN_RESALE_PRICE) {
+      return done('NO_LONGER_PROFITABLE', `Amazon resale price $${resellPrice.toFixed(2)} below $${SS_MIN_RESALE_PRICE} STARTER_SALES floor`, asin, matchMethod, matchConfidence, buyBoxPrice);
+    }
+    if (resellPrice > SS_MAX_RESALE_PRICE) {
+      return done('NO_LONGER_PROFITABLE', `Amazon resale price $${resellPrice.toFixed(2)} exceeds $${SS_MAX_RESALE_PRICE} STARTER_SALES ceiling`, asin, matchMethod, matchConfidence, buyBoxPrice);
+    }
+  } else {
+    if (resellPrice < MIN_RESALE_PRICE) {
+      return done('NO_LONGER_PROFITABLE', `Amazon resale price $${resellPrice.toFixed(2)} below $${MIN_RESALE_PRICE} floor`, asin, matchMethod, matchConfidence, buyBoxPrice);
+    }
   }
 
   // ── 6. Gating / IP / hazmat ───────────────────────────────────────────────
@@ -260,6 +286,19 @@ export async function evaluateCandidate(
   }
   if (gating.isGenericBrand) {
     return done('REJECTED', 'Generic / unbranded product — elevated IP and quality risk', asin, matchMethod, matchConfidence, buyBoxPrice);
+  }
+
+  // ── 6b. STARTER_SALES hard gates: gating risk and meltable ───────────────
+  // These run after the universal hard-rejects (PL/hazmat/generic) so that
+  // those always win. STARTER_SALES restricts further to LOW-risk, non-meltable
+  // products only — beginner sellers should not encounter IP or transit risk.
+  if (isStarterSales) {
+    if (gating.risk !== 'LOW') {
+      return done('NO_LONGER_PROFITABLE', `STARTER_SALES: gating risk ${gating.risk} — only LOW-risk products are eligible`, asin, matchMethod, matchConfidence, buyBoxPrice);
+    }
+    if (gating.isMeltable) {
+      return done('NO_LONGER_PROFITABLE', 'STARTER_SALES: meltable item — temperature-sensitive products excluded from starter sourcing', asin, matchMethod, matchConfidence, buyBoxPrice);
+    }
   }
 
   // ── 7. Advisory signal collection ─────────────────────────────────────────
@@ -309,9 +348,16 @@ export async function evaluateCandidate(
     fbaFee,
   });
 
-  if (!profitResult.qualifies) {
-    const note = `Not profitable: ROI ${profitResult.roi.toFixed(1)}%, profit $${profitResult.profit.toFixed(2)}`;
-    return done('NO_LONGER_PROFITABLE', note, asin, matchMethod, matchConfidence, buyBoxPrice, profitResult.profit, profitResult.roi / 100);
+  if (isStarterSales) {
+    if (profitResult.profit < SS_MIN_PROFIT) {
+      const note = `Not profitable for STARTER_SALES: profit $${profitResult.profit.toFixed(2)} below $${SS_MIN_PROFIT} floor`;
+      return done('NO_LONGER_PROFITABLE', note, asin, matchMethod, matchConfidence, buyBoxPrice, profitResult.profit, profitResult.roi / 100);
+    }
+  } else {
+    if (!profitResult.qualifies) {
+      const note = `Not profitable: ROI ${profitResult.roi.toFixed(1)}%, profit $${profitResult.profit.toFixed(2)}`;
+      return done('NO_LONGER_PROFITABLE', note, asin, matchMethod, matchConfidence, buyBoxPrice, profitResult.profit, profitResult.roi / 100);
+    }
   }
 
   // ── 10. Advisory warnings → NEEDS_REVIEW ─────────────────────────────────

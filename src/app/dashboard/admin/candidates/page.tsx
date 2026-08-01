@@ -30,9 +30,10 @@ interface Candidate {
   lastCheckedAt:   string | null;
   amazonCheckedAt: string | null;
   certifiedAt:     string | null;
-  productId:       string | null;
-  leadId:          string | null;
-  createdAt:       string;
+  productId:         string | null;
+  leadId:            string | null;
+  targetLeadPurpose: string;
+  createdAt:         string;
 }
 
 interface VaPreviewAccepted {
@@ -75,6 +76,11 @@ const STATUS_COLORS: Record<CandidateStatus, string> = {
   STALE:               'bg-slate-700/80 text-slate-500',
   NO_LONGER_PROFITABLE:'bg-orange-900/60 text-orange-400',
 };
+
+// certStatus values that allow targetLeadPurpose to be changed (mirrors backend route)
+const UPDATABLE_STATUSES = new Set<CandidateStatus>([
+  'RAW_CANDIDATE', 'NEEDS_REVIEW', 'NO_LONGER_PROFITABLE', 'REJECTED',
+]);
 
 const ALL_STATUSES: CandidateStatus[] = [
   'RAW_CANDIDATE', 'MATCHED', 'NEEDS_REVIEW', 'CERTIFIED',
@@ -122,6 +128,10 @@ export default function CandidatesPage() {
   const [certifyingId,   setCertifyingId]   = useState<string | null>(null);
   const [certifyLoading, setCertifyLoading] = useState(false);
   const [certifyConfirm, setCertifyConfirm] = useState<string | null>(null);
+
+  // Target lead purpose
+  const [purposeLoadingId, setPurposeLoadingId] = useState<string | null>(null);
+  const [purposeError,     setPurposeError]     = useState<{ id: string; message: string } | null>(null);
 
   // Evaluate
   const [evaluatingId,  setEvaluatingId]  = useState<string | null>(null);
@@ -284,6 +294,25 @@ export default function CandidatesPage() {
       alert((e as Error).message);
     } finally {
       setEvaluatingId(null);
+    }
+  }
+
+  async function handleSetPurpose(id: string, targetLeadPurpose: 'PROFIT' | 'STARTER_SALES') {
+    setPurposeLoadingId(id);
+    setPurposeError(null);
+    try {
+      const res  = await fetch(`/api/admin/candidates/${id}/target-lead-purpose`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ targetLeadPurpose }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to update purpose');
+      setCandidates(prev => prev.map(c => c.id === id ? { ...c, targetLeadPurpose } : c));
+    } catch (e) {
+      setPurposeError({ id, message: (e as Error).message });
+    } finally {
+      setPurposeLoadingId(null);
     }
   }
 
@@ -660,7 +689,7 @@ export default function CandidatesPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-700/50 bg-slate-800/50">
-                  {['Created', 'Retailer', 'Title', 'Source $', 'Buy Box', 'Est. Profit', 'Est. ROI', 'ASIN / UPC', 'Status', 'Checked', 'Actions'].map(h => (
+                  {['Created', 'Retailer', 'Title', 'Source $', 'Buy Box', 'Est. Profit', 'Est. ROI', 'ASIN / UPC', 'Status', 'Purpose', 'Checked', 'Actions'].map(h => (
                     <th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                       {h}
                     </th>
@@ -724,6 +753,50 @@ export default function CandidatesPage() {
                       <span className={cn('px-2 py-0.5 rounded-lg text-[10px] font-semibold', STATUS_COLORS[c.certStatus])}>
                         {c.certStatus.replace(/_/g, ' ')}
                       </span>
+                    </td>
+                    {/* Purpose column */}
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {UPDATABLE_STATUSES.has(c.certStatus) ? (
+                        <div className="flex flex-col gap-1">
+                          <select
+                            value={c.targetLeadPurpose}
+                            onChange={e => handleSetPurpose(c.id, e.target.value as 'PROFIT' | 'STARTER_SALES')}
+                            disabled={purposeLoadingId === c.id}
+                            aria-label={`Purpose for ${c.id}`}
+                            className="text-[11px] bg-slate-800 border border-slate-600 rounded-lg px-1.5 py-0.5 text-slate-300 focus:outline-none focus:border-blue-500 disabled:opacity-50 cursor-pointer"
+                          >
+                            <option value="PROFIT">PROFIT</option>
+                            <option value="STARTER_SALES">STARTER SALES</option>
+                          </select>
+                          {purposeLoadingId === c.id && (
+                            <Loader2 className="w-3 h-3 animate-spin text-slate-500" />
+                          )}
+                          {purposeError?.id === c.id && (
+                            <span className="text-[10px] text-red-400 max-w-[140px] leading-tight">
+                              {purposeError.message}
+                            </span>
+                          )}
+                          {c.targetLeadPurpose === 'STARTER_SALES' && purposeLoadingId !== c.id && (
+                            <span className="text-[10px] text-amber-400/80 max-w-[140px] leading-tight">
+                              Starter Sales uses lower profit thresholds for beginner-friendly velocity leads. Evaluate again after changing purpose.
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span
+                          className={cn(
+                            'px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                            c.targetLeadPurpose === 'STARTER_SALES'
+                              ? 'bg-purple-900/50 text-purple-300'
+                              : 'bg-slate-700 text-slate-400',
+                          )}
+                          title={c.certStatus === 'MATCHED' || c.certStatus === 'CERTIFIED'
+                            ? 'Re-evaluate to change purpose'
+                            : undefined}
+                        >
+                          {c.targetLeadPurpose === 'STARTER_SALES' ? 'STARTER' : 'PROFIT'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap text-[10px]">
                       {c.lastCheckedAt ? fmtDate(c.lastCheckedAt) : '—'}

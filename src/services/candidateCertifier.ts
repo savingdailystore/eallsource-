@@ -1,9 +1,10 @@
 /**
- * Candidate Certifier — Phase 18.3
+ * Candidate Certifier — Phase 18.3 / 20.2E
  *
  * certifyCandidate: promotes a MATCHED candidate to CERTIFIED.
+ *   - Reads SourceCandidate.targetLeadPurpose to select the eligibility path.
  *   - Creates (or upserts) a Product record.
- *   - Creates a Lead record linked to that Product.
+ *   - Creates a Lead record linked to that Product (leadPurpose reflects candidate intent).
  *   - Updates SourceCandidate with CERTIFIED status + productId + leadId.
  *   - Never calls processRetailerProduct, broadcastLeads, or Apify.
  *   - Never creates LeadEntitlement.
@@ -17,26 +18,43 @@
  *   Apify                   → not imported
  *   force: true             → not used anywhere
  *
- * Eligibility rules for certification:
+ * Eligibility rules for PROFIT certification (original):
  *   1. certStatus === 'MATCHED'
  *   2. asin present
  *   3. sourcePrice > 0
- *   4. buyBoxPrice > 0
+ *   4. buyBoxPrice > 0 and <= MAX_BUYBOX_PRICE
  *   5. estimatedProfit > 0
- *   6. estimatedRoi > 0
+ *   6. estimatedRoi >= 30%
  *   7. amazonCheckedAt present (real pricing was verified)
  *   8. certNotes === null (no outstanding advisory warnings)
+ *
+ * Eligibility rules for STARTER_SALES certification (Phase 20.2E):
+ *   1. certStatus === 'MATCHED'
+ *   2. asin present
+ *   3. sourcePrice > 0 and <= $15
+ *   4. buyBoxPrice >= $5 and <= $25 (and <= MAX_BUYBOX_PRICE anomaly guard)
+ *   5. estimatedProfit >= $1
+ *   6. estimatedRoi present (used for score; no minimum)
+ *   7. amazonCheckedAt present
+ *   8. certNotes === null
  */
 
 import { prisma } from '@/lib/prisma';
 import type { CandidateStatus } from '@prisma/client';
 
+// PROFIT path thresholds (original)
 // Minimum ROI required to certify. estimatedRoi is stored as decimal fraction (0.30 = 30%).
 const MIN_CERTIFICATION_ROI = 0.30;
 // Safety backstop: a buy box above this threshold signals a catalog anomaly
 // (same constant as evaluator). Certification must be blocked even if the
 // record somehow passed evaluation with an anomalous price stored.
 const MAX_BUYBOX_PRICE = 5_000;
+
+// STARTER_SALES path thresholds (Phase 20.2E)
+const SS_MIN_PROFIT       = 1;    // minimum net profit; no ROI floor
+const SS_MIN_RESALE_PRICE = 5;    // mirrors evaluator resale floor
+const SS_MAX_RESALE_PRICE = 25;   // mirrors evaluator resale ceiling
+const SS_MAX_SOURCE_PRICE = 15;   // mirrors evaluator source price ceiling
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -96,6 +114,48 @@ function assertEligible(c: EligibilityInput): void {
   }
 }
 
+function assertEligibleStarterSales(c: EligibilityInput): void {
+  if (c.certStatus !== 'MATCHED') {
+    throw new Error(`Only MATCHED candidates can be certified. Current status: ${c.certStatus}`);
+  }
+  if (!c.asin) {
+    throw new Error('Candidate has no ASIN — cannot create Product');
+  }
+  if (c.sourcePrice == null || c.sourcePrice <= 0) {
+    throw new Error('Candidate has no valid source price');
+  }
+  if (c.sourcePrice > SS_MAX_SOURCE_PRICE) {
+    throw new Error(`Candidate source price $${c.sourcePrice.toFixed(2)} exceeds $${SS_MAX_SOURCE_PRICE} STARTER_SALES ceiling`);
+  }
+  if (c.buyBoxPrice == null || c.buyBoxPrice <= 0) {
+    throw new Error('Candidate has no valid buy box price');
+  }
+  if (c.buyBoxPrice > MAX_BUYBOX_PRICE) {
+    throw new Error(`Candidate buy box price $${c.buyBoxPrice.toFixed(2)} is anomalously high — catalog data unreliable; cannot certify`);
+  }
+  if (c.buyBoxPrice < SS_MIN_RESALE_PRICE) {
+    throw new Error(`Candidate buy box price $${c.buyBoxPrice.toFixed(2)} is below $${SS_MIN_RESALE_PRICE} STARTER_SALES floor`);
+  }
+  if (c.buyBoxPrice > SS_MAX_RESALE_PRICE) {
+    throw new Error(`Candidate buy box price $${c.buyBoxPrice.toFixed(2)} exceeds $${SS_MAX_RESALE_PRICE} STARTER_SALES ceiling`);
+  }
+  if (c.estimatedProfit == null) {
+    throw new Error('Candidate is missing estimated profit — re-evaluate before certifying');
+  }
+  if (c.estimatedProfit < SS_MIN_PROFIT) {
+    throw new Error(`Candidate estimated profit $${c.estimatedProfit.toFixed(2)} is below $${SS_MIN_PROFIT} STARTER_SALES floor`);
+  }
+  if (c.estimatedRoi == null) {
+    throw new Error('Candidate is missing estimated ROI — re-evaluate before certifying');
+  }
+  if (!c.amazonCheckedAt) {
+    throw new Error('Candidate has not been Amazon-checked; re-evaluate before certifying');
+  }
+  if (c.certNotes != null) {
+    throw new Error(`Candidate has outstanding review notes — cannot certify`);
+  }
+}
+
 // ─── certifyCandidate ─────────────────────────────────────────────────────────
 
 export async function certifyCandidate(
@@ -105,19 +165,20 @@ export async function certifyCandidate(
   const candidate = await prisma.sourceCandidate.findUnique({
     where:  { id: candidateId },
     select: {
-      id:              true,
-      certStatus:      true,
-      orgId:           true,
-      asin:            true,
-      title:           true,
-      brand:           true,
-      sourcePrice:     true,
-      buyBoxPrice:     true,
-      estimatedProfit: true,
-      estimatedRoi:    true,
-      amazonCheckedAt: true,
-      certNotes:       true,
-      productId:       true,
+      id:                true,
+      certStatus:        true,
+      orgId:             true,
+      asin:              true,
+      title:             true,
+      brand:             true,
+      sourcePrice:       true,
+      buyBoxPrice:       true,
+      estimatedProfit:   true,
+      estimatedRoi:      true,
+      amazonCheckedAt:   true,
+      certNotes:         true,
+      productId:         true,
+      targetLeadPurpose: true,
     },
   });
 
@@ -143,9 +204,16 @@ export async function certifyCandidate(
     };
   }
 
-  assertEligible(candidate);
+  // Any value other than the exact string 'STARTER_SALES' uses the PROFIT path.
+  const isStarterSales = candidate.targetLeadPurpose === 'STARTER_SALES';
+  if (isStarterSales) {
+    assertEligibleStarterSales(candidate);
+  } else {
+    assertEligible(candidate);
+  }
 
   const { orgId, asin, title, brand, buyBoxPrice, estimatedProfit, estimatedRoi } = candidate;
+  const leadPurpose = isStarterSales ? 'STARTER_SALES' : 'PROFIT';
   const now = new Date();
 
   // Upsert Product (@@unique([orgId, asin]))
@@ -175,10 +243,11 @@ export async function certifyCandidate(
   const lead = await prisma.lead.create({
     data: {
       orgId,
-      productId: product.id,
-      score:     estimatedRoi! * 100,
-      status:    'NEW',
-      leadTier:  'BASIC',
+      productId:   product.id,
+      score:       estimatedRoi! * 100,
+      status:      'NEW',
+      leadTier:    'BASIC',
+      leadPurpose,
     },
     select: { id: true },
   });

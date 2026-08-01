@@ -263,3 +263,223 @@ describe('rejectCandidate', () => {
   });
 
 });
+
+// ─── Phase 20.2E: leadPurpose written on Lead.create ─────────────────────────
+
+describe('certifyCandidate — leadPurpose on Lead.create (Phase 20.2E)', () => {
+
+  it('PROFIT path explicitly writes leadPurpose = PROFIT on Lead.create', async () => {
+    // matchedCandidate has no targetLeadPurpose → undefined → PROFIT path
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate(),
+    );
+    (prisma.product.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'prod-1' });
+    (prisma.lead.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'lead-1' });
+    (prisma.sourceCandidate.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    await certifyCandidate('cand-1', 'user-1');
+
+    expect(prisma.lead.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ leadPurpose: 'PROFIT', leadTier: 'BASIC' }),
+    }));
+  });
+
+  it('unknown targetLeadPurpose uses PROFIT certification path (WATCHLIST → ROI still required)', async () => {
+    // 'WATCHLIST' is not 'STARTER_SALES' → assertEligible (PROFIT) is called → ROI must be >= 30%
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ targetLeadPurpose: 'WATCHLIST', estimatedRoi: 0.25 }),
+    );
+
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('below minimum 30%');
+  });
+
+});
+
+// ─── Phase 20.2E: STARTER_SALES eligibility guards ───────────────────────────
+
+function starterMatchedCandidate(overrides: Record<string, unknown> = {}) {
+  return {
+    id:                'cand-1',
+    certStatus:        'MATCHED',
+    orgId:             'org-1',
+    asin:              'B0001234567',
+    title:             'Starter Test Product',
+    brand:             'TestBrand',
+    sourcePrice:       8.00,    // <= $15 ✓
+    buyBoxPrice:       12.00,   // >= $5, <= $25 ✓
+    estimatedProfit:   2.00,    // >= $1 ✓
+    estimatedRoi:      0.25,    // no minimum ✓
+    amazonCheckedAt:   new Date('2026-07-01'),
+    certNotes:         null,
+    productId:         null,
+    targetLeadPurpose: 'STARTER_SALES',
+    ...overrides,
+  };
+}
+
+describe('certifyCandidate — STARTER_SALES eligibility guards (Phase 20.2E)', () => {
+
+  it('STARTER_SALES: profit $1.00 can certify', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ estimatedProfit: 1.00 }),
+    );
+    (prisma.product.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'prod-1' });
+    (prisma.lead.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'lead-1' });
+    (prisma.sourceCandidate.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const result = await certifyCandidate('cand-1', 'user-1');
+
+    expect(result.leadId).toBe('lead-1');
+    expect(result.productId).toBe('prod-1');
+  });
+
+  it('STARTER_SALES: profit $0.99 fails', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ estimatedProfit: 0.99 }),
+    );
+
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('STARTER_SALES floor');
+  });
+
+  it('STARTER_SALES: ROI 25% (below 30%) can certify when profit >= $1', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ estimatedProfit: 2.00, estimatedRoi: 0.25 }),
+    );
+    (prisma.product.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'prod-1' });
+    (prisma.lead.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'lead-1' });
+    (prisma.sourceCandidate.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const result = await certifyCandidate('cand-1', 'user-1');
+
+    expect(result.leadId).toBe('lead-1');
+    // Verify no ROI error thrown — PROFIT path would require >= 30%
+    expect(prisma.lead.create).toHaveBeenCalled();
+  });
+
+  it('STARTER_SALES: resale price $4.99 fails', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ buyBoxPrice: 4.99 }),
+    );
+
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('STARTER_SALES floor');
+  });
+
+  it('STARTER_SALES: resale price $5.00 can certify', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ buyBoxPrice: 5.00 }),
+    );
+    (prisma.product.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'prod-1' });
+    (prisma.lead.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'lead-1' });
+    (prisma.sourceCandidate.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const result = await certifyCandidate('cand-1', 'user-1');
+
+    expect(result.leadId).toBe('lead-1');
+  });
+
+  it('STARTER_SALES: resale price $25.01 fails', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ buyBoxPrice: 25.01 }),
+    );
+
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('STARTER_SALES ceiling');
+  });
+
+  it('STARTER_SALES: source price $15.01 fails', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ sourcePrice: 15.01 }),
+    );
+
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('STARTER_SALES ceiling');
+  });
+
+  it('STARTER_SALES: missing estimatedProfit fails', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ estimatedProfit: null }),
+    );
+
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('missing estimated profit');
+  });
+
+  it('STARTER_SALES: missing estimatedRoi fails (required for score)', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ estimatedRoi: null }),
+    );
+
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('missing estimated ROI');
+  });
+
+  it('STARTER_SALES: certStatus NEEDS_REVIEW fails', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ certStatus: 'NEEDS_REVIEW' }),
+    );
+
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Only MATCHED');
+  });
+
+  it('STARTER_SALES: certNotes non-null fails', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ certNotes: 'Meltable item flagged' }),
+    );
+
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('outstanding review notes');
+  });
+
+});
+
+// ─── Phase 20.2E: STARTER_SALES Lead.create fields ───────────────────────────
+
+describe('certifyCandidate — STARTER_SALES Lead.create behavior (Phase 20.2E)', () => {
+
+  it('creates Lead with leadPurpose = STARTER_SALES and leadTier = BASIC', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate(),
+    );
+    (prisma.product.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'prod-1' });
+    (prisma.lead.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'lead-1' });
+    (prisma.sourceCandidate.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    await certifyCandidate('cand-1', 'user-1');
+
+    expect(prisma.lead.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        leadPurpose: 'STARTER_SALES',
+        leadTier:    'BASIC',
+        status:      'NEW',
+      }),
+    }));
+  });
+
+  it('score is estimatedRoi * 100 for STARTER_SALES (0.25 → 25)', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ estimatedRoi: 0.25 }),
+    );
+    (prisma.product.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'prod-1' });
+    (prisma.lead.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'lead-1' });
+    (prisma.sourceCandidate.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    await certifyCandidate('cand-1', 'user-1');
+
+    expect(prisma.lead.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ score: 25 }),
+    }));
+  });
+
+  it('STARTER_SALES stamps SourceCandidate as CERTIFIED after Lead.create', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate(),
+    );
+    (prisma.product.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'prod-1' });
+    (prisma.lead.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'lead-1' });
+    (prisma.sourceCandidate.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    await certifyCandidate('cand-1', 'user-1');
+
+    // SourceCandidate stamped CERTIFIED — same invariant as PROFIT path
+    expect(prisma.sourceCandidate.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'cand-1' },
+      data:  expect.objectContaining({ certStatus: 'CERTIFIED', productId: 'prod-1', leadId: 'lead-1' }),
+    }));
+  });
+
+});

@@ -30,12 +30,9 @@ export async function GET(req: NextRequest) {
 
   const state = crypto.randomBytes(32).toString('hex');
 
-  // version=beta is required while the app is in Draft status on Seller Central.
-  // Remove it after Amazon approves and publishes the app.
   const amazonUrl = new URL('https://sellercentral.amazon.com/apps/authorize/consent');
   amazonUrl.searchParams.set('application_id', clientId);
   amazonUrl.searchParams.set('state', state);
-  amazonUrl.searchParams.set('version', 'beta');
 
   const res = NextResponse.redirect(amazonUrl.toString());
   res.cookies.set('amazon_oauth_state', state, {

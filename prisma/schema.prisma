@@ -51,12 +51,12 @@ enum UpcCacheStatus {
 }
 
 enum CandidateStatus {
-  RAW_CANDIDATE        // imported, no Amazon data yet
-  MATCHED              // SP-API + Keepa pulled, profitability computed
-  NEEDS_REVIEW         // passed pipeline gates — owner must certify before delivery
-  CERTIFIED            // owner approved and pushed through pipeline for broadcast
-  REJECTED             // owner rejected or hard pipeline failure
-  STALE                // rescan: gone / out of stock / could not fetch
+  RAW_CANDIDATE // imported, no Amazon data yet
+  MATCHED // SP-API + Keepa pulled, profitability computed
+  NEEDS_REVIEW // passed pipeline gates — owner must certify before delivery
+  CERTIFIED // owner approved and pushed through pipeline for broadcast
+  REJECTED // owner rejected or hard pipeline failure
+  STALE // rescan: gone / out of stock / could not fetch
   NO_LONGER_PROFITABLE // rescan: spread collapsed
 }
 
@@ -93,15 +93,17 @@ enum EntitlementSource {
 // ─── Multi-Tenant Core ─────────────────────────────────────────────────────
 
 model Organization {
-  id                String   @id @default(cuid())
-  name              String
-  slug              String   @unique
-  plan              Plan     @default(STARTER)
-  scanEnabled       Boolean  @default(false)
-  isBroadcastSource Boolean  @default(false)
-  receiveBroadcast  Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  name                 String
+  slug                 String   @unique
+  plan                 Plan     @default(STARTER)
+  scanEnabled          Boolean  @default(false)
+  isBroadcastSource    Boolean  @default(false)
+  receiveBroadcast     Boolean  @default(true)
+  // null = use system fallback (0.0875); 0.0000 = explicitly tax-exempt
+  defaultSourceTaxRate Decimal? @db.Decimal(5, 4)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   users                User[]
   subscription         Subscription?
@@ -226,6 +228,7 @@ model Product {
   sourceListPrice Float? // original "was" price before markdown
   onSale          Boolean? // retailer flagged on sale / rollback / clearance
   sourceTax       Float?
+  sourceTaxRate   Decimal? @db.Decimal(5, 4) // rate used when Product profit was calculated
   sourceShipping  Float?
 
   // Discounts applied
@@ -377,6 +380,9 @@ model Lead {
   // Freshness tracking — Phase 19.1
   freshnessStatus    String    @default("NEEDS_RECHECK") // FRESH | NEEDS_RECHECK | STALE | NO_LONGER_PROFITABLE | OUT_OF_STOCK | PRICE_CHANGED | RISK_CHANGED
   freshnessCheckedAt DateTime? // last time this lead's underlying economics were verified
+
+  // Source tax rate used when this lead's profit was calculated/displayed
+  sourceTaxRate Decimal? @db.Decimal(5, 4)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1017,10 +1023,11 @@ model SourceCandidate {
   // Profitability snapshot (populated by enrichment job, not import)
   estimatedProfit Float?
   estimatedRoi    Float?
+  sourceTaxRate   Decimal? @db.Decimal(5, 4) // rate used (or intended override) at evaluation time
 
   // Sourcing attribution
-  sourceType String  // "VA_IMPORT" | "APIFY_SCAN" | "MANUAL" | "RESCAN"
-  sourceCost Float?  // estimated USD cost to discover this candidate (0 for VA_IMPORT)
+  sourceType String // "VA_IMPORT" | "APIFY_SCAN" | "MANUAL" | "RESCAN"
+  sourceCost Float? // estimated USD cost to discover this candidate (0 for VA_IMPORT)
   scanJobId  String? // FK to ScanJob when sourceType = APIFY_SCAN
 
   // VA/operator notes — free text attached at import time

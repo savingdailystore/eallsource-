@@ -13,6 +13,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/billing', req.url));
   }
 
+  const role = session.user.role;
+  if (role !== 'OWNER' && role !== 'ADMIN') {
+    return NextResponse.redirect(new URL('/dashboard/amazon?error=insufficient_role', req.url));
+  }
+
   const clientId = process.env.LWA_CLIENT_ID;
   if (!clientId) {
     return NextResponse.redirect(new URL('/dashboard/amazon?error=missing_credentials', req.url));

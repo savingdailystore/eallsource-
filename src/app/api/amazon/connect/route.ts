@@ -18,6 +18,11 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const role = session.user.role;
+  if (role !== 'OWNER' && role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Forbidden: only account owners and admins can connect Amazon SP-API.' }, { status: 403 });
+  }
+
   if (!isEncryptionConfigured()) {
     return NextResponse.json(
       { error: 'Server encryption key (ENCRYPTION_KEY) is not configured. Contact your administrator.' },

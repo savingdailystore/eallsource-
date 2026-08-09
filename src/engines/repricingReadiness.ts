@@ -54,7 +54,7 @@ export const STRATEGY_META: Record<string, { label: string; desc: string }> = {
 
 const NET_FACTOR     = 0.85;          // 1 - 0.15 referral
 const FIXED_FEES     = 4.56 + 0.50;  // FBA + storage, no prep
-const SOURCE_TAX     = 0.0875;
+const DEFAULT_SOURCE_TAX = 0.0875;   // fallback when no per-org rate is configured
 
 export interface FloorBreakdown {
   costBasis:      number;
@@ -70,12 +70,14 @@ function ceilCents(v: number): number {
 }
 
 export function estimateFloorBreakdown(
-  costBasis:   number,
-  minRoi:      number,
-  minProfit:   number,
-  manualFloor: number | null | undefined,
+  costBasis:    number,
+  minRoi:       number,
+  minProfit:    number,
+  manualFloor:  number | null | undefined,
+  sourceTaxRate?: number,
 ): FloorBreakdown {
-  const manual = manualFloor ?? 0;
+  const manual         = manualFloor ?? 0;
+  const effectiveTax   = sourceTaxRate ?? DEFAULT_SOURCE_TAX;
 
   if (costBasis <= 0) {
     return {
@@ -88,7 +90,7 @@ export function estimateFloorBreakdown(
     };
   }
 
-  const totalCostWithTax = costBasis * (1 + SOURCE_TAX);
+  const totalCostWithTax = costBasis * (1 + effectiveTax);
 
   // Solve: P * 0.85 - FIXED_FEES - totalCostWithTax >= minProfit
   const profitFloor = ceilCents((minProfit + FIXED_FEES + totalCostWithTax) / NET_FACTOR);

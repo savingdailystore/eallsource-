@@ -307,6 +307,7 @@ export async function processRetailerProduct(
     // ── 6. Profitability ──────────────────────────────────────────────────────
     const profitResult = calculateProfitability({
       sourcePrice:   product.price,
+      taxRate:       0.0875,
       discounts:     [],
       resellPrice,
       category,
@@ -406,6 +407,7 @@ export async function processRetailerProduct(
       storageFee:       profitResult.storageFee,
       prepFee:          profitResult.prepFee,
       taxAmount:        profitResult.taxAmount,
+      sourceTaxRate:    0.0875,
 
       price:            resellPrice,
       fees:             profitResult.amazonFees,

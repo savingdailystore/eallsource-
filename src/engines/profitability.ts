@@ -1,7 +1,9 @@
 import type { Discount, ProfitabilityInput, ProfitabilityResult } from '@/types';
 
-// Estimated average sales tax paid when purchasing from the retailer.
-const SALES_TAX_RATE = 0.0875;
+// System-wide fallback source tax rate. Used when no org-level or per-record
+// rate is provided. Callers should pass taxRate explicitly so this constant
+// is only a last-resort default, not a hidden global.
+const DEFAULT_TAX_RATE = 0.0875;
 
 // Referral fee rates by category (approximate)
 const REFERRAL_RATES: Record<string, number> = {
@@ -45,7 +47,7 @@ export function estimateReferralFee(price: number, category: string): number {
 export function calculateProfitability(input: ProfitabilityInput): ProfitabilityResult {
   const {
     sourcePrice,
-    sourceTax      = 0,
+    taxRate,
     sourceShipping = 0,
     discounts,
     resellPrice,
@@ -56,10 +58,17 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
     storageFee     = 0.50,
   } = input;
 
+  // Resolve the effective tax rate once. Callers should pass this explicitly;
+  // DEFAULT_TAX_RATE is the last-resort fallback so existing callers that
+  // omit taxRate continue to produce identical numeric results.
+  const effectiveTaxRate = taxRate ?? DEFAULT_TAX_RATE;
+
   // ── Final source cost ──────────────────────────────────────────────────
   const totalDiscount = discounts.reduce((sum, d) => sum + d.amount, 0);
   const finalCost     = Math.max(0, sourcePrice - totalDiscount);
-  const totalLandedCost = finalCost + sourceTax + sourceShipping;
+  // sourceTax is no longer accepted as a separate dollar-amount input.
+  // Tax is always computed from effectiveTaxRate below (counted exactly once).
+  const totalLandedCost = finalCost + sourceShipping;
 
   // ── Amazon fees ────────────────────────────────────────────────────────
   // Treat a zero (or missing) referral rate as "no real data" — a 0% referral
@@ -80,10 +89,10 @@ export function calculateProfitability(input: ProfitabilityInput): Profitability
   const fbaFee       = feeEstimateConfirmed ? inputFbaFee! : estimateFbaFee();
   // Sales tax is the tax YOU pay buying from the retailer (on the source cost),
   // not a cut of the resale price. The tax a customer pays on Amazon is
-  // collected and remitted by Amazon — it is never the seller's cost. Charging
-  // it on resellPrice (the old behavior) added a large phantom cost that sank
-  // otherwise-profitable leads. Conservative: assumes no resale certificate.
-  const taxAmount    = finalCost * SALES_TAX_RATE;
+  // collected and remitted by Amazon — it is never the seller's cost.
+  // taxAmount is computed exactly once from effectiveTaxRate — not from any
+  // separate dollar-amount input — eliminating the prior double-count risk.
+  const taxAmount    = finalCost * effectiveTaxRate;
   const amazonFees   = referralFee + fbaFee + storageFee;
 
   // ── Profitability ──────────────────────────────────────────────────────

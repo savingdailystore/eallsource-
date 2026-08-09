@@ -100,7 +100,8 @@ export interface AmazonProductData {
 
 export interface ProfitabilityInput {
   sourcePrice: number;
-  sourceTax?: number;
+  /** Source sales tax rate as a decimal fraction (e.g. 0.0875 = 8.75%). Defaults to 0.0875 if omitted. */
+  taxRate?: number;
   sourceShipping?: number;
   discounts: Discount[];
   resellPrice: number;

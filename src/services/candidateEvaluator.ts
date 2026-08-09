@@ -112,9 +112,10 @@ async function persistResult(args: {
   buyBoxPrice:     number | null;
   estimatedProfit: number | null;
   estimatedRoi:    number | null;
+  sourceTaxRate:   number;
   now:             Date;
 }): Promise<void> {
-  const { candidateId, newStatus, certNotes, asin, buyBoxPrice, estimatedProfit, estimatedRoi, now } = args;
+  const { candidateId, newStatus, certNotes, asin, buyBoxPrice, estimatedProfit, estimatedRoi, sourceTaxRate, now } = args;
 
   await prisma.sourceCandidate.update({
     where: { id: candidateId },
@@ -125,6 +126,9 @@ async function persistResult(args: {
       ...(buyBoxPrice     != null ? { buyBoxPrice }     : {}),
       ...(estimatedProfit != null ? { estimatedProfit } : {}),
       ...(estimatedRoi    != null ? { estimatedRoi }    : {}),
+      // Write the tax rate used whenever we have computed economics so the rate
+      // is auditable alongside estimatedProfit/estimatedRoi.
+      ...(estimatedProfit != null ? { sourceTaxRate }   : {}),
       ...(buyBoxPrice     != null ? { amazonCheckedAt: now } : {}),
       lastCheckedAt: now,
       ...(newStatus === 'REJECTED' ? { rejectedAt: now, rejectedBy: 'evaluator' } : {}),
@@ -147,6 +151,7 @@ export async function evaluateCandidate(
       asin: true, upc: true, title: true, brand: true,
       sourcePrice: true,
       targetLeadPurpose: true,
+      sourceTaxRate: true,
     },
   });
 
@@ -161,6 +166,9 @@ export async function evaluateCandidate(
   const now            = new Date();
   // Any value other than the exact string 'STARTER_SALES' falls through to PROFIT behavior.
   const isStarterSales = candidate.targetLeadPurpose === 'STARTER_SALES';
+  // Resolve the tax rate to use for this evaluation. The candidate may have a
+  // per-record override (sourceTaxRate); otherwise fall back to the system default.
+  const effectiveTaxRate = candidate.sourceTaxRate != null ? Number(candidate.sourceTaxRate) : 0.0875;
 
   // Local shorthand: persist and return summary in one call
   async function done(
@@ -173,7 +181,7 @@ export async function evaluateCandidate(
     estimatedProfit: number | null = null,
     estimatedRoi:    number | null = null,
   ): Promise<EvaluationSummary> {
-    await persistResult({ candidateId, newStatus, certNotes, asin, buyBoxPrice, estimatedProfit, estimatedRoi, now });
+    await persistResult({ candidateId, newStatus, certNotes, asin, buyBoxPrice, estimatedProfit, estimatedRoi, sourceTaxRate: effectiveTaxRate, now });
     return { candidateId, prevStatus, newStatus, certNotes, asin, matchMethod, matchConfidence, buyBoxPrice, estimatedProfit, estimatedRoi, evaluatedAt: now };
   }
 
@@ -341,6 +349,7 @@ export async function evaluateCandidate(
   // ── 9. Profitability ──────────────────────────────────────────────────────
   const profitResult = calculateProfitability({
     sourcePrice:     candidate.sourcePrice,
+    taxRate:         effectiveTaxRate,
     discounts:       [],
     resellPrice,
     category,

@@ -92,15 +92,15 @@ export function startWorkers(redisUrl: string) {
     const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
 
     const profitResult = calculateProfitability({
-      sourcePrice: product.sourcePrice ?? 0,
-      sourceTax: product.sourceTax ?? undefined,
+      sourcePrice:    product.sourcePrice ?? 0,
+      taxRate:        product.sourceTaxRate != null ? Number(product.sourceTaxRate) : 0.0875,
       sourceShipping: product.sourceShipping ?? undefined,
-      discounts: [],
-      resellPrice: product.estimatedResellPrice ?? product.buyBoxPrice ?? 0,
-      category: product.category ?? 'Other',
-      prepFee: product.prepFee ?? undefined,
-      fbaFee: product.fbaFee ?? undefined,
-      storageFee: product.storageFee ?? undefined,
+      discounts:      [],
+      resellPrice:    product.estimatedResellPrice ?? product.buyBoxPrice ?? 0,
+      category:       product.category ?? 'Other',
+      prepFee:        product.prepFee ?? undefined,
+      fbaFee:         product.fbaFee ?? undefined,
+      storageFee:     product.storageFee ?? undefined,
     });
 
     const gatingResult = assessGating({
@@ -138,7 +138,8 @@ export function startWorkers(redisUrl: string) {
         storageFee: profitResult.storageFee,
         prepFee: profitResult.prepFee,
         amazonFees: profitResult.amazonFees,
-        taxAmount: profitResult.taxAmount,
+        taxAmount:     profitResult.taxAmount,
+        sourceTaxRate: product.sourceTaxRate != null ? Number(product.sourceTaxRate) : 0.0875,
         score,
         demandLevel: demandResult.level,
         gatingRisk: gatingResult.risk,

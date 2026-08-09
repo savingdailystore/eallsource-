@@ -301,6 +301,12 @@ model Product {
   isMeltable           Boolean    @default(false)
   feeEstimateConfirmed Boolean    @default(false)
 
+  // Fee estimate provenance — when estimates were generated, at what price, and from which source.
+  // null means fees were calculated before this tracking existed; treat as unknown/static.
+  feeEstimateSource String? // "SP_API" | "STATIC"
+  feeEstimatedAt    DateTime? // when the fee estimate was last generated
+  feeEstimatePrice  Float? // resell price used for the fee estimate (fees are price-dependent)
+
   // Real per-ASIN IP complaint history — set manually by an owner after an
   // actual takedown/complaint, not inferred. Once set, permanently blocks the
   // ASIN from becoming a lead again (broadcast-wide, same as the brand-name
@@ -1024,6 +1030,12 @@ model SourceCandidate {
   estimatedProfit Float?
   estimatedRoi    Float?
   sourceTaxRate   Decimal? @db.Decimal(5, 4) // rate used (or intended override) at evaluation time
+
+  // Fee amounts and provenance used when computing estimatedProfit/estimatedRoi
+  referralFee       Float? // referral fee used in the profitability calculation
+  fbaFee            Float? // FBA fee used in the profitability calculation
+  feeEstimateSource String? // "SP_API" | "STATIC"
+  feeEstimatedAt    DateTime? // when getFeeEstimate() ran successfully for this evaluation
 
   // Sourcing attribution
   sourceType String // "VA_IMPORT" | "APIFY_SCAN" | "MANUAL" | "RESCAN"

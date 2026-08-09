@@ -18,8 +18,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard/amazon?error=insufficient_role', req.url));
   }
 
+  // spAppId: published SP-API app ID — used as application_id on the Seller Central consent URL.
+  // clientId: LWA OAuth2 credential — used only for token exchange in the callback route.
+  // Both must be present for a coherent OAuth environment.
+  const spAppId  = process.env.AMAZON_SP_APP_ID;
   const clientId = process.env.LWA_CLIENT_ID;
-  if (!clientId) {
+  if (!spAppId || !clientId) {
     return NextResponse.redirect(new URL('/dashboard/amazon?error=missing_credentials', req.url));
   }
 
@@ -36,7 +40,7 @@ export async function GET(req: NextRequest) {
   const state = crypto.randomBytes(32).toString('hex');
 
   const amazonUrl = new URL('https://sellercentral.amazon.com/apps/authorize/consent');
-  amazonUrl.searchParams.set('application_id', clientId);
+  amazonUrl.searchParams.set('application_id', spAppId);
   amazonUrl.searchParams.set('state', state);
 
   const res = NextResponse.redirect(amazonUrl.toString());

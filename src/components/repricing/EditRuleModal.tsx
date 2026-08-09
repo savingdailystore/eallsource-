@@ -312,7 +312,7 @@ export function EditRuleModal({
                   <span className="text-slate-50">{formatCurrency(floorBreakdown.effectiveFloor)}</span>
                 </div>
                 <div className="text-[10px] text-slate-600">
-                  Binding constraint: {BINDING_LABEL[floorBreakdown.bindingRule] ?? 'N/A'} · Assumes 15% referral, $4.56 FBA, 8.75% source tax
+                  Binding constraint: {BINDING_LABEL[floorBreakdown.bindingRule] ?? 'N/A'} · Assumes 15% referral, $4.56 FBA, configured source tax rate
                 </div>
               </div>
             )}

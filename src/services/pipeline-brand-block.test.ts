@@ -21,16 +21,17 @@ const brandBlockFindFirst = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    product:    {
+    product:      {
       findFirst: (...a: unknown[]) => productFindFirst(...a),
       upsert:    (...a: unknown[]) => productUpsert(...a),
     },
-    lead:       {
+    lead:         {
       findFirst: (...a: unknown[]) => leadFindFirst(...a),
       create:    (...a: unknown[]) => leadCreate(...a),
       update:    (...a: unknown[]) => leadUpdate(...a),
     },
-    brandBlock: { findFirst: (...a: unknown[]) => brandBlockFindFirst(...a) },
+    brandBlock:   { findFirst: (...a: unknown[]) => brandBlockFindFirst(...a) },
+    organization: { findUnique: vi.fn().mockResolvedValue(null) },
   },
 }));
 

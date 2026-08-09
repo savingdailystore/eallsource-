@@ -15,6 +15,7 @@ interface Props {
   amazonFees:        number | null;
   prepFee:           number | null;
   taxAmount:         number | null;
+  sourceTaxRate?:    number | null;
   resellPrice:       number;
 }
 
@@ -33,6 +34,7 @@ export function ProfitabilityCalculator({
   amazonFees,
   prepFee,
   taxAmount,
+  sourceTaxRate,
   resellPrice,
 }: Props) {
   const [discounts, setDiscounts] = useState<EditableDiscount[]>(() =>
@@ -221,7 +223,9 @@ export function ProfitabilityCalculator({
         )}
         {taxAmount != null && (
           <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Tax</span>
+            <span className="text-slate-400">
+              Source Tax{sourceTaxRate != null ? ` (${(sourceTaxRate * 100).toFixed(2)}%)` : ''}
+            </span>
             <span className="text-red-400">−{formatCurrency(taxAmount)}</span>
           </div>
         )}

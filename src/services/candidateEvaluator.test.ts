@@ -30,6 +30,7 @@ vi.mock('@/lib/prisma', () => ({
     sourceCandidate: { findUnique: vi.fn(), update: vi.fn().mockResolvedValue({}) },
     product:         { findFirst: vi.fn().mockResolvedValue(null) },
     brandBlock:      { findFirst: vi.fn().mockResolvedValue(null) },
+    organization:    { findUnique: vi.fn().mockResolvedValue(null) },
     // These must NEVER be called by the evaluator
     lead:            { create: vi.fn(), update: vi.fn(), findFirst: vi.fn() },
     leadEntitlement: { create: vi.fn(), upsert: vi.fn() },

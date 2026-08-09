@@ -36,6 +36,7 @@ export interface LeadRow {
     amazonFees?: number | null;
     prepFee?: number | null;
     taxAmount?: number | null;
+    sourceTaxRate?: any | null;
     profit: number;
     roi: number;
     margin?: number | null;
@@ -195,7 +196,14 @@ function ExpandedPanel({ lead, isOwner, onDelete }: {
             <div className="text-[10px] text-slate-500 mb-1">From resell price {resell ? formatCurrency(resell) : '—'}</div>
             {p.amazonFees != null && <div className="flex justify-between text-xs py-0.5"><span className="text-slate-400">Amazon Fees</span><span className="text-red-400">−{formatCurrency(p.amazonFees)}</span></div>}
             {p.prepFee   != null && <div className="flex justify-between text-xs py-0.5"><span className="text-slate-400">Prep Fee</span><span className="text-red-400">−{formatCurrency(p.prepFee)}</span></div>}
-            {p.taxAmount != null && <div className="flex justify-between text-xs py-0.5"><span className="text-slate-400">Tax</span><span className="text-red-400">−{formatCurrency(p.taxAmount)}</span></div>}
+            {p.taxAmount != null && (
+              <div className="flex justify-between text-xs py-0.5">
+                <span className="text-slate-400">
+                  Source Tax{p.sourceTaxRate != null ? ` (${(Number(p.sourceTaxRate) * 100).toFixed(2)}%)` : ''}
+                </span>
+                <span className="text-red-400">−{formatCurrency(p.taxAmount)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-xs font-bold border-t border-slate-800 pt-1 mt-1">
               <span>Net Profit</span>
               <span className={p.profit >= 0 ? 'text-green-400' : 'text-red-400'}>{formatCurrency(p.profit)}</span>

@@ -81,7 +81,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             imageUrl: true, sourceRetailer: true, sourcePrice: true,
             sourceListPrice: true, onSale: true,
             finalCost: true, lowestFbaPrice: true, buyBoxPrice: true,
-            amazonFees: true, prepFee: true, taxAmount: true,
+            amazonFees: true, prepFee: true, taxAmount: true, sourceTaxRate: true,
             profit: true, roi: true, margin: true,
             bsr: true, bsrPercentage: true,
             demandLevel: true, gatingRisk: true, ipRiskScore: true,

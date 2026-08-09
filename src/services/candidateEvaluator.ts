@@ -166,9 +166,16 @@ export async function evaluateCandidate(
   const now            = new Date();
   // Any value other than the exact string 'STARTER_SALES' falls through to PROFIT behavior.
   const isStarterSales = candidate.targetLeadPurpose === 'STARTER_SALES';
-  // Resolve the tax rate to use for this evaluation. The candidate may have a
-  // per-record override (sourceTaxRate); otherwise fall back to the system default.
-  const effectiveTaxRate = candidate.sourceTaxRate != null ? Number(candidate.sourceTaxRate) : 0.0875;
+  // Resolve the tax rate: candidate override → org default → system fallback (0.0875).
+  const orgForTax = await prisma.organization.findUnique({
+    where:  { id: orgId },
+    select: { defaultSourceTaxRate: true },
+  });
+  const effectiveTaxRate = candidate.sourceTaxRate != null
+    ? Number(candidate.sourceTaxRate)
+    : orgForTax?.defaultSourceTaxRate != null
+      ? Number(orgForTax.defaultSourceTaxRate)
+      : 0.0875;
 
   // Local shorthand: persist and return summary in one call
   async function done(

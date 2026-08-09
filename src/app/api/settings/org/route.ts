@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const updateSchema = z.object({
   name: z.string().min(2).max(80).optional(),
+  defaultSourceTaxRate: z.number().min(0).max(0.15).nullable().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const org = await prisma.organization.findUniqueOrThrow({
     where: { id: session.user.orgId },
-    select: { id: true, name: true, slug: true, plan: true },
+    select: { id: true, name: true, slug: true, plan: true, defaultSourceTaxRate: true },
   });
 
   return NextResponse.json(org);
@@ -36,7 +37,7 @@ export async function PATCH(req: NextRequest) {
   const org = await prisma.organization.update({
     where: { id: session.user.orgId },
     data: parsed.data,
-    select: { id: true, name: true, slug: true, plan: true },
+    select: { id: true, name: true, slug: true, plan: true, defaultSourceTaxRate: true },
   });
 
   await prisma.auditLog.create({

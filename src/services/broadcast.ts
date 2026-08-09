@@ -59,6 +59,7 @@ export async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct):
     storageFee:        p.storageFee,
     prepFee:           p.prepFee,
     taxAmount:         p.taxAmount,
+    sourceTaxRate:     p.sourceTaxRate,
     price:             p.price,
     fees:              p.fees,
     profit:            p.profit,
@@ -124,7 +125,7 @@ export async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct):
   }
 
   const created = await prisma.lead.create({
-    data: { orgId: targetOrgId, productId: savedProduct.id, score: lead.score, status: 'NEW', leadTier: lead.leadTier },
+    data: { orgId: targetOrgId, productId: savedProduct.id, score: lead.score, status: 'NEW', leadTier: lead.leadTier, sourceTaxRate: p.sourceTaxRate },
   });
   return created.id;
 }

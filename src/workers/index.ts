@@ -91,9 +91,17 @@ export function startWorkers(redisUrl: string) {
     const { productId } = job.data as { productId: string };
     const product = await prisma.product.findUniqueOrThrow({ where: { id: productId } });
 
+    let resolvedTaxRate = 0.0875;
+    if (product.sourceTaxRate != null) {
+      resolvedTaxRate = Number(product.sourceTaxRate);
+    } else {
+      const workerOrg = await prisma.organization.findUnique({ where: { id: product.orgId }, select: { defaultSourceTaxRate: true } });
+      if (workerOrg?.defaultSourceTaxRate != null) resolvedTaxRate = Number(workerOrg.defaultSourceTaxRate);
+    }
+
     const profitResult = calculateProfitability({
       sourcePrice:    product.sourcePrice ?? 0,
-      taxRate:        product.sourceTaxRate != null ? Number(product.sourceTaxRate) : 0.0875,
+      taxRate:        resolvedTaxRate,
       sourceShipping: product.sourceShipping ?? undefined,
       discounts:      [],
       resellPrice:    product.estimatedResellPrice ?? product.buyBoxPrice ?? 0,
@@ -139,7 +147,7 @@ export function startWorkers(redisUrl: string) {
         prepFee: profitResult.prepFee,
         amazonFees: profitResult.amazonFees,
         taxAmount:     profitResult.taxAmount,
-        sourceTaxRate: product.sourceTaxRate != null ? Number(product.sourceTaxRate) : 0.0875,
+        sourceTaxRate: resolvedTaxRate,
         score,
         demandLevel: demandResult.level,
         gatingRisk: gatingResult.risk,

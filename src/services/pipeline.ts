@@ -87,6 +87,15 @@ export async function processRetailerProduct(
   opts: ProcessOptions = {},
 ): Promise<PipelineResult> {
   try {
+    // ── 0. Resolve org-level source tax rate ──────────────────────────────────
+    const pipelineOrg = await prisma.organization.findUnique({
+      where:  { id: orgId },
+      select: { defaultSourceTaxRate: true },
+    });
+    const orgTaxRate = pipelineOrg?.defaultSourceTaxRate != null
+      ? Number(pipelineOrg.defaultSourceTaxRate)
+      : 0.0875;
+
     // ── 1. Find Amazon ASIN (or use the one provided) ─────────────────────────
     const match: AmazonMatch | null = opts.knownAsin
       ? { asin: opts.knownAsin, amazonUrl: `https://www.amazon.com/dp/${opts.knownAsin}`, matchMethod: 'MANUAL', matchConfidence: 100 }
@@ -307,7 +316,7 @@ export async function processRetailerProduct(
     // ── 6. Profitability ──────────────────────────────────────────────────────
     const profitResult = calculateProfitability({
       sourcePrice:   product.price,
-      taxRate:       0.0875,
+      taxRate:       orgTaxRate,
       discounts:     [],
       resellPrice,
       category,
@@ -407,7 +416,7 @@ export async function processRetailerProduct(
       storageFee:       profitResult.storageFee,
       prepFee:          profitResult.prepFee,
       taxAmount:        profitResult.taxAmount,
-      sourceTaxRate:    0.0875,
+      sourceTaxRate:    orgTaxRate,
 
       price:            resellPrice,
       fees:             profitResult.amazonFees,

@@ -6,7 +6,8 @@ import { OrgForm } from '@/components/settings/OrgForm';
 import { PasswordForm } from '@/components/settings/PasswordForm';
 import { TeamMembers } from '@/components/settings/TeamMembers';
 import { MfaSettings } from '@/components/settings/MfaSettings';
-import { Users, Building2, Settings, ShieldCheck } from 'lucide-react';
+import { SourceTaxForm } from '@/components/settings/SourceTaxForm';
+import { Users, Building2, Settings, ShieldCheck, Receipt } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Settings' };
@@ -18,7 +19,7 @@ export default async function SettingsPage() {
   const [org, users, currentUser] = await Promise.all([
     prisma.organization.findUnique({
       where: { id: orgId },
-      select: { name: true, slug: true, plan: true },
+      select: { name: true, slug: true, plan: true, defaultSourceTaxRate: true },
     }),
     prisma.user.findMany({
       where: { orgId },
@@ -51,6 +52,18 @@ export default async function SettingsPage() {
         <OrgForm
           orgName={org?.name ?? ''}
           orgSlug={org?.slug ?? ''}
+          canEdit={canManageUsers}
+        />
+      </div>
+
+      {/* Source Tax Rate */}
+      <div className="card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Receipt className="w-4 h-4 text-slate-400" />
+          <h2 className="font-semibold text-slate-50">Source Tax Rate</h2>
+        </div>
+        <SourceTaxForm
+          currentRate={org?.defaultSourceTaxRate != null ? Number(org.defaultSourceTaxRate) : null}
           canEdit={canManageUsers}
         />
       </div>

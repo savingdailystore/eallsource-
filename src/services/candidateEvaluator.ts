@@ -105,17 +105,26 @@ async function resolveMatch(
 }
 
 async function persistResult(args: {
-  candidateId:     string;
-  newStatus:       CandidateStatus;
-  certNotes:       string | null;
-  asin:            string | null;
-  buyBoxPrice:     number | null;
-  estimatedProfit: number | null;
-  estimatedRoi:    number | null;
-  sourceTaxRate:   number;
-  now:             Date;
+  candidateId:       string;
+  newStatus:         CandidateStatus;
+  certNotes:         string | null;
+  asin:              string | null;
+  buyBoxPrice:       number | null;
+  estimatedProfit:   number | null;
+  estimatedRoi:      number | null;
+  sourceTaxRate:     number;
+  now:               Date;
+  // Fee audit fields — only written when SP-API estimate succeeded for this evaluation.
+  feeReferralFee?:   number;
+  feeFbaFee?:        number;
+  feeEstimateSource?: string;
+  feeEstimatedAt?:   Date;
 }): Promise<void> {
-  const { candidateId, newStatus, certNotes, asin, buyBoxPrice, estimatedProfit, estimatedRoi, sourceTaxRate, now } = args;
+  const {
+    candidateId, newStatus, certNotes, asin, buyBoxPrice,
+    estimatedProfit, estimatedRoi, sourceTaxRate, now,
+    feeReferralFee, feeFbaFee, feeEstimateSource, feeEstimatedAt,
+  } = args;
 
   await prisma.sourceCandidate.update({
     where: { id: candidateId },
@@ -130,6 +139,13 @@ async function persistResult(args: {
       // is auditable alongside estimatedProfit/estimatedRoi.
       ...(estimatedProfit != null ? { sourceTaxRate }   : {}),
       ...(buyBoxPrice     != null ? { amazonCheckedAt: now } : {}),
+      // Write fee provenance only when SP-API returned confirmed fees for this run.
+      ...(feeEstimateSource != null ? {
+        referralFee:       feeReferralFee,
+        fbaFee:            feeFbaFee,
+        feeEstimateSource,
+        feeEstimatedAt,
+      } : {}),
       lastCheckedAt: now,
       ...(newStatus === 'REJECTED' ? { rejectedAt: now, rejectedBy: 'evaluator' } : {}),
     },
@@ -177,6 +193,16 @@ export async function evaluateCandidate(
       ? Number(orgForTax.defaultSourceTaxRate)
       : 0.0875;
 
+  // Fee audit metadata — set only when getFeeEstimate() succeeds for this run.
+  // Captured as a closure var so `done` can include it in every persistResult call
+  // without threading it through every call site.
+  let evalFeeMetadata: {
+    feeReferralFee:    number;
+    feeFbaFee:         number;
+    feeEstimateSource: string;
+    feeEstimatedAt:    Date;
+  } | undefined;
+
   // Local shorthand: persist and return summary in one call
   async function done(
     newStatus:       CandidateStatus,
@@ -188,7 +214,7 @@ export async function evaluateCandidate(
     estimatedProfit: number | null = null,
     estimatedRoi:    number | null = null,
   ): Promise<EvaluationSummary> {
-    await persistResult({ candidateId, newStatus, certNotes, asin, buyBoxPrice, estimatedProfit, estimatedRoi, sourceTaxRate: effectiveTaxRate, now });
+    await persistResult({ candidateId, newStatus, certNotes, asin, buyBoxPrice, estimatedProfit, estimatedRoi, sourceTaxRate: effectiveTaxRate, now, ...evalFeeMetadata });
     return { candidateId, prevStatus, newStatus, certNotes, asin, matchMethod, matchConfidence, buyBoxPrice, estimatedProfit, estimatedRoi, evaluatedAt: now };
   }
 
@@ -340,7 +366,17 @@ export async function evaluateCandidate(
   let feeEstimateOk = false;
   if (resellPrice > 0) {
     const fees = await getFeeEstimate(orgId, asin, resellPrice).catch(() => null);
-    if (fees) { referralFee = fees.referralFee; fbaFee = fees.fbaFee; feeEstimateOk = true; }
+    if (fees) {
+      referralFee   = fees.referralFee;
+      fbaFee        = fees.fbaFee;
+      feeEstimateOk = true;
+      evalFeeMetadata = {
+        feeReferralFee:    fees.referralFee,
+        feeFbaFee:         fees.fbaFee,
+        feeEstimateSource: 'SP_API',
+        feeEstimatedAt:    now,
+      };
+    }
   }
 
   // Without a real fee estimate, profit/ROI would be based on default rates that

@@ -304,6 +304,7 @@ export async function processRetailerProduct(
     // ── 5. Get real fee data if SP-API is connected ───────────────────────────
     let referralFee: number | undefined;
     let fbaFee: number | undefined;
+    const feeEstimatedAt = new Date();
 
     if (resellPrice > 0) {
       const feeData = await getFeeEstimate(orgId, asin, resellPrice).catch(() => null);
@@ -312,6 +313,10 @@ export async function processRetailerProduct(
         fbaFee      = feeData.fbaFee;
       }
     }
+
+    // "SP_API" when SP-API returned confirmed fees; "STATIC" when falling back to
+    // the built-in referral-rate table and FBA weight tiers.
+    const feeEstimateSource = referralFee != null ? 'SP_API' : 'STATIC';
 
     // ── 6. Profitability ──────────────────────────────────────────────────────
     const profitResult = calculateProfitability({
@@ -453,6 +458,10 @@ export async function processRetailerProduct(
       isGenericBrand:   gatingResult.isGenericBrand,
       isMeltable:       gatingResult.isMeltable,
       feeEstimateConfirmed: profitResult.feeEstimateConfirmed,
+      feeEstimateSource,
+      feeEstimatedAt,
+      feeEstimatePrice: resellPrice,
+      priceCheckedAt:   feeEstimatedAt,
 
       demandLevel:      demandResult.level,
       priceStability:   priceStability,

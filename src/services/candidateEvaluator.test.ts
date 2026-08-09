@@ -887,3 +887,94 @@ describe('evaluateCandidate — STARTER_SALES: gating risk gates', () => {
     expect(result.certNotes).toContain('STARTER_SALES: meltable item');
   });
 });
+
+// ─── Fee audit metadata writes (Phase 20.2M-1D-2) ────────────────────────────
+
+describe('evaluateCandidate — fee metadata writes', () => {
+  it('writes referralFee and fbaFee to SourceCandidate when SP-API estimate succeeds', async () => {
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue({ referralFee: 6.75, fbaFee: 4.56 });
+
+    await evaluateCandidate(CAND_ID, ORG_ID);
+
+    const updateCall = (prisma.sourceCandidate.update as MockedFunction<typeof prisma.sourceCandidate.update>).mock.calls[0][0];
+    expect((updateCall as any).data.referralFee).toBe(6.75);
+    expect((updateCall as any).data.fbaFee).toBe(4.56);
+  });
+
+  it('writes feeEstimateSource = "SP_API" when fee estimate succeeds', async () => {
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue({ referralFee: 6.75, fbaFee: 4.56 });
+
+    await evaluateCandidate(CAND_ID, ORG_ID);
+
+    const updateCall = (prisma.sourceCandidate.update as MockedFunction<typeof prisma.sourceCandidate.update>).mock.calls[0][0];
+    expect((updateCall as any).data.feeEstimateSource).toBe('SP_API');
+  });
+
+  it('writes feeEstimatedAt as a Date when fee estimate succeeds', async () => {
+    const before = new Date();
+    await evaluateCandidate(CAND_ID, ORG_ID);
+    const after = new Date();
+
+    const updateCall = (prisma.sourceCandidate.update as MockedFunction<typeof prisma.sourceCandidate.update>).mock.calls[0][0];
+    const at = (updateCall as any).data.feeEstimatedAt;
+    expect(at).toBeInstanceOf(Date);
+    expect(at.getTime()).toBeGreaterThanOrEqual(before.getTime());
+    expect(at.getTime()).toBeLessThanOrEqual(after.getTime());
+  });
+
+  it('does not write referralFee or fbaFee when fee estimate is unavailable', async () => {
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue(null);
+
+    await evaluateCandidate(CAND_ID, ORG_ID);
+
+    const updateCall = (prisma.sourceCandidate.update as MockedFunction<typeof prisma.sourceCandidate.update>).mock.calls[0][0];
+    // feeEstimateSource must not be set when no SP-API fees were obtained
+    expect((updateCall as any).data.feeEstimateSource).toBeUndefined();
+    expect((updateCall as any).data.referralFee).toBeUndefined();
+    expect((updateCall as any).data.fbaFee).toBeUndefined();
+  });
+
+  it('does not write fake fee amounts when fee estimate throws', async () => {
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockRejectedValue(new Error('Decryption failed'));
+
+    await evaluateCandidate(CAND_ID, ORG_ID);
+
+    const updateCall = (prisma.sourceCandidate.update as MockedFunction<typeof prisma.sourceCandidate.update>).mock.calls[0][0];
+    expect((updateCall as any).data.feeEstimateSource).toBeUndefined();
+    expect((updateCall as any).data.referralFee).toBeUndefined();
+    expect((updateCall as any).data.fbaFee).toBeUndefined();
+  });
+
+  it('still routes fee-unavailable candidates to NEEDS_REVIEW (no regression)', async () => {
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue(null);
+
+    const result = await evaluateCandidate(CAND_ID, ORG_ID);
+
+    expect(result.newStatus).toBe('NEEDS_REVIEW');
+    expect(result.certNotes).toContain('Fee estimate unavailable');
+    expect(result.estimatedProfit).toBeNull();
+    expect(result.estimatedRoi).toBeNull();
+  });
+
+  it('fee metadata is included even on NEEDS_REVIEW from advisory warnings (fees were obtained)', async () => {
+    (amazon.getProductData as MockedFunction<typeof amazon.getProductData>)
+      .mockResolvedValue({ ...goodProductData(), amazonIsSeller: true } as any);
+    (keepa.getKeepaData as MockedFunction<typeof keepa.getKeepaData>)
+      .mockResolvedValue({ ...goodKeepaData(), amazonIsSeller: true } as any);
+    (amazon.getFeeEstimate as MockedFunction<typeof amazon.getFeeEstimate>)
+      .mockResolvedValue({ referralFee: 6.75, fbaFee: 4.56 });
+
+    await evaluateCandidate(CAND_ID, ORG_ID);
+
+    const updateCall = (prisma.sourceCandidate.update as MockedFunction<typeof prisma.sourceCandidate.update>).mock.calls[0][0];
+    // Fee was available, so metadata should be written even though result is NEEDS_REVIEW
+    expect((updateCall as any).data.feeEstimateSource).toBe('SP_API');
+    expect((updateCall as any).data.referralFee).toBe(6.75);
+    expect((updateCall as any).data.fbaFee).toBe(4.56);
+  });
+});

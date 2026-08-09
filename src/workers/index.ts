@@ -6,6 +6,7 @@ import { assessDemand } from '@/engines/demand';
 import { calculateScore } from '@/engines/scoring';
 import { validateProduct } from '@/engines/validation';
 import { calculateReprice } from '@/engines/repricing';
+import { getFeeEstimate } from '@/lib/amazon';
 import { processRetailerProduct } from '@/services/pipeline';
 import type { RetailerProduct } from '@/types';
 
@@ -99,16 +100,37 @@ export function startWorkers(redisUrl: string) {
       if (workerOrg?.defaultSourceTaxRate != null) resolvedTaxRate = Number(workerOrg.defaultSourceTaxRate);
     }
 
+    // Try to refresh fees from SP-API using the product's current resell/buy-box price.
+    // On success: use fresh fees in profitability calculation and write all fee metadata.
+    // On failure: fall back to stored fees; preserve existing confirmed SP_API metadata.
+    const workerResellPrice = product.estimatedResellPrice ?? product.buyBoxPrice ?? 0;
+    let workerReferralFee: number | undefined = product.referralFee ?? undefined;
+    let workerFbaFee: number | undefined = product.fbaFee ?? undefined;
+    const feeEstimatedAt = new Date();
+    let freshFeeConfirmed = false;
+
+    if (product.asin && workerResellPrice > 0) {
+      const freshFees = await getFeeEstimate(product.orgId, product.asin, workerResellPrice).catch(() => null);
+      if (freshFees) {
+        workerReferralFee  = freshFees.referralFee;
+        workerFbaFee       = freshFees.fbaFee;
+        freshFeeConfirmed  = true;
+      }
+    }
+
     const profitResult = calculateProfitability({
       sourcePrice:    product.sourcePrice ?? 0,
       taxRate:        resolvedTaxRate,
       sourceShipping: product.sourceShipping ?? undefined,
       discounts:      [],
-      resellPrice:    product.estimatedResellPrice ?? product.buyBoxPrice ?? 0,
+      resellPrice:    workerResellPrice,
       category:       product.category ?? 'Other',
       prepFee:        product.prepFee ?? undefined,
-      fbaFee:         product.fbaFee ?? undefined,
+      fbaFee:         workerFbaFee,
       storageFee:     product.storageFee ?? undefined,
+      referralFeeRate: freshFeeConfirmed && workerResellPrice > 0 && workerReferralFee != null
+        ? workerReferralFee / workerResellPrice
+        : undefined,
     });
 
     const gatingResult = assessGating({
@@ -133,28 +155,56 @@ export function startWorkers(redisUrl: string) {
       priceStability: (product.priceStability as 'STABLE' | 'VOLATILE' | 'UNKNOWN') ?? 'UNKNOWN',
     });
 
+    // Fee metadata update strategy:
+    // - SP-API succeeded: overwrite all fee fields and mark SP_API.
+    // - SP-API failed and existing confirmed SP_API data exists: preserve it (don't downgrade).
+    // - SP-API failed and no prior confirmed data: mark STATIC.
+    const hasExistingConfirmedSpApi =
+      product.feeEstimateConfirmed === true && product.feeEstimateSource === 'SP_API';
+
+    const feeMetaUpdate = freshFeeConfirmed
+      ? {
+          referralFee:          workerReferralFee,
+          fbaFee:               workerFbaFee,
+          amazonFees:           profitResult.amazonFees,
+          feeEstimateConfirmed: true,
+          feeEstimateSource:    'SP_API',
+          feeEstimatedAt,
+          feeEstimatePrice:     workerResellPrice,
+          priceCheckedAt:       feeEstimatedAt,
+        }
+      : {
+          referralFee:          profitResult.referralFee,
+          fbaFee:               profitResult.fbaFee,
+          amazonFees:           profitResult.amazonFees,
+          feeEstimateConfirmed: hasExistingConfirmedSpApi,
+          ...(!hasExistingConfirmedSpApi ? {
+            feeEstimateSource: 'STATIC',
+            feeEstimatedAt,
+            feeEstimatePrice:  workerResellPrice,
+          } : {}),
+        };
+
     await prisma.product.update({
       where: { id: productId },
       data: {
-        profit: profitResult.profit,
-        roi: profitResult.roi,
-        margin: profitResult.margin,
-        finalCost: profitResult.finalCost,
+        profit:          profitResult.profit,
+        roi:             profitResult.roi,
+        margin:          profitResult.margin,
+        finalCost:       profitResult.finalCost,
         totalLandedCost: profitResult.totalLandedCost,
-        referralFee: profitResult.referralFee,
-        fbaFee: profitResult.fbaFee,
-        storageFee: profitResult.storageFee,
-        prepFee: profitResult.prepFee,
-        amazonFees: profitResult.amazonFees,
-        taxAmount:     profitResult.taxAmount,
-        sourceTaxRate: resolvedTaxRate,
+        storageFee:      profitResult.storageFee,
+        prepFee:         profitResult.prepFee,
+        taxAmount:       profitResult.taxAmount,
+        sourceTaxRate:   resolvedTaxRate,
         score,
-        demandLevel: demandResult.level,
-        gatingRisk: gatingResult.risk,
-        autoUngated: gatingResult.autoUngated,
-        hasHazmat: gatingResult.hasHazmat,
+        demandLevel:       demandResult.level,
+        gatingRisk:        gatingResult.risk,
+        autoUngated:       gatingResult.autoUngated,
+        hasHazmat:         gatingResult.hasHazmat,
         isBrandRestricted: gatingResult.isBrandRestricted,
-        isCategoryGated: gatingResult.isCategoryGated,
+        isCategoryGated:   gatingResult.isCategoryGated,
+        ...feeMetaUpdate,
       },
     });
 

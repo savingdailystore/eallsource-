@@ -414,3 +414,79 @@ describe('backfillOrgFromSource', () => {
     expect(entitlementUpsert.mock.calls[0][0].create.countsTowardWeeklyLimit).toBe(true);
   });
 });
+
+// ── Fee metadata copy (Phase 20.2M-1D-2) ─────────────────────────────────────
+describe('copyLeadToOrg — copies fee metadata fields', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    productUpsert.mockResolvedValue({ id: 'cust-prod-1', asin: 'B001BASIC01' });
+    leadFindFirst.mockResolvedValue(null);
+    leadCreate.mockResolvedValue({ id: 'cust-lead-1' });
+    leadUpdate.mockResolvedValue({});
+    entitlementUpsert.mockResolvedValue({});
+    entitlementFindMany.mockResolvedValue([]);
+    getWeeklyLeadUsageMock.mockResolvedValue(0);
+    allowedLeadTiersForPlanMock.mockReturnValue(['BASIC', 'PRO']);
+    brandBlockFindMany.mockResolvedValue([]);
+  });
+
+  it('copies feeEstimateSource, feeEstimatedAt, feeEstimatePrice, priceCheckedAt to target product', async () => {
+    const feeEstimatedAt = new Date('2026-08-09T06:00:00Z');
+    const priceCheckedAt = new Date('2026-08-09T06:00:00Z');
+
+    const leadWithFeeData = makeSourceLead({
+      product: {
+        ...makeSourceLead().product,
+        feeEstimateSource: 'SP_API',
+        feeEstimatedAt,
+        feeEstimatePrice: 28.00,
+        priceCheckedAt,
+      },
+    });
+
+    leadFindMany.mockResolvedValue([leadWithFeeData]);
+    orgFindMany.mockResolvedValue([{ id: 'cust-org-1', plan: 'PRO' }]);
+
+    await broadcastLeads('source-org', ['src-lead-1']);
+
+    const upsertCall = productUpsert.mock.calls[0][0];
+    expect(upsertCall.create.feeEstimateSource).toBe('SP_API');
+    expect(upsertCall.create.feeEstimatedAt).toStrictEqual(feeEstimatedAt);
+    expect(upsertCall.create.feeEstimatePrice).toBe(28.00);
+    expect(upsertCall.create.priceCheckedAt).toStrictEqual(priceCheckedAt);
+  });
+
+  it('copies null fee metadata fields (historical products with no fee audit data)', async () => {
+    const leadNullFees = makeSourceLead({
+      product: {
+        ...makeSourceLead().product,
+        feeEstimateSource: null,
+        feeEstimatedAt: null,
+        feeEstimatePrice: null,
+        priceCheckedAt: null,
+      },
+    });
+
+    leadFindMany.mockResolvedValue([leadNullFees]);
+    orgFindMany.mockResolvedValue([{ id: 'cust-org-1', plan: 'PRO' }]);
+
+    await broadcastLeads('source-org', ['src-lead-1']);
+
+    const upsertCall = productUpsert.mock.calls[0][0];
+    expect(upsertCall.create.feeEstimateSource).toBeNull();
+    expect(upsertCall.create.feeEstimatedAt).toBeNull();
+    expect(upsertCall.create.feeEstimatePrice).toBeNull();
+    expect(upsertCall.create.priceCheckedAt).toBeNull();
+  });
+
+  it('sourceTaxRate behavior from Phase 20.2M-1C is unchanged', async () => {
+    leadFindMany.mockResolvedValue([makeSourceLead()]);
+    orgFindMany.mockResolvedValue([{ id: 'cust-org-1', plan: 'PRO' }]);
+
+    await broadcastLeads('source-org', ['src-lead-1']);
+
+    // sourceTaxRate is copied to both the product and the lead create data
+    const upsertCall = productUpsert.mock.calls[0][0];
+    expect(upsertCall.create).toHaveProperty('sourceTaxRate');
+  });
+});

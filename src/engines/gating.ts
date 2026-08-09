@@ -98,6 +98,31 @@ const GATED_CATEGORIES = new Set([
   'Wine',
 ]);
 
+/**
+ * Returns true only when the hazmat keyword appears as a genuine hazard signal
+ * in the title.
+ *
+ * 'toxic' special case — two properties must both hold:
+ *   1. Negated: strip all safe labels (non-toxic / non toxic / nontoxic) so a
+ *      title like "non-toxic toy" contains no remaining 'toxic' occurrence.
+ *   2. Standalone: test with \b word boundaries so 'toxic' embedded inside
+ *      longer words (e.g. "intoxicating") does not match.
+ * If any non-negated, standalone occurrence remains, the title is hazmat.
+ */
+function matchesHazmatKeyword(titleLower: string, keyword: string): boolean {
+  if (keyword !== 'toxic') {
+    return titleLower.includes(keyword);
+  }
+
+  // Remove all safe negated forms before testing for real hazmat occurrences.
+  const stripped = titleLower
+    .replace(/non-toxic/g, ' ')
+    .replace(/non toxic/g, ' ')
+    .replace(/nontoxic/g,  ' ');
+
+  return /\btoxic\b/.test(stripped);
+}
+
 export function assessGating(input: GatingInput): GatingResult {
   const { title, brand, category, hasHazmat: knownHazmat } = input;
   const reasons: string[] = [];
@@ -129,7 +154,7 @@ export function assessGating(input: GatingInput): GatingResult {
 
   // Hazmat / dangerous goods check
   const titleLower = title.toLowerCase();
-  const hasHazmat = knownHazmat || HAZMAT_KEYWORDS.some((kw) => titleLower.includes(kw));
+  const hasHazmat = knownHazmat || HAZMAT_KEYWORDS.some((kw) => matchesHazmatKeyword(titleLower, kw));
   if (hasHazmat) {
     risk = 'HIGH';
     reasons.push('Potential hazmat / dangerous goods materials detected');

@@ -60,8 +60,15 @@ export async function POST(
     return NextResponse.json({ error: 'Cannot grant a rejected or expired lead.' }, { status: 400 });
   }
 
-  // Copy the lead into the target org (idempotent upsert — returns existing lead ID if already copied)
+  // Copy the lead into the target org (idempotent upsert — returns existing lead ID if already copied).
+  // Returns null if the source product's Amazon fee estimate is stale or unavailable.
   const copiedLeadId = await copyLeadToOrg(targetOrgId, sourceLead);
+  if (copiedLeadId === null) {
+    return NextResponse.json(
+      { error: 'Amazon fee estimate is stale or unavailable. Re-evaluate this candidate before granting.' },
+      { status: 400 },
+    );
+  }
 
   // Check if this target org already has an entitlement for the copied lead
   const existing = await prisma.leadEntitlement.findUnique({

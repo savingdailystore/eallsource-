@@ -45,19 +45,24 @@ import { prisma } from '@/lib/prisma';
 
 function matchedCandidate(overrides: Record<string, unknown> = {}) {
   return {
-    id:              'cand-1',
-    certStatus:      'MATCHED',
-    orgId:           'org-1',
-    asin:            'B0001234567',
-    title:           'Test Product',
-    brand:           'TestBrand',
-    sourcePrice:     10.00,
-    buyBoxPrice:     24.99,
-    estimatedProfit: 5.00,
-    estimatedRoi:    0.30,
-    amazonCheckedAt: new Date('2026-07-01'),
-    certNotes:       null,
-    productId:       null,
+    id:                'cand-1',
+    certStatus:        'MATCHED',
+    orgId:             'org-1',
+    asin:              'B0001234567',
+    title:             'Test Product',
+    brand:             'TestBrand',
+    sourcePrice:       10.00,
+    buyBoxPrice:       24.99,
+    estimatedProfit:   5.00,
+    estimatedRoi:      0.30,
+    amazonCheckedAt:   new Date('2026-07-01'),
+    certNotes:         null,
+    productId:         null,
+    // Fee freshness defaults — FRESH SP_API so eligibility tests reach the happy path
+    feeEstimateSource: 'SP_API',
+    feeEstimatedAt:    new Date(), // always FRESH at test run time
+    referralFee:       4.50,
+    fbaFee:            3.50,
     ...overrides,
   };
 }
@@ -313,6 +318,11 @@ function starterMatchedCandidate(overrides: Record<string, unknown> = {}) {
     certNotes:         null,
     productId:         null,
     targetLeadPurpose: 'STARTER_SALES',
+    // Fee freshness defaults — FRESH SP_API so eligibility tests reach the happy path
+    feeEstimateSource: 'SP_API',
+    feeEstimatedAt:    new Date(), // always FRESH at test run time
+    referralFee:       3.60,
+    fbaFee:            2.70,
     ...overrides,
   };
 }
@@ -480,6 +490,144 @@ describe('certifyCandidate — STARTER_SALES Lead.create behavior (Phase 20.2E)'
       where: { id: 'cand-1' },
       data:  expect.objectContaining({ certStatus: 'CERTIFIED', productId: 'prod-1', leadId: 'lead-1' }),
     }));
+  });
+
+});
+
+// ─── Phase 20.2M-1D-4: Fee freshness guard ───────────────────────────────────
+
+describe('certifyCandidate — fee freshness guard (Phase 20.2M-1D-4)', () => {
+
+  function setupHappy(overrides: Record<string, unknown> = {}) {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate(overrides),
+    );
+    (prisma.product.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'prod-1' });
+    (prisma.lead.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'lead-1' });
+    (prisma.sourceCandidate.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+  }
+
+  // ── Allowed ──
+
+  it('certifies when feeEstimateSource=SP_API, FRESH feeEstimatedAt, referralFee > 0, fbaFee > 0', async () => {
+    setupHappy();
+    const result = await certifyCandidate('cand-1', 'user-1');
+    expect(result.productId).toBe('prod-1');
+    expect(result.leadId).toBe('lead-1');
+  });
+
+  // ── Blocked ──
+
+  it('blocks when feeEstimatedAt is null', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: 'SP_API', feeEstimatedAt: null, referralFee: 4.50, fbaFee: 3.50 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.product.upsert).not.toHaveBeenCalled();
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks when feeEstimateSource is STATIC', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: 'STATIC', feeEstimatedAt: new Date(), referralFee: 4.50, fbaFee: 3.50 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.product.upsert).not.toHaveBeenCalled();
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks when feeEstimateSource is null (missing)', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: null, feeEstimatedAt: new Date(), referralFee: 4.50, fbaFee: 3.50 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.product.upsert).not.toHaveBeenCalled();
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks when referralFee is null', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: 'SP_API', feeEstimatedAt: new Date(), referralFee: null, fbaFee: 3.50 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks when fbaFee is null', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: 'SP_API', feeEstimatedAt: new Date(), referralFee: 4.50, fbaFee: null }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks when referralFee is 0', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: 'SP_API', feeEstimatedAt: new Date(), referralFee: 0, fbaFee: 3.50 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks when feeEstimatedAt is older than 48 hours (NEEDS_RECHECK)', async () => {
+    const staleAt = new Date(Date.now() - 49 * 60 * 60 * 1000); // 49h ago
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: 'SP_API', feeEstimatedAt: staleAt, referralFee: 4.50, fbaFee: 3.50 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.product.upsert).not.toHaveBeenCalled();
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks when feeEstimatedAt is older than 7 days (STALE)', async () => {
+    const staleAt = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: 'SP_API', feeEstimatedAt: staleAt, referralFee: 4.50, fbaFee: 3.50 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks when feeEstimatedAt is older than 30 days (VERY_STALE)', async () => {
+    const staleAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: 'SP_API', feeEstimatedAt: staleAt, referralFee: 4.50, fbaFee: 3.50 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('does not create Product, Lead, or mutate SourceCandidate when blocked', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      matchedCandidate({ feeEstimateSource: null, feeEstimatedAt: null, referralFee: null, fbaFee: null }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.product.upsert).not.toHaveBeenCalled();
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+    expect(prisma.sourceCandidate.update).not.toHaveBeenCalled();
+  });
+
+  // ── STARTER_SALES fee guard is the same code path ──
+
+  it('STARTER_SALES: blocks when feeEstimateSource is STATIC', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate({ feeEstimateSource: 'STATIC', feeEstimatedAt: new Date(), referralFee: 3.60, fbaFee: 2.70 }),
+    );
+    await expect(certifyCandidate('cand-1', 'user-1')).rejects.toThrow('Amazon fee estimate is stale or unavailable');
+    expect(prisma.lead.create).not.toHaveBeenCalled();
+  });
+
+  it('STARTER_SALES: allows FRESH SP_API fees', async () => {
+    (prisma.sourceCandidate.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(
+      starterMatchedCandidate(),
+    );
+    (prisma.product.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'prod-ss-1' });
+    (prisma.lead.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'lead-ss-1' });
+    (prisma.sourceCandidate.update as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const result = await certifyCandidate('cand-1', 'user-1');
+    expect(result.productId).toBe('prod-ss-1');
+    expect(result.leadId).toBe('lead-ss-1');
   });
 
 });

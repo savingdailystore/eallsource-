@@ -41,6 +41,7 @@
 
 import { prisma } from '@/lib/prisma';
 import type { CandidateStatus } from '@prisma/client';
+import { getFeeStaleStatus } from '@/engines/feeStaleStatus';
 
 // PROFIT path thresholds (original)
 // Minimum ROI required to certify. estimatedRoi is stored as decimal fraction (0.30 = 30%).
@@ -156,6 +157,26 @@ function assertEligibleStarterSales(c: EligibilityInput): void {
   }
 }
 
+// ─── Fee freshness guard ──────────────────────────────────────────────────────
+// Requires a FRESH SP_API fee estimate with both referral and FBA fees present.
+// Called after path-specific eligibility checks so it never races eligibility errors.
+
+const FEE_STALE_MSG = 'Amazon fee estimate is stale or unavailable. Re-evaluate this candidate before certification.';
+
+function assertFeesFresh(c: {
+  feeEstimateSource: string | null;
+  feeEstimatedAt:    Date   | null;
+  referralFee:       number | null;
+  fbaFee:            number | null;
+}): void {
+  if (c.feeEstimateSource !== 'SP_API')                  throw new Error(FEE_STALE_MSG);
+  if (!c.feeEstimatedAt)                                 throw new Error(FEE_STALE_MSG);
+  if (c.referralFee == null || c.referralFee <= 0)       throw new Error(FEE_STALE_MSG);
+  if (c.fbaFee      == null || c.fbaFee      <= 0)       throw new Error(FEE_STALE_MSG);
+  const status = getFeeStaleStatus({ feeEstimatedAt: c.feeEstimatedAt });
+  if (status !== 'FRESH')                                throw new Error(FEE_STALE_MSG);
+}
+
 // ─── certifyCandidate ─────────────────────────────────────────────────────────
 
 export async function certifyCandidate(
@@ -179,6 +200,10 @@ export async function certifyCandidate(
       certNotes:         true,
       productId:         true,
       targetLeadPurpose: true,
+      feeEstimateSource: true,
+      feeEstimatedAt:    true,
+      referralFee:       true,
+      fbaFee:            true,
     },
   });
 
@@ -211,6 +236,7 @@ export async function certifyCandidate(
   } else {
     assertEligible(candidate);
   }
+  assertFeesFresh(candidate);
 
   const { orgId, asin, title, brand, buyBoxPrice, estimatedProfit, estimatedRoi } = candidate;
   const leadPurpose = isStarterSales ? 'STARTER_SALES' : 'PROFIT';

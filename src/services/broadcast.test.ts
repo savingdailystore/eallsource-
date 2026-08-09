@@ -65,7 +65,10 @@ function makeSourceLead(overrides: Record<string, unknown> = {}) {
       inventoryScore: 75, validationPassed: true, autoUngated: false, ipRiskScore: 'LOW',
       gatingRisk: 'LOW', hasHazmat: false, isBrandRestricted: false, isCategoryGated: false,
       isPrivateLabel: false, isGenericBrand: false, isMeltable: false,
-      feeEstimateConfirmed: true, hasIpComplaintHistory: false, ipComplaintNote: null,
+      feeEstimateConfirmed: true,
+      // Phase 20.2M-1D-4: FRESH SP_API defaults so guard passes in all existing tests
+      feeEstimateSource: 'SP_API', feeEstimatedAt: new Date(), feeEstimatePrice: 20,
+      hasIpComplaintHistory: false, ipComplaintNote: null,
       demandLevel: 'HIGH', priceStability: 'STABLE', priceTrend: null, priceTrendPct: null,
       keepaLink: null, notes: null, score: 85,
     },
@@ -434,12 +437,14 @@ describe('copyLeadToOrg — copies fee metadata fields', () => {
     const feeEstimatedAt = new Date('2026-08-09T06:00:00Z');
     const priceCheckedAt = new Date('2026-08-09T06:00:00Z');
 
+    // feeEstimatePrice must be consistent with buyBoxPrice/estimatedResellPrice (20)
+    // so the price-change guard does not block the copy.
     const leadWithFeeData = makeSourceLead({
       product: {
         ...makeSourceLead().product,
         feeEstimateSource: 'SP_API',
         feeEstimatedAt,
-        feeEstimatePrice: 28.00,
+        feeEstimatePrice: 20,   // matches buyBoxPrice & estimatedResellPrice (0% change)
         priceCheckedAt,
       },
     });
@@ -452,31 +457,32 @@ describe('copyLeadToOrg — copies fee metadata fields', () => {
     const upsertCall = productUpsert.mock.calls[0][0];
     expect(upsertCall.create.feeEstimateSource).toBe('SP_API');
     expect(upsertCall.create.feeEstimatedAt).toStrictEqual(feeEstimatedAt);
-    expect(upsertCall.create.feeEstimatePrice).toBe(28.00);
+    expect(upsertCall.create.feeEstimatePrice).toBe(20);
     expect(upsertCall.create.priceCheckedAt).toStrictEqual(priceCheckedAt);
   });
 
-  it('copies null fee metadata fields (historical products with no fee audit data)', async () => {
+  it('skips (does not broadcast) products with null fee metadata — no Product/Lead/Entitlement created', async () => {
+    // Phase 20.2M-1D-4: null fee source → fee guard blocks broadcast.
+    // Previously this test verified null metadata was copied; with the guard it is skipped entirely.
     const leadNullFees = makeSourceLead({
       product: {
         ...makeSourceLead().product,
         feeEstimateSource: null,
-        feeEstimatedAt: null,
-        feeEstimatePrice: null,
-        priceCheckedAt: null,
+        feeEstimatedAt:    null,
+        feeEstimatePrice:  null,
+        priceCheckedAt:    null,
       },
     });
 
     leadFindMany.mockResolvedValue([leadNullFees]);
     orgFindMany.mockResolvedValue([{ id: 'cust-org-1', plan: 'PRO' }]);
 
-    await broadcastLeads('source-org', ['src-lead-1']);
+    const count = await broadcastLeads('source-org', ['src-lead-1']);
 
-    const upsertCall = productUpsert.mock.calls[0][0];
-    expect(upsertCall.create.feeEstimateSource).toBeNull();
-    expect(upsertCall.create.feeEstimatedAt).toBeNull();
-    expect(upsertCall.create.feeEstimatePrice).toBeNull();
-    expect(upsertCall.create.priceCheckedAt).toBeNull();
+    expect(count).toBe(0);
+    expect(productUpsert).not.toHaveBeenCalled();
+    expect(leadCreate).not.toHaveBeenCalled();
+    expect(entitlementUpsert).not.toHaveBeenCalled();
   });
 
   it('sourceTaxRate behavior from Phase 20.2M-1C is unchanged', async () => {
@@ -488,5 +494,151 @@ describe('copyLeadToOrg — copies fee metadata fields', () => {
     // sourceTaxRate is copied to both the product and the lead create data
     const upsertCall = productUpsert.mock.calls[0][0];
     expect(upsertCall.create).toHaveProperty('sourceTaxRate');
+  });
+});
+
+// ── Phase 20.2M-1D-4: Broadcast fee freshness guard ──────────────────────────
+
+describe('copyLeadToOrg / broadcastLeads — fee freshness guard (Phase 20.2M-1D-4)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    productUpsert.mockResolvedValue({ id: 'cust-prod-1', asin: 'B001BASIC01' });
+    leadFindFirst.mockResolvedValue(null);
+    leadCreate.mockResolvedValue({ id: 'cust-lead-1' });
+    leadUpdate.mockResolvedValue({});
+    entitlementUpsert.mockResolvedValue({});
+    entitlementFindMany.mockResolvedValue([]);
+    getWeeklyLeadUsageMock.mockResolvedValue(0);
+    allowedLeadTiersForPlanMock.mockReturnValue(['BASIC', 'PRO']);
+    brandBlockFindMany.mockResolvedValue([]);
+  });
+
+  function freshSpApiLead(productOverrides: Record<string, unknown> = {}) {
+    return makeSourceLead({
+      product: {
+        ...makeSourceLead().product,
+        feeEstimateSource: 'SP_API',
+        feeEstimatedAt:    new Date(),  // always FRESH
+        feeEstimatePrice:  20,
+        referralFee:       2,
+        fbaFee:            1,
+        ...productOverrides,
+      },
+    });
+  }
+
+  async function broadcastOne(productOverrides: Record<string, unknown> = {}) {
+    leadFindMany.mockResolvedValue([freshSpApiLead(productOverrides)]);
+    orgFindMany.mockResolvedValue([{ id: 'cust-org-1', plan: 'PRO' }]);
+    return broadcastLeads('source-org', ['src-lead-1']);
+  }
+
+  // ── Allowed ──
+
+  it('broadcasts when feeEstimateSource=SP_API, FRESH feeEstimatedAt, referralFee > 0, fbaFee > 0', async () => {
+    const count = await broadcastOne();
+    expect(count).toBe(1);
+    expect(productUpsert).toHaveBeenCalledOnce();
+    expect(leadCreate).toHaveBeenCalledOnce();
+    expect(entitlementUpsert).toHaveBeenCalledOnce();
+  });
+
+  it('still copies fee metadata fields to the recipient product when FRESH', async () => {
+    const feeEstimatedAt = new Date('2026-08-09T10:00:00Z');
+    const count = await broadcastOne({ feeEstimatedAt, feeEstimatePrice: 20, priceCheckedAt: feeEstimatedAt });
+    expect(count).toBe(1);
+    const upsertArg = productUpsert.mock.calls[0][0];
+    expect(upsertArg.create.feeEstimateSource).toBe('SP_API');
+    expect(upsertArg.create.feeEstimatePrice).toBe(20);
+  });
+
+  // ── Skipped ──
+
+  it('skips and creates 0 entitlements when feeEstimatedAt is null', async () => {
+    const count = await broadcastOne({ feeEstimatedAt: null });
+    expect(count).toBe(0);
+    expect(productUpsert).not.toHaveBeenCalled();
+    expect(leadCreate).not.toHaveBeenCalled();
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it('skips when feeEstimateSource is STATIC', async () => {
+    const count = await broadcastOne({ feeEstimateSource: 'STATIC' });
+    expect(count).toBe(0);
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it('skips when feeEstimateSource is null (missing)', async () => {
+    const count = await broadcastOne({ feeEstimateSource: null });
+    expect(count).toBe(0);
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it('skips when referralFee is null', async () => {
+    const count = await broadcastOne({ referralFee: null });
+    expect(count).toBe(0);
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it('skips when fbaFee is null', async () => {
+    const count = await broadcastOne({ fbaFee: null });
+    expect(count).toBe(0);
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it('skips when feeEstimatedAt is NEEDS_RECHECK (49 hours old)', async () => {
+    const staleAt = new Date(Date.now() - 49 * 60 * 60 * 1000);
+    const count = await broadcastOne({ feeEstimatedAt: staleAt });
+    expect(count).toBe(0);
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it('skips when feeEstimatedAt is STALE (8 days old)', async () => {
+    const staleAt = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    const count = await broadcastOne({ feeEstimatedAt: staleAt });
+    expect(count).toBe(0);
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it('skips when feeEstimatedAt is VERY_STALE (31 days old)', async () => {
+    const staleAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+    const count = await broadcastOne({ feeEstimatedAt: staleAt });
+    expect(count).toBe(0);
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it('skips when price moved >10% (feeEstimatePrice=20, buyBoxPrice=22.01)', async () => {
+    // (22.01 - 20) / 20 = 10.05% → NEEDS_RECHECK → skipped
+    const count = await broadcastOne({
+      feeEstimatePrice:    20,
+      estimatedResellPrice: null,
+      buyBoxPrice:         22.01,
+    });
+    expect(count).toBe(0);
+    expect(entitlementUpsert).not.toHaveBeenCalled();
+  });
+
+  it('does not skip when price moved exactly 10% (feeEstimatePrice=20, buyBoxPrice=22.00)', async () => {
+    // exactly 10% → FRESH → allowed
+    const count = await broadcastOne({
+      feeEstimatePrice:    20,
+      estimatedResellPrice: null,
+      buyBoxPrice:         22.00,
+    });
+    expect(count).toBe(1);
+    expect(entitlementUpsert).toHaveBeenCalledOnce();
+  });
+
+  it('does not create recipient Product or Lead when skipped', async () => {
+    const count = await broadcastOne({ feeEstimateSource: 'STATIC' });
+    expect(count).toBe(0);
+    expect(productUpsert).not.toHaveBeenCalled();
+    expect(leadCreate).not.toHaveBeenCalled();
+  });
+
+  it('sourceTaxRate behavior is unchanged — still copied on FRESH leads', async () => {
+    await broadcastOne();
+    const upsertArg = productUpsert.mock.calls[0][0];
+    expect(upsertArg.create).toHaveProperty('sourceTaxRate');
   });
 });

@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import { normalizeBrand } from '@/lib/brand';
 import type { Lead, Product } from '@prisma/client';
+import { getFeeStaleStatus } from '@/engines/feeStaleStatus';
 import { PLAN_LIMITS } from '@/types';
 import type { Plan } from '@/types';
 import {
@@ -25,9 +26,34 @@ import {
 type LeadWithProduct = Lead & { product: Product };
 
 // Copy a single source lead's product + lead into a target org (upsert).
-// Returns the id of the customer org's lead row (new or existing).
-export async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct): Promise<string> {
+// Returns the customer org's lead id, or null if the lead is skipped because
+// the source product's Amazon fee estimate is not FRESH SP_API.
+export async function copyLeadToOrg(targetOrgId: string, lead: LeadWithProduct): Promise<string | null> {
   const p = lead.product;
+
+  // ── Fee freshness guard ───────────────────────────────────────────────────────
+  // Require a FRESH SP_API estimate with both fees > 0 before distributing.
+  // Uses feeEstimatePrice vs current resell price so a >10% price shift also blocks.
+  const currentResellPrice = p.estimatedResellPrice ?? p.buyBoxPrice ?? null;
+  const feePrecheck =
+    p.feeEstimateSource === 'SP_API' &&
+    p.feeEstimatedAt    != null       &&
+    p.referralFee       != null && (p.referralFee as number) > 0 &&
+    p.fbaFee            != null && (p.fbaFee      as number) > 0;
+
+  const feeStatus = feePrecheck
+    ? getFeeStaleStatus({
+        feeEstimatedAt:     p.feeEstimatedAt,
+        feeEstimatePrice:   p.feeEstimatePrice   ?? null,
+        currentResellPrice,
+      })
+    : 'VERY_STALE';
+
+  if (feeStatus !== 'FRESH') {
+    console.log(`[broadcast] skip lead ${lead.id} (asin=${p.asin}): Amazon fee status ${feeStatus} — requires FRESH SP_API estimate`);
+    return null;
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const productData = {
     asin:              p.asin,
@@ -198,6 +224,7 @@ export async function broadcastLeads(sourceOrgId: string, leadIds: string[]): Pr
       if (newThisRun >= slots) break;
 
       const copiedLeadId = await copyLeadToOrg(org.id, lead);
+      if (copiedLeadId === null) continue; // stale fee estimate — already logged
 
       if (alreadyEntitled.has(copiedLeadId)) {
         // Org already has this lead from a previous drop or backfill — skip without
@@ -280,6 +307,7 @@ export async function backfillOrgFromSource(targetOrgId: string): Promise<number
   let count = 0;
   for (const lead of eligibleLeads) {
     const copiedLeadId = await copyLeadToOrg(targetOrgId, lead);
+    if (copiedLeadId === null) continue; // stale fee estimate — skip without entitlement
 
     await prisma.leadEntitlement.upsert({
       where:  { orgId_leadId: { orgId: targetOrgId, leadId: copiedLeadId } },

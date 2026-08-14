@@ -27,7 +27,7 @@ const COLUMN_ALIASES: Record<keyof CandidateRow, string[]> = {
   title:          ['title', 'productname', 'name', 'itemname', 'description'],
   asin:           ['asin', 'amazonasin'],
   upc:            ['upc', 'barcode', 'gtin'],
-  retailerItemId: ['retaileritemid', 'retailer_item_id', 'itemid', 'walmart_item_id', 'dpci'],
+  retailerItemId: ['retaileritemid', 'retailer_item_id', 'itemid', 'walmart_item_id', 'dpci', 'tcin', 'target_item_id'],
   brand:          ['brand', 'manufacturer'],
   sourceListPrice:['sourcelistprice', 'source_list_price', 'listprice', 'wasprice', 'originalprice'],
   onSale:         ['onsale', 'on_sale', 'sale', 'clearance', 'rollback'],

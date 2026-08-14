@@ -434,8 +434,9 @@ describe('copyLeadToOrg — copies fee metadata fields', () => {
   });
 
   it('copies feeEstimateSource, feeEstimatedAt, feeEstimatePrice, priceCheckedAt to target product', async () => {
-    const feeEstimatedAt = new Date('2026-08-09T06:00:00Z');
-    const priceCheckedAt = new Date('2026-08-09T06:00:00Z');
+    // Use a relative timestamp so this stays within the FRESH window regardless of when the test runs.
+    const feeEstimatedAt = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago — always FRESH
+    const priceCheckedAt = new Date(Date.now() - 60 * 60 * 1000);
 
     // feeEstimatePrice must be consistent with buyBoxPrice/estimatedResellPrice (20)
     // so the price-change guard does not block the copy.
@@ -544,7 +545,8 @@ describe('copyLeadToOrg / broadcastLeads — fee freshness guard (Phase 20.2M-1D
   });
 
   it('still copies fee metadata fields to the recipient product when FRESH', async () => {
-    const feeEstimatedAt = new Date('2026-08-09T10:00:00Z');
+    // Use a relative timestamp so this stays within the FRESH window regardless of when the test runs.
+    const feeEstimatedAt = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago — always FRESH
     const count = await broadcastOne({ feeEstimatedAt, feeEstimatePrice: 20, priceCheckedAt: feeEstimatedAt });
     expect(count).toBe(1);
     const upsertArg = productUpsert.mock.calls[0][0];

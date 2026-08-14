@@ -8,7 +8,7 @@ import {
   LayoutDashboard, TrendingUp, Package, BarChart3,
   RefreshCw, Link2, CreditCard, Settings,
   LogOut, ChevronRight, Zap, Radar, ShieldCheck, ShoppingCart, DollarSign,
-  Menu, X, LifeBuoy, ShieldAlert, SquareTerminal, Inbox,
+  Menu, X, LifeBuoy, ShieldAlert, SquareTerminal, Inbox, Calculator,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { showAdminNav } from '@/lib/nav-auth';
@@ -37,9 +37,10 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { label: 'Admin Dashboard',  href: '/dashboard/admin',              icon: SquareTerminal },
-  { label: 'Brand Blocklist',  href: '/dashboard/admin/brand-blocks', icon: ShieldAlert },
-  { label: 'Candidate Queue',  href: '/dashboard/admin/candidates',   icon: Inbox },
+  { label: 'Admin Dashboard',  href: '/dashboard/admin',                        icon: SquareTerminal },
+  { label: 'Brand Blocklist',  href: '/dashboard/admin/brand-blocks',           icon: ShieldAlert },
+  { label: 'Candidate Queue',  href: '/dashboard/admin/candidates',             icon: Inbox },
+  { label: 'Fee Preview',      href: '/dashboard/admin/tools/fee-preview',      icon: Calculator },
 ];
 
 const BOTTOM_NAV: NavItem[] = [

@@ -43,7 +43,7 @@ export default function RegisterPage() {
 
     const { signIn } = await import('next-auth/react');
     await signIn('credentials', { email, password, redirect: false });
-    router.push('/dashboard');
+    router.push('/dashboard?welcome=1');
   }
 
   return (

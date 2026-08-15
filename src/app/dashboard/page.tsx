@@ -22,7 +22,7 @@ import Link from 'next/link';
 import {
   TrendingUp, Package, Wallet, RefreshCw, ShieldCheck,
   ShoppingCart, ArrowUpRight, Flame, CheckCircle2, Clock,
-  AlertTriangle, BarChart3, DollarSign, CalendarClock,
+  AlertTriangle, BarChart3, DollarSign, CalendarClock, PartyPopper, X,
 } from 'lucide-react';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -30,13 +30,18 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Dashboard' };
 
-export default async function DashboardPage() {
-  const session = await auth();
-  const orgId   = session!.user.orgId;
-  const role    = session!.user.role;
-  const plan    = session!.user.plan;
-  const isOwner = role === 'OWNER';
-  const isPro   = plan === 'PRO' || plan === 'ENTERPRISE';
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
+  const [session, sp] = await Promise.all([auth(), searchParams]);
+  const orgId       = session!.user.orgId;
+  const role        = session!.user.role;
+  const plan        = session!.user.plan;
+  const isOwner     = role === 'OWNER';
+  const isPro       = plan === 'PRO' || plan === 'ENTERPRISE';
+  const showWelcome = sp.welcome === '1' && !isOwner;
 
   const currentOrg = await prisma.organization.findUnique({
     where:  { id: orgId },
@@ -470,6 +475,42 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+
+      {/* ── First-arrival welcome card (shows once via ?welcome=1 from registration) ── */}
+      {showWelcome && (
+        <section className="card p-5 border-green-500/30 bg-green-500/5">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+              <PartyPopper className="w-5 h-5 text-green-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-slate-50 text-sm">Your account is ready</p>
+              <p className="text-sm text-slate-400 mt-1 leading-relaxed">
+                EALLsource delivers curated sourcing leads weekly on Monday at 6:00 AM Arizona time.
+                Your first drop will appear in your Lead Feed. Follow the checklist below to finish setup.
+              </p>
+              <div className="flex flex-wrap items-center gap-4 mt-3">
+                <Link href="/dashboard/leads" className="text-xs font-medium text-green-400 hover:text-green-300 transition-colors">
+                  View Lead Feed →
+                </Link>
+                <Link href="/dashboard/amazon" className="text-xs font-medium text-green-400 hover:text-green-300 transition-colors">
+                  Connect Amazon for Pro tools →
+                </Link>
+                <Link href="/dashboard/help" className="text-xs font-medium text-green-400 hover:text-green-300 transition-colors">
+                  Read Help Guide →
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="ml-auto flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  Got it
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Page header ── */}
       <div className="page-header">

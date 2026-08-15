@@ -92,6 +92,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             validationPassed: true, identityScore: true, urlScore: true,
             priceScore: true, inventoryScore: true,
             feeEstimatedAt: true, feeEstimateSource: true, feeEstimatePrice: true,
+            referralFee: true, fbaFee: true,
           },
         },
       },

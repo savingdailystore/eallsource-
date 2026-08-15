@@ -440,6 +440,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   feeEstimatedAt={p.feeEstimatedAt}
                   feeEstimatePrice={p.feeEstimatePrice}
                   currentResellPrice={p.lowestFbaPrice}
+                  referralFee={p.referralFee}
+                  fbaFee={p.fbaFee}
                 />
               </div>
             </div>

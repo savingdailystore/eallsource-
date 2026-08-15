@@ -15,6 +15,8 @@ interface FeeFreshnessBadgeProps {
   feeEstimatedAt?:     Date | string | null;
   feeEstimatePrice?:   number | null;
   currentResellPrice?: number | null;
+  referralFee?:        number | null;
+  fbaFee?:             number | null;
 }
 
 export function FeeFreshnessBadge({
@@ -22,12 +24,16 @@ export function FeeFreshnessBadge({
   feeEstimatedAt,
   feeEstimatePrice,
   currentResellPrice,
+  referralFee,
+  fbaFee,
 }: FeeFreshnessBadgeProps) {
   const status = resolveFeeFreshnessStatus({
     feeEstimateSource,
     feeEstimatedAt,
     feeEstimatePrice,
     currentResellPrice,
+    referralFee,
+    fbaFee,
   });
   const { label, cls } = CONFIG[status];
   return (

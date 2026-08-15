@@ -67,6 +67,8 @@ export interface LeadRow {
     feeEstimatedAt?: Date | string | null;
     feeEstimateSource?: string | null;
     feeEstimatePrice?: number | null;
+    referralFee?: number | null;
+    fbaFee?: number | null;
   };
 }
 
@@ -445,6 +447,8 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = fa
                           feeEstimatedAt={p.feeEstimatedAt}
                           feeEstimatePrice={p.feeEstimatePrice}
                           currentResellPrice={p.lowestFbaPrice}
+                          referralFee={p.referralFee}
+                          fbaFee={p.fbaFee}
                         />
                       </td>
 

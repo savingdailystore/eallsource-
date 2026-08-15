@@ -13,6 +13,7 @@ import { discountUrl } from '@/lib/discount-urls';
 import { scoreLabel } from '@/engines/scoring';
 import { ungatingOutlook } from '@/engines/gating';
 import type { Discount, Plan } from '@/types';
+import { FeeFreshnessBadge } from './FeeFreshnessBadge';
 
 export interface LeadRow {
   id: string;
@@ -63,6 +64,9 @@ export interface LeadRow {
     urlScore?: number | null;
     priceScore?: number | null;
     inventoryScore?: number | null;
+    feeEstimatedAt?: Date | string | null;
+    feeEstimateSource?: string | null;
+    feeEstimatePrice?: number | null;
   };
 }
 
@@ -435,7 +439,13 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = fa
 
                       {/* Amazon Fees */}
                       <td className="table-td text-right text-xs text-slate-300">
-                        {p.amazonFees != null ? formatCurrency(p.amazonFees) : '—'}
+                        <div>{p.amazonFees != null ? formatCurrency(p.amazonFees) : '—'}</div>
+                        <FeeFreshnessBadge
+                          feeEstimateSource={p.feeEstimateSource}
+                          feeEstimatedAt={p.feeEstimatedAt}
+                          feeEstimatePrice={p.feeEstimatePrice}
+                          currentResellPrice={p.lowestFbaPrice}
+                        />
                       </td>
 
                       {/* Profit */}

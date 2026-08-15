@@ -12,6 +12,7 @@ import {
 import Link from 'next/link';
 import type { Discount } from '@/types';
 import { ProfitabilityCalculator } from '@/components/leads/ProfitabilityCalculator';
+import { FeeFreshnessBadge } from '@/components/leads/FeeFreshnessBadge';
 import { LeadNotes } from '@/components/leads/LeadNotes';
 import { IpHistoryFlag } from '@/components/leads/IpHistoryFlag';
 import { ProductHero } from '@/components/leads/ProductHero';
@@ -432,6 +433,15 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   <span className={`text-sm font-medium ${good ? 'text-green-400' : 'text-red-400'}`}>{value as string}</span>
                 </div>
               ))}
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-sm text-slate-400">Fee Freshness</span>
+                <FeeFreshnessBadge
+                  feeEstimateSource={p.feeEstimateSource}
+                  feeEstimatedAt={p.feeEstimatedAt}
+                  feeEstimatePrice={p.feeEstimatePrice}
+                  currentResellPrice={p.lowestFbaPrice}
+                />
+              </div>
             </div>
           </div>
         </div>

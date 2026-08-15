@@ -22,7 +22,7 @@ import Link from 'next/link';
 import {
   TrendingUp, Package, Wallet, RefreshCw, ShieldCheck,
   ShoppingCart, ArrowUpRight, Flame, CheckCircle2, Clock,
-  AlertTriangle, BarChart3, DollarSign,
+  AlertTriangle, BarChart3, DollarSign, CalendarClock,
 } from 'lucide-react';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -484,6 +484,35 @@ export default async function DashboardPage() {
           View lead feed
         </Link>
       </div>
+
+      {/* ── Welcome banner — new non-owner customers with no leads and no Amazon connection ── */}
+      {!isOwner && leadsRaw.length === 0 && !amazonConnected && (
+        <section className="card p-5 border-blue-500/30 bg-blue-500/5">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+              <CalendarClock className="w-5 h-5 text-blue-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-slate-50 text-sm">Welcome to EALLsource</p>
+              <p className="text-sm text-slate-400 mt-1 leading-relaxed">
+                Leads are delivered weekly on Monday at 6:00 AM Arizona time. While you wait for your first drop,
+                review the Lead Feed, connect Amazon if you use Pro tools, and read the Help guide.
+              </p>
+              <div className="flex flex-wrap gap-3 mt-3">
+                <Link href="/dashboard/leads" className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">
+                  Lead Feed →
+                </Link>
+                <Link href="/dashboard/amazon" className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">
+                  Connect Amazon (Pro) →
+                </Link>
+                <Link href="/dashboard/help" className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">
+                  Help guide →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Getting Started Checklist ── */}
       {!allDone && (

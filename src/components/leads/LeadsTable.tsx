@@ -310,17 +310,33 @@ export function LeadsTable({ leads, total, page, pageSize, orgPlan, isOwner = fa
         <div className="card py-16 text-center">
           <TrendingUp className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <p className="text-slate-200 font-semibold text-lg mb-1">No leads yet</p>
-          <p className="text-sm text-slate-400 max-w-sm mx-auto mb-6">
-            Run a scan or check your scanner access to start finding product opportunities.
-          </p>
-          <div className="flex items-center justify-center gap-3 flex-wrap">
-            <Link href="/dashboard/scanner" className="btn-primary text-sm">
-              Go to Scanner →
-            </Link>
-            <Link href="/contact" className="btn-secondary text-sm">
-              Help &amp; Support
-            </Link>
-          </div>
+          {isOwner ? (
+            <>
+              <p className="text-sm text-slate-400 max-w-sm mx-auto mb-6">
+                Run a scan or check your scanner access to start finding product opportunities.
+              </p>
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                <Link href="/dashboard/scanner" className="btn-primary text-sm">
+                  Go to Scanner →
+                </Link>
+                <Link href="/contact" className="btn-secondary text-sm">
+                  Help &amp; Support
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-400 max-w-md mx-auto mb-2">
+                Your lead feed is waiting for the next drop. New leads are delivered weekly on Monday at 6:00 AM Arizona time.
+              </p>
+              <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
+                When a lead is available, you&apos;ll see the product, source price, Amazon price, estimated profit, ROI, and risk notes here.
+              </p>
+              <Link href="/dashboard/help" className="btn-secondary text-sm">
+                Help &amp; Support
+              </Link>
+            </>
+          )}
         </div>
       );
     }

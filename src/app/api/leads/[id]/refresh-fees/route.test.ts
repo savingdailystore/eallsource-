@@ -1,9 +1,10 @@
 /**
- * Phase 20.2M-1D-6B — Lead Fee Refresh Endpoint Tests
+ * Phase 20.2M-1D-6B/6C — Lead Fee Refresh Endpoint Tests
  *
  * Tests POST /api/leads/[id]/refresh-fees.
  * All external I/O (auth, prisma, SP-API, rate-limit) is mocked with
  * explicit factory functions to avoid loading real next-auth/prisma modules.
+ * calculateProfitability is NOT mocked — it is a pure function with no I/O.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -42,15 +43,42 @@ const OWNER_SESSION = {
   user: { id: 'user-1', orgId: 'org-1', role: 'OWNER', plan: 'PRO', email: 'owner@example.com' },
 };
 
+// Base product includes all fields now selected by the route (Phase 6C expansion).
+// sourcePrice present → triggers full recalculation path by default.
 const PRODUCT = {
   id:             'product-1',
   orgId:          'org-1',
   asin:           'B001234567',
   lowestFbaPrice: 29.99,
   buyBoxPrice:    31.00,
+  sourcePrice:    25.00,
+  sourceTaxRate:  null,      // → defaults to 0.0875 in engine
+  storageFee:     0.50,
+  prepFee:        1.50,
+  category:       'Electronics',
 };
 
 const FRESH_FEES = { referralFee: 3.00, fbaFee: 4.50 };
+
+// Pre-computed from calculateProfitability with PRODUCT + FRESH_FEES:
+//   referralFee  = 3.00  (SP-API rate)
+//   fbaFee       = 4.50  (SP-API)
+//   storageFee   = 0.50  (stored)
+//   prepFee      = 1.50  (stored)
+//   taxAmount    = 25.00 * 0.0875 = 2.1875
+//   amazonFees   = 3.00 + 4.50 + 0.50 = 8.00
+//   fees (total) = 8.00 + 1.50 + 2.1875 = 11.6875
+//   finalCost    = 25.00 (no discounts)
+//   totalLandedCost = 25.00
+//   profit       = 29.99 - 11.6875 - 25.00 = -6.6975
+const EXPECTED_AMAZON_FEES      = 3.00 + 4.50 + 0.50;           // 8.00
+const EXPECTED_TAX_AMOUNT       = 25.00 * 0.0875;               // 2.1875
+const EXPECTED_FEES_COL         = EXPECTED_AMAZON_FEES + 1.50 + EXPECTED_TAX_AMOUNT;
+const EXPECTED_TOTAL_LANDED     = 25.00;
+const EXPECTED_FINAL_COST       = 25.00;
+const EXPECTED_PROFIT           = 29.99 - EXPECTED_FEES_COL - EXPECTED_TOTAL_LANDED;
+const EXPECTED_ROI              = (EXPECTED_PROFIT / EXPECTED_TOTAL_LANDED) * 100;
+const EXPECTED_MARGIN           = (EXPECTED_PROFIT / 29.99) * 100;
 
 function makeReq(body?: object): NextRequest {
   return new NextRequest('http://localhost/api/leads/lead-1/refresh-fees', {
@@ -191,7 +219,6 @@ describe('resell price resolution', () => {
 
   it('does not accept or use a price from the request body', async () => {
     await POST(makeReq({ price: 999.99 }), makeCtx());
-    // Must use stored lowestFbaPrice, not the client-supplied value
     expect(mockGetFeeEstimate).toHaveBeenCalledWith('org-1', 'B001234567', 29.99);
     expect(mockGetFeeEstimate).not.toHaveBeenCalledWith(
       expect.anything(), expect.anything(), 999.99
@@ -227,28 +254,20 @@ describe('SP-API behavior', () => {
   });
 });
 
-// ─── 6. Success behavior ─────────────────────────────────────────────────────
+// ─── 6. Full success (Phase 6C — recalculation) ──────────────────────────────
 
-describe('success behavior', () => {
-  it('returns REFRESHED on success', async () => {
+describe('full success behavior (sourcePrice present)', () => {
+  it('returns REFRESHED with profitUpdated: true', async () => {
     const res = await POST(makeReq(), makeCtx());
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ ok: true, status: 'REFRESHED' });
+    expect(body).toEqual({ ok: true, status: 'REFRESHED', profitUpdated: true });
   });
 
-  it('updates only the allowed fee metadata fields on Product with org-scoped where clause', async () => {
+  it('writes fee metadata with org-scoped where clause', async () => {
     await POST(makeReq(), makeCtx());
-    expect(mockProductUpdateMany).toHaveBeenCalledTimes(1);
-    const call = mockProductUpdateMany.mock.calls[0][0] as {
-      where: Record<string, unknown>;
-      data:  Record<string, unknown>;
-    };
-
-    // Where clause must be double-keyed
+    const call = mockProductUpdateMany.mock.calls[0][0] as { where: Record<string, unknown>; data: Record<string, unknown> };
     expect(call.where).toMatchObject({ id: 'product-1', orgId: 'org-1' });
-
-    // Exactly these 6 fields — no more
     expect(call.data.referralFee).toBe(3.00);
     expect(call.data.fbaFee).toBe(4.50);
     expect(call.data.feeEstimateSource).toBe('SP_API');
@@ -257,31 +276,131 @@ describe('success behavior', () => {
     expect(call.data.feeEstimatedAt).toBeInstanceOf(Date);
   });
 
-  it('does not update profit, roi, margin, amazonFees, buyBoxPrice, lowestFbaPrice, priceCheckedAt, storageFee, prepFee, or taxAmount', async () => {
+  it('computes amazonFees = referralFee + fbaFee + storageFee (includes storageFee)', async () => {
+    await POST(makeReq(), makeCtx());
+    const data = mockProductUpdateMany.mock.calls[0][0].data as Record<string, unknown>;
+    expect(data.amazonFees).toBeCloseTo(EXPECTED_AMAZON_FEES, 6); // 8.00
+  });
+
+  it('computes fees column = amazonFees + prepFee + taxAmount', async () => {
+    await POST(makeReq(), makeCtx());
+    const data = mockProductUpdateMany.mock.calls[0][0].data as Record<string, unknown>;
+    expect(data.fees).toBeCloseTo(EXPECTED_FEES_COL, 6);
+  });
+
+  it('writes recalculated profit, roi, margin as numbers', async () => {
+    await POST(makeReq(), makeCtx());
+    const data = mockProductUpdateMany.mock.calls[0][0].data as Record<string, unknown>;
+    expect(typeof data.profit).toBe('number');
+    expect(typeof data.roi).toBe('number');
+    expect(typeof data.margin).toBe('number');
+    expect(data.profit).toBeCloseTo(EXPECTED_PROFIT, 6);
+    expect(data.roi).toBeCloseTo(EXPECTED_ROI, 4);
+    expect(data.margin).toBeCloseTo(EXPECTED_MARGIN, 4);
+  });
+
+  it('writes finalCost and totalLandedCost from the engine', async () => {
+    await POST(makeReq(), makeCtx());
+    const data = mockProductUpdateMany.mock.calls[0][0].data as Record<string, unknown>;
+    expect(data.finalCost).toBeCloseTo(EXPECTED_FINAL_COST, 6);
+    expect(data.totalLandedCost).toBeCloseTo(EXPECTED_TOTAL_LANDED, 6);
+    expect(data.taxAmount).toBeCloseTo(EXPECTED_TAX_AMOUNT, 6);
+  });
+
+  it('uses stored storageFee from product (not a hardcoded default) in amazonFees', async () => {
+    // storageFee=1.00 → amazonFees should be 3.00 + 4.50 + 1.00 = 8.50
+    mockLeadFindFirst.mockResolvedValue({
+      product: { ...PRODUCT, storageFee: 1.00 },
+    });
+    await POST(makeReq(), makeCtx());
+    const data = mockProductUpdateMany.mock.calls[0][0].data as Record<string, unknown>;
+    expect(data.amazonFees).toBeCloseTo(3.00 + 4.50 + 1.00, 6);
+  });
+
+  it('defaults storageFee to 0.50 and prepFee to 1.50 when stored values are null', async () => {
+    mockLeadFindFirst.mockResolvedValue({
+      product: { ...PRODUCT, storageFee: null, prepFee: null },
+    });
+    await POST(makeReq(), makeCtx());
+    const data = mockProductUpdateMany.mock.calls[0][0].data as Record<string, unknown>;
+    // amazonFees = 3.00 + 4.50 + 0.50 = 8.00
+    expect(data.amazonFees).toBeCloseTo(8.00, 6);
+  });
+
+  it('uses sourceTaxRate from product when present', async () => {
+    // taxRate 0.10 → taxAmount = 25.00 * 0.10 = 2.50
+    mockLeadFindFirst.mockResolvedValue({
+      product: { ...PRODUCT, sourceTaxRate: '0.1000' },
+    });
+    await POST(makeReq(), makeCtx());
+    const data = mockProductUpdateMany.mock.calls[0][0].data as Record<string, unknown>;
+    expect(data.taxAmount).toBeCloseTo(25.00 * 0.10, 6);
+  });
+
+  it('does not return fee or profitability amounts in the response body', async () => {
+    const res = await POST(makeReq(), makeCtx());
+    const body = await res.json();
+    for (const field of ['referralFee', 'fbaFee', 'amazonFees', 'profit', 'roi', 'margin', 'storageFee']) {
+      expect(body, `response must not include ${field}`).not.toHaveProperty(field);
+    }
+  });
+
+  it('does not update forbidden fields', async () => {
     await POST(makeReq(), makeCtx());
     const data = mockProductUpdateMany.mock.calls[0][0].data as Record<string, unknown>;
     for (const forbidden of [
-      'profit', 'roi', 'margin', 'amazonFees',
-      'buyBoxPrice', 'lowestFbaPrice', 'priceCheckedAt',
-      'storageFee', 'prepFee', 'taxAmount',
+      'storageFee', 'prepFee',
+      'sourcePrice', 'sourceTaxRate',
+      'buyBoxPrice', 'lowestFbaPrice',
+      'priceCheckedAt', 'freshnessStatus',
+      'estimatedResellPrice',
     ]) {
       expect(data, `data.${forbidden} must not be set`).not.toHaveProperty(forbidden);
     }
   });
 
-  it('does not return fee amounts in the response body', async () => {
-    const res = await POST(makeReq(), makeCtx());
-    const body = await res.json();
-    for (const field of ['referralFee', 'fbaFee', 'amazonFees', 'feeEstimatePrice', 'storageFee']) {
-      expect(body, `response must not include ${field}`).not.toHaveProperty(field);
-    }
+  it('does not call lead.update — Lead is read-only throughout', async () => {
+    await POST(makeReq(), makeCtx());
+    expect(mockLeadFindFirst).toHaveBeenCalledTimes(1);
+    expect(mockProductUpdateMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── 7. Fees-only fallback (sourcePrice null) ────────────────────────────────
+
+describe('fees-only fallback (sourcePrice null)', () => {
+  beforeEach(() => {
+    mockLeadFindFirst.mockResolvedValue({
+      product: { ...PRODUCT, sourcePrice: null },
+    });
   });
 
-  it('does not call lead.update, and only calls lead.findFirst once (read-only on Lead)', async () => {
+  it('returns REFRESHED_FEES_ONLY with profitUpdated: false and warning', async () => {
+    const res = await POST(makeReq(), makeCtx());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      ok:           true,
+      status:       'REFRESHED_FEES_ONLY',
+      profitUpdated: false,
+      warning:      'MISSING_SOURCE_PRICE',
+    });
+  });
+
+  it('writes only the 6 fee metadata fields — no profit/roi/margin/amazonFees', async () => {
     await POST(makeReq(), makeCtx());
-    // lead.findFirst was called once (read), never updated
-    expect(mockLeadFindFirst).toHaveBeenCalledTimes(1);
-    // No lead or entitlement write mock was registered — confirms no such call
-    expect(mockProductUpdateMany).toHaveBeenCalledTimes(1); // only product write
+    expect(mockProductUpdateMany).toHaveBeenCalledTimes(1);
+    const data = mockProductUpdateMany.mock.calls[0][0].data as Record<string, unknown>;
+    // Fee metadata fields present
+    expect(data.referralFee).toBe(3.00);
+    expect(data.fbaFee).toBe(4.50);
+    expect(data.feeEstimateSource).toBe('SP_API');
+    expect(data.feeEstimatePrice).toBe(29.99);
+    expect(data.feeEstimateConfirmed).toBe(true);
+    expect(data.feeEstimatedAt).toBeInstanceOf(Date);
+    // Recalculation fields absent
+    for (const absent of ['profit', 'roi', 'margin', 'amazonFees', 'fees', 'finalCost', 'totalLandedCost', 'taxAmount']) {
+      expect(data, `data.${absent} must not be set`).not.toHaveProperty(absent);
+    }
   });
 });

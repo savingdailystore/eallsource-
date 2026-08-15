@@ -2,7 +2,7 @@ import Link from 'next/link';
 import {
   LifeBuoy, Zap, Link2, Radar, TrendingUp,
   BarChart3, ShoppingCart, DollarSign, ShieldCheck,
-  RefreshCw, CreditCard, ChevronRight,
+  RefreshCw, CreditCard, ChevronRight, PackageSearch,
 } from 'lucide-react';
 
 export const metadata = { title: 'Help & Support' };
@@ -24,6 +24,42 @@ const SECTIONS: FAQSection[] = [
     title: 'Getting Started',
     items: [
       {
+        q: 'What do I need before I can use EALLsource?',
+        a: (
+          <>
+            <p>Starter accounts can review curated leads in the Lead Feed immediately after signup — no Amazon account required to browse leads.</p>
+            <p className="mt-2">To act on FBA opportunities, you should have an active Amazon Professional Seller account with FBA enabled. Pro tools — including Amazon SP-API connection, inventory sync, sales and profit tracking, and repricing — all require that connection.</p>
+            <p className="mt-2">Amazon account approval, category restrictions, brand gating, and seller eligibility are controlled entirely by Amazon, not EALLsource. EALLsource cannot grant or remove Amazon selling permissions.</p>
+          </>
+        ),
+      },
+      {
+        q: 'What is a lead and how is profit estimated?',
+        a: (
+          <>
+            <p>A lead is a sourced product opportunity — a specific item available at a source retailer (such as Walmart or Target) that may be resellable on Amazon FBA at a profit.</p>
+            <p className="mt-2">Profit estimates use: source cost, source tax rate, Amazon resale price (buy-box at time of validation), Amazon referral fee, and FBA fulfillment fee. EALLsource validates leads against live Amazon pricing and SP-API fee data where available.</p>
+            <p className="mt-2">Estimates are snapshots taken at the time of validation. They are not guarantees of future profit. Prices, fees, and product availability change — always verify current economics before purchasing inventory.</p>
+          </>
+        ),
+      },
+      {
+        q: 'Why can my ROI or profit change after a lead is delivered?',
+        a: (
+          <>
+            <p>Several factors can shift the economics of a lead after it is delivered:</p>
+            <ul className="list-disc pl-4 space-y-1 mt-2 text-slate-400 text-xs">
+              <li>Amazon buy-box price can rise or fall; the seller holding the buy box can change.</li>
+              <li>Amazon referral fees and FBA fees are subject to Amazon rate changes.</li>
+              <li>Source price, availability, or applicable taxes may differ from the validated snapshot.</li>
+              <li>A product can become gated, brand-restricted, or hazmat-flagged after validation.</li>
+              <li>Amazon Retail (1P) can enter or re-enter a listing and suppress the 3P buy box.</li>
+            </ul>
+            <p className="mt-2">Always re-check SellerAmp, the Amazon Seller App, and the EALLsource Fee Preview tool before purchasing inventory. Do not buy based solely on the lead estimate.</p>
+          </>
+        ),
+      },
+      {
         q: 'What should I do first?',
         a: 'Follow the Getting Started checklist on your dashboard. The recommended order is: connect Amazon, add inventory, explore leads, then import sales reports. Configure repricing last — only after inventory costs and Amazon data are confirmed.',
       },
@@ -34,6 +70,28 @@ const SECTIONS: FAQSection[] = [
       {
         q: 'Why do I see a Getting Started checklist?',
         a: 'The checklist guides you through the setup sequence in the right order. Each step unlocks the next. You can dismiss individual items as you complete them.',
+      },
+    ],
+  },
+  {
+    icon:  PackageSearch,
+    title: 'Buying Inventory',
+    items: [
+      {
+        q: 'What should I check before buying inventory from a lead?',
+        a: (
+          <>
+            <p>Before purchasing any inventory based on a lead, confirm all of the following:</p>
+            <ul className="list-disc pl-4 space-y-1 mt-2 text-slate-400 text-xs">
+              <li><strong className="text-slate-300">Exact product match</strong> — confirm UPC, title, size, count, flavor, and pack exactly match the Amazon listing. A different pack size or count is a different product.</li>
+              <li><strong className="text-slate-300">Selling eligibility</strong> — confirm you are approved to sell this ASIN in Amazon Seller Central. Check gating status in SellerAmp or the Amazon Seller App.</li>
+              <li><strong className="text-slate-300">Active buy box</strong> — confirm the buy box is active and not suppressed. A suppressed buy box means you cannot compete for the sale.</li>
+              <li><strong className="text-slate-300">Amazon Retail presence</strong> — confirm Amazon (1P) is not holding the buy box or listed as a competing seller at a price at or below the buy box. Amazon Retail can reclaim the buy box at any time.</li>
+              <li><strong className="text-slate-300">Current economics</strong> — re-run the EALLsource Fee Preview with today&apos;s source cost and current buy-box price. Confirm estimated profit and ROI still meet your thresholds.</li>
+              <li><strong className="text-slate-300">For in-store clearance</strong> — keep your receipt and photograph the front label, back label/UPC, and clearance sticker before leaving the store. Evidence is required to import a clearance candidate.</li>
+            </ul>
+          </>
+        ),
       },
     ],
   },

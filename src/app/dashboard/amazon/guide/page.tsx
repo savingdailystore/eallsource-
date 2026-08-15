@@ -75,7 +75,7 @@ export default function SpApiGuidePage() {
             Click the <strong className="text-slate-100">Connect with Amazon</strong> button.
           </p>
           <Note>
-            Only the account Owner can connect or reconnect Amazon. If you are a team member, ask your account owner to complete this step.
+            Only account owners and admins can connect or reconnect Amazon. If you are a team member, ask your account owner or admin to complete this step.
           </Note>
         </Step>
 

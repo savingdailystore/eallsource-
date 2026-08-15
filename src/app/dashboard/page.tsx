@@ -317,8 +317,8 @@ export default async function DashboardPage() {
   const gettingStarted = [
     {
       key:       'plan',
-      title:     'Choose your plan',
-      desc:      'Upgrade to Pro to unlock Sales & Profit Tracking, Profit Recovery, and Repricing.',
+      title:     'Explore Pro features',
+      desc:      'Pro ($50/mo) adds Amazon SP-API, Sales & Profit Tracking, Profit Recovery, and Repricing. Starter is fully usable without upgrading.',
       done:      isPro,
       href:      '/dashboard/billing',
       linkLabel: 'View plans',
@@ -475,7 +475,9 @@ export default async function DashboardPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Business Intelligence</h1>
-          <p className="page-subtitle">Your full workflow at a glance.</p>
+          <p className="page-subtitle">
+            {!allDone ? 'Set up your account — then your workflow appears here.' : 'Your full workflow at a glance.'}
+          </p>
         </div>
         <Link href="/dashboard/leads" className="btn-primary">
           <TrendingUp className="w-4 h-4" />
@@ -925,16 +927,27 @@ export default async function DashboardPage() {
           </div>
           {topLeads.length === 0 ? (
             <div className="py-12 text-center space-y-3">
-              <p className="text-sm text-slate-400">No leads yet — run a scan or check your Lead Feed to get started.</p>
-              <div className="flex items-center justify-center gap-3">
-                <Link href="/dashboard/scanner" className="text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors">
-                  Go to Scanner →
-                </Link>
-                <span className="text-slate-700">·</span>
-                <Link href="/dashboard/leads" className="text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors">
-                  Open Lead Feed →
-                </Link>
-              </div>
+              {isOwner ? (
+                <>
+                  <p className="text-sm text-slate-400">No leads yet — run a scan or check your Lead Feed to get started.</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <Link href="/dashboard/scanner" className="text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors">
+                      Go to Scanner →
+                    </Link>
+                    <span className="text-slate-700">·</span>
+                    <Link href="/dashboard/leads" className="text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors">
+                      Open Lead Feed →
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-400">Leads arrive weekly on Monday at 6:00 AM (Arizona time). Your first drop will appear here.</p>
+                  <Link href="/dashboard/leads" className="text-xs font-medium text-blue-500 hover:text-blue-400 transition-colors">
+                    Open Lead Feed →
+                  </Link>
+                </>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-slate-800">

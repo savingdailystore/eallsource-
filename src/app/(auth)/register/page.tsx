@@ -7,8 +7,8 @@ import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
 
 const FEATURES = [
   'Free starter access — no credit card required',
-  'Full lead engine with ROI calculator',
-  'Validation engine (95%+ confidence required)',
+  'Curated leads with ROI calculator (3/week on Starter)',
+  'Leads validated against live Amazon pricing & fees',
   'Inventory & repricing tools (Pro)',
 ];
 
@@ -51,7 +51,7 @@ export default function RegisterPage() {
       <h1 className="text-2xl font-bold text-slate-50 mb-1">Create your free account</h1>
       <p className="text-slate-400 text-sm mb-4">Free to start. No credit card required.</p>
 
-      <ul className="space-y-1 mb-6">
+      <ul className="space-y-1 mb-3">
         {FEATURES.map((f) => (
           <li key={f} className="flex items-center gap-2 text-xs text-slate-300">
             <Check className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
@@ -59,6 +59,9 @@ export default function RegisterPage() {
           </li>
         ))}
       </ul>
+      <p className="text-xs text-slate-500 mb-6">
+        You&apos;ll need an active Amazon Professional Seller account to use inventory, repricing, and Pro features.
+      </p>
 
       {error && (
         <div className="mb-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">

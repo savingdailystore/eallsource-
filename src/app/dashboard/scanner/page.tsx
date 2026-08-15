@@ -27,7 +27,7 @@ export default async function ScannerPage() {
     canManualLead = !!dbUser?.canManualLead;
   }
 
-  if (!isOwner && !canManualLead) redirect('/dashboard');
+  if (!isOwner && !canManualLead) redirect('/dashboard?scanner=unavailable');
 
   const orgId = session!.user.orgId;
 

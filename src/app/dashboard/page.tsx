@@ -22,7 +22,7 @@ import Link from 'next/link';
 import {
   TrendingUp, Package, Wallet, RefreshCw, ShieldCheck,
   ShoppingCart, ArrowUpRight, Flame, CheckCircle2, Clock,
-  AlertTriangle, BarChart3, DollarSign, CalendarClock, PartyPopper, X,
+  AlertTriangle, BarChart3, DollarSign, CalendarClock, PartyPopper, X, Info,
 } from 'lucide-react';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -33,15 +33,16 @@ export const metadata = { title: 'Dashboard' };
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ welcome?: string }>;
+  searchParams: Promise<{ welcome?: string; scanner?: string }>;
 }) {
   const [session, sp] = await Promise.all([auth(), searchParams]);
-  const orgId       = session!.user.orgId;
-  const role        = session!.user.role;
-  const plan        = session!.user.plan;
-  const isOwner     = role === 'OWNER';
-  const isPro       = plan === 'PRO' || plan === 'ENTERPRISE';
-  const showWelcome = sp.welcome === '1' && !isOwner;
+  const orgId          = session!.user.orgId;
+  const role           = session!.user.role;
+  const plan           = session!.user.plan;
+  const isOwner        = role === 'OWNER';
+  const isPro          = plan === 'PRO' || plan === 'ENTERPRISE';
+  const showWelcome    = sp.welcome === '1' && !isOwner;
+  const showScannerMsg = sp.scanner === 'unavailable' && !isOwner;
 
   const currentOrg = await prisma.organization.findUnique({
     where:  { id: orgId },
@@ -525,6 +526,39 @@ export default async function DashboardPage({
           View lead feed
         </Link>
       </div>
+
+      {/* ── Scanner unavailable message — non-owner redirected from /dashboard/scanner ── */}
+      {showScannerMsg && (
+        <section className="card p-5 border-slate-700 bg-slate-800/40">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-slate-700/60 flex items-center justify-center flex-shrink-0">
+              <Info className="w-5 h-5 text-slate-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-slate-50 text-sm">About the Scanner</p>
+              <p className="text-sm text-slate-400 mt-1 leading-relaxed">
+                Lead discovery is currently managed by EALLsource. Your curated leads will appear in the
+                Lead Feed when available. Scanner access is limited to the EALLsource operator workflow.
+              </p>
+              <div className="flex flex-wrap items-center gap-4 mt-3">
+                <Link href="/dashboard/leads" className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">
+                  View Lead Feed →
+                </Link>
+                <Link href="/dashboard/help" className="text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors">
+                  Read Help Guide →
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="ml-auto flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  Got it
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Welcome banner — new non-owner customers with no leads and no Amazon connection ── */}
       {!isOwner && leadsRaw.length === 0 && !amazonConnected && (

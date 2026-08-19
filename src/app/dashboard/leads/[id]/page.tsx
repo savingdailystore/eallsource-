@@ -29,6 +29,7 @@ import { OpportunityTimeline } from '@/components/leads/OpportunityTimeline';
 import { RiskBreakdownPanel } from '@/components/leads/RiskBreakdownPanel';
 import { HistoricalInsights } from '@/components/leads/HistoricalInsights';
 import { CreateOrderModal } from '@/components/orders/CreateOrderModal';
+import { FeeRefreshButton } from '@/components/leads/FeeRefreshButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -445,6 +446,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 />
               </div>
             </div>
+            {session!.user.role === 'OWNER' && (
+              <div className="mt-4 pt-4 border-t border-slate-800">
+                <FeeRefreshButton leadId={lead.id} />
+              </div>
+            )}
           </div>
         </div>
       </div>

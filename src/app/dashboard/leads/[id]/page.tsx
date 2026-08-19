@@ -30,6 +30,7 @@ import { RiskBreakdownPanel } from '@/components/leads/RiskBreakdownPanel';
 import { HistoricalInsights } from '@/components/leads/HistoricalInsights';
 import { CreateOrderModal } from '@/components/orders/CreateOrderModal';
 import { FeeRefreshButton } from '@/components/leads/FeeRefreshButton';
+import { canShowFeeRefreshButton } from '@/lib/canShowFeeRefreshButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -446,7 +447,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 />
               </div>
             </div>
-            {session!.user.role === 'OWNER' && (
+            {canShowFeeRefreshButton({ role: session!.user.role, isBroadcastSource }) && (
               <div className="mt-4 pt-4 border-t border-slate-800">
                 <FeeRefreshButton leadId={lead.id} />
               </div>

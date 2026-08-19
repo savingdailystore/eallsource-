@@ -74,19 +74,24 @@ export function FeeRefreshButton({ leadId }: FeeRefreshButtonProps) {
   const msg = result ? statusMessage(result) : null;
 
   return (
-    <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={handleRefresh}
-        disabled={loading}
-        className="btn-secondary text-xs py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-        {loading ? 'Refreshing…' : 'Refresh Amazon Fees'}
-      </button>
-      {msg && (
-        <span className={`text-xs ${msg.cls}`}>{msg.text}</span>
-      )}
+    <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={loading}
+          className="btn-secondary text-xs py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Refreshing…' : 'Refresh Amazon Fees'}
+        </button>
+        {msg && (
+          <span className={`text-xs ${msg.cls}`}>{msg.text}</span>
+        )}
+      </div>
+      <p className="text-[10px] text-slate-500 leading-relaxed">
+        Refresh uses the current stored Amazon price and may update displayed profit and ROI. It does not refresh buy box price.
+      </p>
     </div>
   );
 }
